@@ -1,0 +1,2 @@
+This is a project to determine the relative speed of a very simple 2D
+incompressible Navier-Stokes solver in C and python.
