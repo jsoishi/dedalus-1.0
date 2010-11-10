@@ -1,8 +1,13 @@
+#include <stdlib.h>
 #include <math.h>
 #include <stdio.h>
 #include <fftw3.h>
-#include <stdlib.h>
+
+
+/* this isn't really right. but it will work for now if you define a local variable called N_j... */
 #define index(i,j) (j+N_j*i)
+#define GOOD_STEP 0
+#define BAD_STEP  1
 
 typedef struct {
   int N_i, N_j, N_ik, N_jk;
@@ -10,6 +15,9 @@ typedef struct {
   /* double *xspace; */
   fftw_complex *xspace;
   fftw_complex *kspace;
+  fftw_plan fwd_plan, rev_plan;
+  double *kx;
+  double *ky;
 } field;
 
 void write_data(FILE *file, fftw_complex *data, int N) {
@@ -76,12 +84,22 @@ field *create_field(char *name, int N_i, int N_j) {
   new_field->name = name;
   new_field->N_i = N_i;
   new_field->N_j = N_j;
-
+  
   return new_field;
 }
 
 void init_field(field *new_field) {
   printf("Initializing field %s with N_i = %i, N_j = %i...\n",new_field->name,new_field->N_i, new_field->N_j);
+
+  /* allocate and set up k */
+  int i, j;
+  new_field->kx = (double *) malloc(sizeof(double) * new_field->N_i);
+  new_field->ky = (double *) malloc(sizeof(double) * new_field->N_j);
+  for (i = 0; i < new_field->N_i; ++i)
+    new_field->kx[i] = 2*M_PI*i;
+  for (j = 0; i < new_field->N_j; ++j)
+    new_field->ky[j] = 2*M_PI*j;
+
   /* Allocate memory for the real and k space data */
   new_field->kspace = (fftw_complex *) fftw_malloc(sizeof(fftw_complex) * new_field->N_i
                                                    * new_field->N_j);
@@ -90,7 +108,107 @@ void init_field(field *new_field) {
   new_field->xspace = (fftw_complex *) fftw_malloc(sizeof(fftw_complex) * new_field->N_i
                                                    * new_field->N_j);
 
+  /* construct fftw plans */
+  new_field->fwd_plan = fftw_plan_dft_2d(new_field->N_i, new_field->N_j, new_field->kspace, new_field->xspace, FFTW_FORWARD, FFTW_ESTIMATE);
+  new_field->rev_plan = fftw_plan_dft_2d(new_field->N_i, new_field->N_j, new_field->xspace, new_field->kspace, FFTW_BACKWARD, FFTW_ESTIMATE);
+
   return;
+}
+
+void destroy_field(field *field) {
+  free(field->kspace);
+  free(field->xspace);
+}
+
+int evolve_hydro_rk2(double dt, field *vx, field *vy) {
+  /* take a hydro timestep */
+
+  
+  
+
+  return GOOD_STEP;
+}
+
+int vgradv(field *vx, field *vy, field *vgradvx, field *vgradvy) {
+  /* compute non-linear term */
+  /* WARNING: DEALIASING IS NOT YET IMPLEMENTED!!! SOLUTIONS ARE FULLY ALIASED! */
+
+  int i, j, N_j = vx->N_j;
+  field *dvxhatdx = create_field("dvxdx",vx->N_i, vx->N_j);
+  field *dvyhatdx = create_field("dvydx",vy->N_i, vy->N_j);
+  field *dvxhatdy = create_field("dvxdy",vx->N_i, vx->N_j);
+  field *dvyhatdy = create_field("dvydy",vy->N_i, vy->N_j);
+  init_field(dvxhatdx);
+  init_field(dvyhatdx);
+  init_field(dvxhatdy);
+  init_field(dvyhatdy);
+
+  dfhatdx(vx, dvxhatdx);
+  dfhatdx(vy, dvyhatdx);
+  dfhatdy(vx, dvxhatdy);
+  dfhatdy(vy, dvyhatdy);
+
+  /* compute vx, vy from kspace */
+  fftw_execute(vx->fwd_plan);
+  fftw_execute(vy->fwd_plan);
+
+  /* compute dvx,dvy from kspace */
+  fftw_execute(dvxhatdx->fwd_plan);
+  fftw_execute(dvyhatdx->fwd_plan);
+  fftw_execute(dvxhatdy->fwd_plan);
+  fftw_execute(dvyhatdy->fwd_plan);
+
+  /* compute v.grad(v) in real space */
+  for (j = 0; j < vx->N_j; ++j)
+    for (i = 0; i < vx->N_i; ++i) {
+      vgradvx->xspace[index(i,j)][0] = vx->xspace[index(i,j)][0] * dvxhatdx->xspace[index(i,j)][0] + vy->xspace[index(i,j)][0] * dvxhatdy->xspace[index(i,j)][0];
+      vgradvy->xspace[index(i,j)][0] = vx->xspace[index(i,j)][0] * dvyhatdx->xspace[index(i,j)][0] + vy->xspace[index(i,j)][0] * dvyhatdy->xspace[index(i,j)][0];
+    }
+
+  /* return to kspace */
+  fftw_execute(vgradvx->fwd_plan);
+  fftw_execute(vgradvy->fwd_plan);
+
+  destroy_field(dvxhatdx);
+  destroy_field(dvyhatdx);
+  destroy_field(dvxhatdy);
+  destroy_field(dvyhatdy);
+
+  return GOOD_STEP;
+}
+
+int dfhatdx(field *f, field *dfhatdx) {
+  /* compute kspace derivative */
+  int i, j, N_j = f->N_j;
+
+  for (j = 1; j < f->N_j; ++j)
+    for (i = 1; i < f->N_j; ++i) {
+      if (f->kx[i] != 0) {
+        dfhatdx->kspace[index(i,j)][0] = -f->kspace[index(i,j)][1]/f->kx[i]; /* real */
+        dfhatdx->kspace[index(i,j)][1] = f->kspace[index(i,j)][0]/f->kx[i];  /* imag */
+      } else {
+        dfhatdx = 0;
+      }
+    }
+
+  return GOOD_STEP;
+}
+
+int dfhatdy(field *f, field *dfhatdy) {
+  /* compute kspace derivative */
+  int i, j, N_j = f->N_j;
+
+  for (j = 1; j < f->N_j; ++j)
+    for (i = 1; i < f->N_j; ++i) {
+      if (f->kx[i] != 0) {
+        dfhatdy->kspace[index(i,j)][0] = -f->kspace[index(i,j)][1]/f->ky[j]; /* real */
+        dfhatdy->kspace[index(i,j)][1] = f->kspace[index(i,j)][0]/f->ky[j];  /* imag */
+      } else {
+        dfhatdy = 0;
+      }
+    }
+
+  return GOOD_STEP;
 }
 
 int main() {
@@ -104,13 +222,12 @@ int main() {
   init_field(vx);
   init_field(vy);
   tg_setup_2d(vx,vy);
-  vx_plan = fftw_plan_dft_2d(vx->N_i, vx->N_j, vx->kspace, vx->xspace, FFTW_FORWARD, FFTW_ESTIMATE);
   FILE *koutput;
   koutput = fopen("vx_tg_kspace.dat","w");
 
   write_field_kspace(koutput,vx);
   close(koutput);
-  fftw_execute(vx_plan);
+  fftw_execute(vx->fwd_plan);
 
   FILE *output;
   output = fopen("vx_tg_real.dat","w");
