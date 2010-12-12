@@ -118,14 +118,35 @@ void init_field(field *new_field) {
 void destroy_field(field *field) {
   free(field->kspace);
   free(field->xspace);
+  fftw_destroy_plan(field->fwd_plan);
+  fftw_destroy_plan(field->rev_plan);
 }
 
 int evolve_hydro_rk2(double dt, field *vx, field *vy) {
-  /* take a hydro timestep */
+  /* take a Runge-Kutta-2 hydro timestep */
+
+  /* 
+     f_n+1/2 = (f_n + f_n+1)/2 = (f_n + f_n + h*RHS_n)/2 = f_n + h/2*RHS_n
+     RHS_n+1/2 = RHS(f_n+1/2) = RHS(f_n) + h/2 * RHS(RHS_n)
+     f_n+1 = f_n + h*RHS_n+1/2
+   */
+
+  /* from NR:
+     k1 = h * RHS(x_n, y_n)
+     k2 = h * RHS(x_n + 1/2*h, y_n + 1/2*k1)
+     y_n+1 = y_n + k2 +O(h**3)
+   */
 
   
-  
 
+  return GOOD_STEP;
+}
+
+int pressure(field *vx, field *vy, field *pressure) {
+  
+  /* i/k FFT(d_j u_i  d_i u _j)
+
+   */
   return GOOD_STEP;
 }
 
@@ -215,7 +236,6 @@ int main() {
   int N_i = 100, N_j = 100;
 
   field *vx, *vy;
-  fftw_plan vx_plan;
   vx = create_field("x-velocity",N_i,N_j);
   vy = create_field("y-velocity",N_i,N_j);
 
@@ -234,7 +254,5 @@ int main() {
   write_field_xspace(output,vx);
   close(output);
 
-  fftw_destroy_plan(vx_plan);
   return 0;
-
 }
