@@ -136,17 +136,62 @@ int evolve_hydro_rk2(double dt, field *vx, field *vy) {
      k2 = h * RHS(x_n + 1/2*h, y_n + 1/2*k1)
      y_n+1 = y_n + k2 +O(h**3)
    */
+  int i, j, N_j = vx->N_j;  
+  field *RHS_x = create_field("RHS_x",vx->N_i, vx->N_j);
+  field *RHS_y = create_field("RHS_y",vy->N_i, vy->N_j);
+  field *vx1 = create_field("vx1",vx->N_i, vx->N_j);
+  field *vy1 = create_field("vy1",vx->N_i, vx->N_j);
 
+  /* first step */
+  RHS(vx, vy, RHS_x, RHS_y);
+  for (j = 0; j < pressure->N_j; ++j)
+    for (i = 0; i < pressure->N_i; ++i) {
+      vx1->kspace[index(i,j)][0] = vx->kspace[index(i,j)][0] + dt*RHS_x->kspace[index(i,j)][0]
+      vx1->kspace[index(i,j)][1] = vx->kspace[index(i,j)][1] + dt*RHS_x->kspace[index(i,j)][1]
+      vy1->kspace[index(i,j)][0] = vy->kspace[index(i,j)][0] + dt*RHS_y->kspace[index(i,j)][0]
+      vy1->kspace[index(i,j)][1] = vy->kspace[index(i,j)][1] + dt*RHS_y->kspace[index(i,j)][1]
+    }  
+
+  RHS(vx1, vy1, RHS_x, RHS_y);
   
 
   return GOOD_STEP;
 }
 
-int pressure(field *vx, field *vy, field *pressure) {
+int RHS(field *vx, field *vy, field *RHS_x, field * RHS_y) {
+  /* i hate C */
+
+  int i, j, N_j = vx->N_j;  
+  field *vgradvx = create_field("vgradvx",vx->N_i, vx->N_j);
+  field *vgradvy = create_field("vgradvy",vy->N_i, vy->N_j);
+  field *pressure = create_field("pressure",vy->N_i, vy->N_j);
+  
+  vgradv(vx, vy, vgradvx, vgradvy);
+  pressure(vgradvx, vgradvy, pressure);
+
+  for (j = 0; j < pressure->N_j; ++j)
+    for (i = 0; i < pressure->N_i; ++i) {
+      RHS_x->kspace[index(i,j)] = -vgradvx->kspace[index(i,j)] + pressure->kspace[index(i,j)]*pressure->kx[i];
+      RHS_y->kspace[index(i,j)] = -vgradvy->kspace[index(i,j)] + pressure->kspace[index(i,j)]*pressure->ky[i];
+    }
+  return RHS;
+
+}
+
+int pressure(field *vgradvx, field *vgradvy, field *pressure) {
   
   /* i/k FFT(d_j u_i  d_i u _j)
 
    */
+  int i, j, N_j = pressure->N_j;  
+  double ksquared;
+  for (j = 0; j < pressure->N_j; ++j)
+    for (i = 0; i < pressure->N_i; ++i) {
+      ksquared = pressure->kx[i]*pressure->kx[i] 
+        + pressure->ky[j]*pressure->ky[j];
+      pressure->kspace[index(i,j)][0] = pressure->kx[i]*vgradvx->kspace[index(i,j)][1] + pressure->ky[i]*vgradvy->kspace[index(i,j)][1];
+      pressure->kspace[index(i,j)][1] = pressure->kx[i]*vgradvx->kspace[index(i,j)][0] + pressure->ky[i]*vgradvy->kspace[index(i,j)][0];
+    }
   return GOOD_STEP;
 }
 
