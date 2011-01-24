@@ -9,6 +9,8 @@
 #define GOOD_STEP 0
 #define BAD_STEP  1
 
+int debug = 0;
+
 typedef struct {
   int N_i, N_j, N_ik, N_jk;
   char *name;
@@ -89,7 +91,8 @@ field *create_field(char *name, int N_i, int N_j) {
 }
 
 void init_field(field *new_field) {
-  printf("Initializing field %s with N_i = %i, N_j = %i...\n",new_field->name,new_field->N_i, new_field->N_j);
+  if (debug)
+    printf("Initializing field %s with N_i = %i, N_j = %i...\n",new_field->name,new_field->N_i, new_field->N_j);
 
   /* allocate and set up k */
   int i, j;
@@ -141,20 +144,32 @@ int evolve_hydro_rk2(double dt, field *vx, field *vy) {
   field *RHS_y = create_field("RHS_y",vy->N_i, vy->N_j);
   field *vx1 = create_field("vx1",vx->N_i, vx->N_j);
   field *vy1 = create_field("vy1",vx->N_i, vx->N_j);
-
+  init_field(RHS_x);
+  init_field(RHS_y);
+  init_field(vx1);
+  init_field(vy1);
   /* first step */
   RHS(vx, vy, RHS_x, RHS_y);
-  for (j = 0; j < pressure->N_j; ++j)
-    for (i = 0; i < pressure->N_i; ++i) {
-      vx1->kspace[index(i,j)][0] = vx->kspace[index(i,j)][0] + dt*RHS_x->kspace[index(i,j)][0]
-      vx1->kspace[index(i,j)][1] = vx->kspace[index(i,j)][1] + dt*RHS_x->kspace[index(i,j)][1]
-      vy1->kspace[index(i,j)][0] = vy->kspace[index(i,j)][0] + dt*RHS_y->kspace[index(i,j)][0]
-      vy1->kspace[index(i,j)][1] = vy->kspace[index(i,j)][1] + dt*RHS_y->kspace[index(i,j)][1]
+  for (j = 0; j < vx->N_j; ++j)
+    for (i = 0; i < vx->N_i; ++i) {
+      vx1->kspace[index(i,j)][0] = vx->kspace[index(i,j)][0] + dt/2.*RHS_x->kspace[index(i,j)][0];
+      vx1->kspace[index(i,j)][1] = vx->kspace[index(i,j)][1] + dt/2.*RHS_x->kspace[index(i,j)][1];
+      vy1->kspace[index(i,j)][0] = vy->kspace[index(i,j)][0] + dt/2.*RHS_y->kspace[index(i,j)][0];
+      vy1->kspace[index(i,j)][1] = vy->kspace[index(i,j)][1] + dt/2.*RHS_y->kspace[index(i,j)][1];
     }  
 
   RHS(vx1, vy1, RHS_x, RHS_y);
-  
-
+  for (j = 0; j < vx->N_j; ++j)
+    for (i = 0; i < vx->N_i; ++i) {
+      vx->kspace[index(i,j)][0] = vx->kspace[index(i,j)][0] + dt*RHS_x->kspace[index(i,j)][0];
+      vx->kspace[index(i,j)][1] = vx->kspace[index(i,j)][1] + dt*RHS_x->kspace[index(i,j)][1];
+      vy->kspace[index(i,j)][0] = vy->kspace[index(i,j)][0] + dt*RHS_y->kspace[index(i,j)][0];
+      vy->kspace[index(i,j)][1] = vy->kspace[index(i,j)][1] + dt*RHS_y->kspace[index(i,j)][1];
+    }
+  destroy_field(vx1);
+  destroy_field(vy1);
+  destroy_field(RHS_x);
+  destroy_field(RHS_y);
   return GOOD_STEP;
 }
 
@@ -165,20 +180,29 @@ int RHS(field *vx, field *vy, field *RHS_x, field * RHS_y) {
   field *vgradvx = create_field("vgradvx",vx->N_i, vx->N_j);
   field *vgradvy = create_field("vgradvy",vy->N_i, vy->N_j);
   field *pressure = create_field("pressure",vy->N_i, vy->N_j);
-  
+  init_field(vgradvx);
+  init_field(vgradvy);
+  init_field(pressure);
+
   vgradv(vx, vy, vgradvx, vgradvy);
-  pressure(vgradvx, vgradvy, pressure);
+  calc_pressure(vgradvx, vgradvy, pressure);
 
   for (j = 0; j < pressure->N_j; ++j)
     for (i = 0; i < pressure->N_i; ++i) {
-      RHS_x->kspace[index(i,j)] = -vgradvx->kspace[index(i,j)] + pressure->kspace[index(i,j)]*pressure->kx[i];
-      RHS_y->kspace[index(i,j)] = -vgradvy->kspace[index(i,j)] + pressure->kspace[index(i,j)]*pressure->ky[i];
+      RHS_x->kspace[index(i,j)][0] = pressure->kspace[index(i,j)][0]*pressure->kx[i] - vgradvx->kspace[index(i,j)][0];
+      RHS_x->kspace[index(i,j)][0] = pressure->kspace[index(i,j)][1]*pressure->kx[i] - vgradvx->kspace[index(i,j)][1];
+      RHS_y->kspace[index(i,j)][0] = pressure->kspace[index(i,j)][0]*pressure->ky[i] - vgradvy->kspace[index(i,j)][0];
+      RHS_y->kspace[index(i,j)][0] = pressure->kspace[index(i,j)][1]*pressure->ky[i] - vgradvy->kspace[index(i,j)][1];
     }
-  return RHS;
 
+  destroy_field(vgradvx);
+  destroy_field(vgradvy);
+  destroy_field(pressure);
+
+  return GOOD_STEP;
 }
 
-int pressure(field *vgradvx, field *vgradvy, field *pressure) {
+int calc_pressure(field *vgradvx, field *vgradvy, field *pressure) {
   
   /* i/k FFT(d_j u_i  d_i u _j)
 
@@ -225,12 +249,14 @@ int vgradv(field *vx, field *vy, field *vgradvx, field *vgradvy) {
   fftw_execute(dvyhatdy->fwd_plan);
 
   /* compute v.grad(v) in real space */
-  for (j = 0; j < vx->N_j; ++j)
+
+  for (j = 0; j < vx->N_j; ++j) {
     for (i = 0; i < vx->N_i; ++i) {
+      fflush(stdout);
       vgradvx->xspace[index(i,j)][0] = vx->xspace[index(i,j)][0] * dvxhatdx->xspace[index(i,j)][0] + vy->xspace[index(i,j)][0] * dvxhatdy->xspace[index(i,j)][0];
       vgradvy->xspace[index(i,j)][0] = vx->xspace[index(i,j)][0] * dvyhatdx->xspace[index(i,j)][0] + vy->xspace[index(i,j)][0] * dvyhatdy->xspace[index(i,j)][0];
     }
-
+  }
   /* return to kspace */
   fftw_execute(vgradvx->fwd_plan);
   fftw_execute(vgradvy->fwd_plan);
@@ -293,6 +319,18 @@ int main() {
   write_field_kspace(koutput,vx);
   close(koutput);
   fftw_execute(vx->fwd_plan);
+
+  /* main loop */
+  double t = 0, dt=0.01;
+  double t_stop = 1;
+  int it = 0;
+  while (t < t_stop) {
+    printf("step %i\n", it);
+    evolve_hydro_rk2(dt,vx,vy);
+    
+    t += dt;
+    it++;
+  }
 
   FILE *output;
   output = fopen("vx_tg_real.dat","w");
