@@ -321,10 +321,10 @@ int main() {
   fftw_execute(vx->fwd_plan);
 
   /* main loop */
-  double t = 0, dt=0.01;
+  double t = 0, dt=1e-4;
   double t_stop = 1;
-  int it = 0;
-  while (t < t_stop) {
+  int it = 0, i_stop = 2;
+  while (t < t_stop && it < i_stop) {
     printf("step %i\n", it);
     evolve_hydro_rk2(dt,vx,vy);
     
@@ -335,6 +335,7 @@ int main() {
   FILE *output;
   output = fopen("vx_tg_real.dat","w");
   write_field_xspace(output,vx);
+  write_field_xspace(koutput,vx);
   close(output);
 
   return 0;
