@@ -306,11 +306,12 @@ int main() {
   init_field(vx);
   init_field(vy);
   tg_setup_2d(vx,vy);
-  FILE *koutput;
-
+  FILE *koutput, *output;
+  output = fopen("vx_tg_real_0.dat","w");
   koutput = fopen("vx_tg_kspace_0.dat","w");
 
   write_field_kspace(koutput,vx);
+  write_field_xspace(output,vx);
   close(koutput);
   fftw_execute(vx->fwd_plan);
 
@@ -330,7 +331,6 @@ int main() {
   vxhat = create_field("x-der",N_i,N_j);
   init_field(vxhat);
   dfhatdy(vx,vxhat);
-  FILE *output;
   output = fopen("vx_tg_real.dat","w");
   koutput = fopen("vx_tg_kspace.dat","w");
   write_field_xspace(output,vxhat);
