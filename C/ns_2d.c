@@ -319,22 +319,18 @@ int main() {
   double t = 0, dt=1e-4;
   double t_stop = 1;
   int it = 0, i_stop = 2;
-  /* while (t < t_stop && it < i_stop) { */
-  /*   printf("step %i\n", it); */
-  /*   evolve_hydro_rk2(dt,vx,vy); */
+  while (t < t_stop && it < i_stop) {
+    printf("step %i\n", it);
+    evolve_hydro_rk2(dt,vx,vy);
     
-  /*   t += dt; */
-  /*   it++; */
-  /* } */
+    t += dt;
+    it++;
+  }
 
-  field *vxhat;
-  vxhat = create_field("x-der",N_i,N_j);
-  init_field(vxhat);
-  dfhatdy(vx,vxhat);
   output = fopen("vx_tg_real.dat","w");
   koutput = fopen("vx_tg_kspace.dat","w");
-  write_field_xspace(output,vxhat);
-  write_field_kspace(koutput,vxhat);
+  write_field_xspace(output,vx);
+  write_field_kspace(koutput,vx);
   close(output);
   close(koutput);
 
