@@ -29,6 +29,7 @@ void write_data(FILE *file, fftw_complex *data, int N) {
 }
 
 void write_field_xspace(FILE *file, field *field) {
+  fftw_execute(field->fwd_plan);
   int i,j, N_j;
   N_j = field->N_j;
   for (j = 0; j < field->N_j; j++) {
@@ -100,9 +101,9 @@ void init_field(field *new_field) {
   new_field->ky = (double *) malloc(sizeof(double) * new_field->N_j);
   for (i = 0; i < new_field->N_i; ++i)
     new_field->kx[i] = 2*M_PI*i;
-  for (j = 0; i < new_field->N_j; ++j)
+  for (j = 0; j < new_field->N_j; ++j) {
     new_field->ky[j] = 2*M_PI*j;
-
+  }
   /* Allocate memory for the real and k space data */
   new_field->kspace = (fftw_complex *) fftw_malloc(sizeof(fftw_complex) * new_field->N_i
                                                    * new_field->N_j);
@@ -190,9 +191,9 @@ int RHS(field *vx, field *vy, field *RHS_x, field * RHS_y) {
   for (j = 0; j < pressure->N_j; ++j)
     for (i = 0; i < pressure->N_i; ++i) {
       RHS_x->kspace[index(i,j)][0] = pressure->kspace[index(i,j)][0]*pressure->kx[i] - vgradvx->kspace[index(i,j)][0];
-      RHS_x->kspace[index(i,j)][0] = pressure->kspace[index(i,j)][1]*pressure->kx[i] - vgradvx->kspace[index(i,j)][1];
+      RHS_x->kspace[index(i,j)][1] = pressure->kspace[index(i,j)][1]*pressure->kx[i] - vgradvx->kspace[index(i,j)][1];
       RHS_y->kspace[index(i,j)][0] = pressure->kspace[index(i,j)][0]*pressure->ky[i] - vgradvy->kspace[index(i,j)][0];
-      RHS_y->kspace[index(i,j)][0] = pressure->kspace[index(i,j)][1]*pressure->ky[i] - vgradvy->kspace[index(i,j)][1];
+      RHS_y->kspace[index(i,j)][1] = pressure->kspace[index(i,j)][1]*pressure->ky[i] - vgradvy->kspace[index(i,j)][1];
     }
 
   destroy_field(vgradvx);
@@ -258,8 +259,8 @@ int vgradv(field *vx, field *vy, field *vgradvx, field *vgradvy) {
     }
   }
   /* return to kspace */
-  fftw_execute(vgradvx->fwd_plan);
-  fftw_execute(vgradvy->fwd_plan);
+  fftw_execute(vgradvx->rev_plan);
+  fftw_execute(vgradvy->rev_plan);
 
   destroy_field(dvxhatdx);
   destroy_field(dvyhatdx);
@@ -275,12 +276,8 @@ int dfhatdx(field *f, field *dfhatdx) {
 
   for (j = 1; j < f->N_j; ++j)
     for (i = 1; i < f->N_j; ++i) {
-      if (f->kx[i] != 0) {
-        dfhatdx->kspace[index(i,j)][0] = -f->kspace[index(i,j)][1]/f->kx[i]; /* real */
-        dfhatdx->kspace[index(i,j)][1] = f->kspace[index(i,j)][0]/f->kx[i];  /* imag */
-      } else {
-        dfhatdx = 0;
-      }
+      dfhatdx->kspace[index(i,j)][0] = -f->kspace[index(i,j)][1]*f->kx[i]; /* real */
+      dfhatdx->kspace[index(i,j)][1] = f->kspace[index(i,j)][0]*f->kx[i];  /* imag */
     }
 
   return GOOD_STEP;
@@ -292,12 +289,8 @@ int dfhatdy(field *f, field *dfhatdy) {
 
   for (j = 1; j < f->N_j; ++j)
     for (i = 1; i < f->N_j; ++i) {
-      if (f->kx[i] != 0) {
-        dfhatdy->kspace[index(i,j)][0] = -f->kspace[index(i,j)][1]/f->ky[j]; /* real */
-        dfhatdy->kspace[index(i,j)][1] = f->kspace[index(i,j)][0]/f->ky[j];  /* imag */
-      } else {
-        dfhatdy = 0;
-      }
+      dfhatdy->kspace[index(i,j)][0] = -f->kspace[index(i,j)][1]*f->ky[j]; /* real */
+      dfhatdy->kspace[index(i,j)][1] = f->kspace[index(i,j)][0]*f->ky[j];  /* imag */
     }
 
   return GOOD_STEP;
@@ -314,7 +307,8 @@ int main() {
   init_field(vy);
   tg_setup_2d(vx,vy);
   FILE *koutput;
-  koutput = fopen("vx_tg_kspace.dat","w");
+
+  koutput = fopen("vx_tg_kspace_0.dat","w");
 
   write_field_kspace(koutput,vx);
   close(koutput);
@@ -324,19 +318,25 @@ int main() {
   double t = 0, dt=1e-4;
   double t_stop = 1;
   int it = 0, i_stop = 2;
-  while (t < t_stop && it < i_stop) {
-    printf("step %i\n", it);
-    evolve_hydro_rk2(dt,vx,vy);
+  /* while (t < t_stop && it < i_stop) { */
+  /*   printf("step %i\n", it); */
+  /*   evolve_hydro_rk2(dt,vx,vy); */
     
-    t += dt;
-    it++;
-  }
+  /*   t += dt; */
+  /*   it++; */
+  /* } */
 
+  field *vxhat;
+  vxhat = create_field("x-der",N_i,N_j);
+  init_field(vxhat);
+  dfhatdy(vx,vxhat);
   FILE *output;
   output = fopen("vx_tg_real.dat","w");
-  write_field_xspace(output,vx);
-  write_field_xspace(koutput,vx);
+  koutput = fopen("vx_tg_kspace.dat","w");
+  write_field_xspace(output,vxhat);
+  write_field_kspace(koutput,vxhat);
   close(output);
+  close(koutput);
 
   return 0;
 }
