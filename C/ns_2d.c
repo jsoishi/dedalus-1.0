@@ -126,6 +126,21 @@ void destroy_field(field *field) {
   fftw_destroy_plan(field->rev_plan);
 }
 
+int field_execute(field *field, int dir) {
+  int i;
+  if (dir == FFTW_FORWARD)
+    fftw_execute(field->fwd_plan);
+  if (dir == FFTW_BACKWARD) {
+    fftw_execute(field->rev_plan);
+    int N = field->N_i*field->N_j;
+    for (i = 0; i < N; ++i) {
+      field->kspace[i][0] /= (N*N);
+      field->kspace[i][1] /= (N*N);
+    }
+  }
+  
+}
+
 int evolve_hydro_rk2(double dt, field *vx, field *vy) {
   /* take a Runge-Kutta-2 hydro timestep */
 
@@ -190,10 +205,10 @@ int RHS(field *vx, field *vy, field *RHS_x, field * RHS_y) {
 
   for (j = 0; j < pressure->N_j; ++j)
     for (i = 0; i < pressure->N_i; ++i) {
-      RHS_x->kspace[index(i,j)][0] = pressure->kspace[index(i,j)][0]*pressure->kx[i] - vgradvx->kspace[index(i,j)][0];
-      RHS_x->kspace[index(i,j)][1] = pressure->kspace[index(i,j)][1]*pressure->kx[i] - vgradvx->kspace[index(i,j)][1];
-      RHS_y->kspace[index(i,j)][0] = pressure->kspace[index(i,j)][0]*pressure->ky[i] - vgradvy->kspace[index(i,j)][0];
-      RHS_y->kspace[index(i,j)][1] = pressure->kspace[index(i,j)][1]*pressure->ky[i] - vgradvy->kspace[index(i,j)][1];
+      RHS_x->kspace[index(i,j)][0] = -pressure->kspace[index(i,j)][1]*pressure->kx[i] - vgradvx->kspace[index(i,j)][0];
+      RHS_x->kspace[index(i,j)][1] = -pressure->kspace[index(i,j)][0]*pressure->kx[i] - vgradvx->kspace[index(i,j)][1];
+      RHS_y->kspace[index(i,j)][0] = -pressure->kspace[index(i,j)][1]*pressure->ky[i] - vgradvy->kspace[index(i,j)][0];
+      RHS_y->kspace[index(i,j)][1] = -pressure->kspace[index(i,j)][0]*pressure->ky[i] - vgradvy->kspace[index(i,j)][1];
     }
 
   destroy_field(vgradvx);
@@ -214,8 +229,11 @@ int calc_pressure(field *vgradvx, field *vgradvy, field *pressure) {
     for (i = 0; i < pressure->N_i; ++i) {
       ksquared = pressure->kx[i]*pressure->kx[i] 
         + pressure->ky[j]*pressure->ky[j];
-      pressure->kspace[index(i,j)][0] = pressure->kx[i]*vgradvx->kspace[index(i,j)][1] + pressure->ky[i]*vgradvy->kspace[index(i,j)][1];
-      pressure->kspace[index(i,j)][1] = pressure->kx[i]*vgradvx->kspace[index(i,j)][0] + pressure->ky[i]*vgradvy->kspace[index(i,j)][0];
+      if (ksquared == 0) {
+          ksquared = 1;
+        }
+      pressure->kspace[index(i,j)][0] = (pressure->kx[i]*vgradvx->kspace[index(i,j)][1] + pressure->ky[i]*vgradvy->kspace[index(i,j)][1])/ksquared;
+      pressure->kspace[index(i,j)][1] = (pressure->kx[i]*vgradvx->kspace[index(i,j)][0] + pressure->ky[i]*vgradvy->kspace[index(i,j)][0])/ksquared;
     }
   return GOOD_STEP;
 }
@@ -240,27 +258,29 @@ int vgradv(field *vx, field *vy, field *vgradvx, field *vgradvy) {
   dfhatdy(vy, dvyhatdy);
 
   /* compute vx, vy from kspace */
-  fftw_execute(vx->fwd_plan);
-  fftw_execute(vy->fwd_plan);
+  field_execute(vx, FFTW_FORWARD);
+  field_execute(vy, FFTW_FORWARD);
 
   /* compute dvx,dvy from kspace */
-  fftw_execute(dvxhatdx->fwd_plan);
-  fftw_execute(dvyhatdx->fwd_plan);
-  fftw_execute(dvxhatdy->fwd_plan);
-  fftw_execute(dvyhatdy->fwd_plan);
+  field_execute(dvxhatdx, FFTW_FORWARD);
+  field_execute(dvyhatdx, FFTW_FORWARD);
+  field_execute(dvxhatdy, FFTW_FORWARD);
+  field_execute(dvyhatdy, FFTW_FORWARD);
 
   /* compute v.grad(v) in real space */
 
   for (j = 0; j < vx->N_j; ++j) {
     for (i = 0; i < vx->N_i; ++i) {
-      fflush(stdout);
+      /* fflush(stdout); */
       vgradvx->xspace[index(i,j)][0] = vx->xspace[index(i,j)][0] * dvxhatdx->xspace[index(i,j)][0] + vy->xspace[index(i,j)][0] * dvxhatdy->xspace[index(i,j)][0];
+      vgradvx->xspace[index(i,j)][1] = 0;
       vgradvy->xspace[index(i,j)][0] = vx->xspace[index(i,j)][0] * dvyhatdx->xspace[index(i,j)][0] + vy->xspace[index(i,j)][0] * dvyhatdy->xspace[index(i,j)][0];
+      vgradvy->xspace[index(i,j)][1] = 0;
     }
   }
   /* return to kspace */
-  fftw_execute(vgradvx->rev_plan);
-  fftw_execute(vgradvy->rev_plan);
+  field_execute(vgradvx,FFTW_BACKWARD);
+  field_execute(vgradvy,FFTW_BACKWARD);
 
   destroy_field(dvxhatdx);
   destroy_field(dvyhatdx);
@@ -313,7 +333,7 @@ int main() {
   write_field_kspace(koutput,vx);
   write_field_xspace(output,vx);
   close(koutput);
-  fftw_execute(vx->fwd_plan);
+  field_execute(vx, FFTW_FORWARD);
 
   /* main loop */
   double t = 0, dt=1e-4;
