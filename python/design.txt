@@ -1,0 +1,50 @@
+Objects
+-------
+
+* Fields
+   -- xspace representation
+   -- kspace representation
+   -- name
+
+* representation
+  -- fftw plan
+  -- pointer to data 
+
+   -- subclass: xspace
+   -- subclass: kspace
+
+* Physics
+   -- subclass: MHD
+   -- subclass: shear
+   -- subclass: anelastic
+
+* Init cond
+
+* Analysis
+
+* solvers
+  -- derivatives
+
+* timestepper
+  
+
+a simulation
+------------
+this is expressed as a script?
+is the paradigm something like
+
+$ mpirun -np 128 python ./simulation_2B.py
+
+or is it 
+
+$ mpirun -np 128 pydro simulation_2B
+
+where simulation_2B is some kind of input file?
+
+has a number of fields
+
+one timestepper
+
+some physics
+
+some (inline) analysis 
