@@ -22,13 +22,26 @@ License:
 """
 
 import numpy as na
+import fftw3
 
-class FourierData(object):
+class Representation(object):
+    """a representation of a field. it stores data and provides
+    spatial derivatives.
+
+    """
+
+    def __init__(self, shape):
+        pass
+
+
+class FourierData(Representation):
     """Container for data that can be Fourier transformed. Includes a
     wrapped and specifiable method for performing the FFT. 
 
+    Parallelization will go here?
+
     """
-    def __init__(self, shape):
+    def __init__(self, shape, dtype='complex128', method='fftw'):
         """
         
         Parameters
@@ -37,26 +50,51 @@ class FourierData(object):
             the shape of the data.
         """
         self._shape = shape
+        self._curr_space = 'kspace'
         self.dim = len(shape)
-        self.data = {'kspace': None,
-                     'xspace': None}
-        self._ktype = 'complex128'
-        self._xtype = 'float64'
+        self.data = na.zeros(self._shape,dtype=dtype)
+        self.k = {}
+        for dim in range(self.dim):
+            self.k[dim] = na.linspace(0,1,self._shape[dim],endpoint=False)*2*na.pi
 
-    def set_fft(self, method):
-        pass
+        self.set_fft(method)
 
-    def allocate_data(self, key):
-        if key == 'kspace':
-            self.data[key] = na.zeros(self.shape,dtype=self._ktype)
+    def __getitem__(self,space):
+        """returns data in either xspace or kspace, transforming as necessary.
+
+        """
+        if space == self._curr_space:
+            pass
+        elif space == 'xspace':
+            self.forward()
+        elif space == 'kspace':
+            self.reverse()
         else:
-            self.data[key] = na.zeros(self.shape,dtype=self._xtype)
-    
+            raise KeyError("space must be either xspace or kspace")
+        
+        return self.data
+        
+        
+    def set_fft(self, method):
+        if method == 'fftw':
+            self.fft = fftw3.Plan(self.data,direction='forward', flags=['measure'])
+            self.ifft = fftw3.Plan(self.data,direction='backward', flags=['measure'])
+
     def forward(self):
-        pass
+        self.fft()
+        self._curr_space = 'xspace'
 
     def backward(self):
-        pass
+        self.ifft()
+        self._curr_space = 'kspace'
+
+    def deriv(self,dim):
+        """take a derivative along dim"""
+        if self._curr_space == 'xspace':
+            self.backward()
+        return self.data * 1j*self.k[dim]
+
+
     
 class SphericalHarmonicData(FourierData):
     """Pydro should eventually support spherical and cylindrical geometries.
