@@ -7,6 +7,10 @@ Objects
    -- name
 
 * representation
+
+  -- this is the fundamental parallel object: it needs to be aware of
+     the processor layout and do multi-dimensional partial FFTs
+
   -- fftw plan
   -- pointer to data 
 
@@ -14,6 +18,8 @@ Objects
    -- subclass: kspace
 
 * Physics
+  -- this *defines* the necessary fields. 
+  -- should therefore have a class factory to build fields
    -- subclass: MHD
    -- subclass: shear
    -- subclass: anelastic
@@ -26,7 +32,10 @@ Objects
   -- derivatives
 
 * timestepper
-  
+  -- has an RHS object
+
+* RHS
+  -- this is essentially a list of physics objects
 
 a simulation
 ------------
