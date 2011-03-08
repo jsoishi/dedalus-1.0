@@ -53,9 +53,11 @@ class FourierData(Representation):
         self._curr_space = 'kspace'
         self.dim = len(shape)
         self.data = na.zeros(self._shape,dtype=dtype)
-        self.k = {}
-        for dim in range(self.dim):
-            self.k[dim] = na.linspace(0,1,self._shape[dim],endpoint=False)*2*na.pi
+        names = ['z','y','x']
+        kslice = [slice(0,a) for a in self._shape]
+        self.k = dict(zip(names[3-self.dim:],na.ogrid[kslice]))
+        for key,v in self.k.iteritems():
+            self.k[key] = v*2*na.pi/v.size
 
         self.set_fft(method)
 
@@ -93,6 +95,30 @@ class FourierData(Representation):
         if self._curr_space == 'xspace':
             self.backward()
         return self.data * 1j*self.k[dim]
+
+class FourierShearData(FourierData):
+    """
+
+    """
+    def __init__(self, shape, S, **kwargs):    
+        """Shearing box implementation.
+
+
+        Parameters
+        ----------
+        S : float
+            the *dimensional* shear rate in 1/t units
+
+        """
+        self.shear_rate = S
+        FourierData.__init__(self, shape, **kwargs)
+
+    def forward(self):
+        pass
+
+    def backward(self):
+        pass
+
 
 
     
