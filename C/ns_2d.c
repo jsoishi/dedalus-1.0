@@ -33,6 +33,7 @@ License:
 #define BAD_STEP  1
 
 int debug = 0;
+double nu = 0; /*1e-4; */
 
 typedef struct {
   int N_i, N_j, N_ik, N_jk;
@@ -179,6 +180,7 @@ int evolve_hydro_rk2(double dt, field *vx, field *vy) {
      y_n+1 = y_n + k2 +O(h**3)
    */
   int i, j, N_j = vx->N_j;  
+  double viscosity, k2;
   field *RHS_x = create_field("RHS_x",vx->N_i, vx->N_j);
   field *RHS_y = create_field("RHS_y",vy->N_i, vy->N_j);
   field *vx1 = create_field("vx1",vx->N_i, vx->N_j);
@@ -191,19 +193,23 @@ int evolve_hydro_rk2(double dt, field *vx, field *vy) {
   RHS(vx, vy, RHS_x, RHS_y);
   for (j = 0; j < vx->N_j; ++j)
     for (i = 0; i < vx->N_i; ++i) {
-      vx1->kspace[index(i,j)][0] = vx->kspace[index(i,j)][0] + dt/2.*RHS_x->kspace[index(i,j)][0];
-      vx1->kspace[index(i,j)][1] = vx->kspace[index(i,j)][1] + dt/2.*RHS_x->kspace[index(i,j)][1];
-      vy1->kspace[index(i,j)][0] = vy->kspace[index(i,j)][0] + dt/2.*RHS_y->kspace[index(i,j)][0];
-      vy1->kspace[index(i,j)][1] = vy->kspace[index(i,j)][1] + dt/2.*RHS_y->kspace[index(i,j)][1];
+      k2 = vx->kx[i] * vx->kx[i] + vx->ky[j] * vx->ky[j];
+      viscosity = exp(-k2*dt/2.*nu);
+      vx1->kspace[index(i,j)][0] = (vx->kspace[index(i,j)][0] + dt/2.*RHS_x->kspace[index(i,j)][0]) * viscosity;
+      vx1->kspace[index(i,j)][1] = (vx->kspace[index(i,j)][1] + dt/2.*RHS_x->kspace[index(i,j)][1]) * viscosity;
+      vy1->kspace[index(i,j)][0] = (vy->kspace[index(i,j)][0] + dt/2.*RHS_y->kspace[index(i,j)][0]) * viscosity;
+      vy1->kspace[index(i,j)][1] = (vy->kspace[index(i,j)][1] + dt/2.*RHS_y->kspace[index(i,j)][1]) * viscosity;
     }  
 
   RHS(vx1, vy1, RHS_x, RHS_y);
   for (j = 0; j < vx->N_j; ++j)
     for (i = 0; i < vx->N_i; ++i) {
-      vx->kspace[index(i,j)][0] = vx->kspace[index(i,j)][0] + dt*RHS_x->kspace[index(i,j)][0];
-      vx->kspace[index(i,j)][1] = vx->kspace[index(i,j)][1] + dt*RHS_x->kspace[index(i,j)][1];
-      vy->kspace[index(i,j)][0] = vy->kspace[index(i,j)][0] + dt*RHS_y->kspace[index(i,j)][0];
-      vy->kspace[index(i,j)][1] = vy->kspace[index(i,j)][1] + dt*RHS_y->kspace[index(i,j)][1];
+      k2 = vx->kx[i] * vx->kx[i] + vx->ky[j] * vx->ky[j];
+      viscosity = exp(-k2*dt/2.*nu);
+      vx->kspace[index(i,j)][0] = (vx->kspace[index(i,j)][0] * viscosity + dt*RHS_x->kspace[index(i,j)][0]) * viscosity;
+      vx->kspace[index(i,j)][1] = (vx->kspace[index(i,j)][1] * viscosity + dt*RHS_x->kspace[index(i,j)][1]) * viscosity;
+      vy->kspace[index(i,j)][0] = (vy->kspace[index(i,j)][0] * viscosity + dt*RHS_y->kspace[index(i,j)][0]) * viscosity;
+      vy->kspace[index(i,j)][1] = (vy->kspace[index(i,j)][1] * viscosity + dt*RHS_y->kspace[index(i,j)][1]) * viscosity;
     }
   destroy_field(vx1);
   destroy_field(vy1);
@@ -339,7 +345,7 @@ int dfhatdy(field *f, field *dfhatdy) {
   return GOOD_STEP;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
   int N_i = 100, N_j = 100;
 
   field *vx, *vy;
@@ -359,9 +365,13 @@ int main() {
   field_execute(vx, FFTW_FORWARD);
 
   /* main loop */
-  double t = 0, dt=1e-4;
+  double t = 0, dt=1e-6;
   double t_stop = 1;
-  int it = 0, i_stop = 2;
+  int it = 0, i_stop = 10;
+  if (argc == 2) 
+    i_stop = atoi(argv[1]);
+  
+  printf("running %i steps\n", i_stop);
   while (t < t_stop && it < i_stop) {
     printf("step %i\n", it);
     evolve_hydro_rk2(dt,vx,vy);
