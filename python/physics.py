@@ -23,23 +23,77 @@ License:
 """
 
 import numpy as na
+from data_object import create_data
 
 class Physics(object):
     """This is a base class for a physics object. It needs to provide
     a right hand side for a time integration scheme.
-
     """
-
-    def __init__(self,shape):
+    def __init__(self, shape, representation):
         self._shape = shape
+        self._ndims = len(self._shape)
+        self._representation = representation
+        dataname = "%sData" % self.__class__.__name__
+        self.__DataClass = create_data(self._representation, self._shape, dataname)
+        self.parameters = {}
+        self.fields = {}
+        self.aux_fields = {}
+    
+    def __getitem__(self, item):
+         a = self.parameters.get(item, None)
+         # if a is None:
+         #      a = self.parameters.get(item, None)
+         if a is None:
+              raise KeyError
+         return
+
+    def create_fields(self, t, fields=None):
+         if fields == None:
+              return self.__DataClass(self.fields, t)
+         else:
+              return self.__DataClass(fields, t)
+    def _setup_parameters(self, params):
+        for k,v in params.iteritems():
+            self.parameters[k] = v
+
+    def _setup_aux_fields(self, aux):
+         for f in aux:
+              self.aux_fields[f] = representation(self,shape)
 
     def RHS(self):
         pass
 
 class Hydro(Physics):
-    
-    def __init__(self,shape):
-        Physics.__init__(self,shape)
+    """incompressible hydrodynamics.
+
+    """
+    def __init__(self,*args):
+        Physics.__init__(self, *args)
+        self.fields = ['ux','uy']
+        self._naux = 4
+        if self._ndims == 3:
+             self.fields.append('uz')
+             self._naux = 9
+
+        params = {'nu': 0.}
         
+        self.aux_fields = []
+        for i in range(self._naux):
+             self.aux_fields.append(self._representation(self._shape))
+        self._setup_parameters(params)
+    
+    def RHS(self):
+        self.vgradv()
+        self.pressure()
 
+    def pressure(self):
+        pass
 
+    def vgradv(self):
+         pass
+
+if __name__ == "__main__":
+     from fourier_data import FourierData
+     a = Hydro((100,100),FourierData)
+     data = a.create_fields(0.)
+     print data.fields
