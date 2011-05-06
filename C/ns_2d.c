@@ -33,7 +33,7 @@ License:
 #define BAD_STEP  1
 
 int debug = 0;
-double nu = 0; /*1e-4; */
+double nu = 1e-2; /*1e-4; */
 
 typedef struct {
   int N_i, N_j, N_ik, N_jk;
@@ -52,7 +52,11 @@ void write_data(FILE *file, fftw_complex *data, int N) {
     fprintf(file, "%10.5e %10.5e\n", data[j][0], data[j][1]);
 }
 
-void write_field_xspace(FILE *file, field *field) {
+void write_field_xspace(field *field, int step) {
+  char filen[50];
+  sprintf(filen,"%s_xspace_%04i",field->name,step);
+  FILE *file;
+  file = fopen(filen,"w");
   fftw_execute(field->fwd_plan);
   int i,j, N_j;
   N_j = field->N_j;
@@ -61,9 +65,14 @@ void write_field_xspace(FILE *file, field *field) {
       fprintf(file, "%10.5e\n", field->xspace[index(i,j)][0]);
     }
   }
+  close(file);
 }
 
-void write_field_kspace(FILE *file, field *field) {
+void write_field_kspace(field *field, int step) {
+  char filen[50];
+  sprintf(filen,"%s_kspace_%04i",field->name,step);
+  FILE *file;
+  file = fopen(filen,"w");
   int i,j, N_j;
   N_j = field->N_j;
   for (j = 0; j < N_j; j++) {
@@ -71,6 +80,7 @@ void write_field_kspace(FILE *file, field *field) {
       fprintf(file, "%10.5e %10.5e\n", field->kspace[index(i,j)][0],field->kspace[index(i,j)][1]);
     }
   }
+  close(file);
 }
 
 void tg_setup_2d(field *vx, field *vy) {
@@ -146,8 +156,11 @@ void init_field(field *new_field) {
 void destroy_field(field *field) {
   free(field->kspace);
   free(field->xspace);
+  free(field->kx);
+  free(field->ky);
   fftw_destroy_plan(field->fwd_plan);
   fftw_destroy_plan(field->rev_plan);
+  free(field);
 }
 
 int field_execute(field *field, int dir) {
@@ -355,13 +368,12 @@ int main(int argc, char *argv[]) {
   init_field(vx);
   init_field(vy);
   tg_setup_2d(vx,vy);
-  FILE *koutput, *output;
-  output = fopen("vx_tg_real_0.dat","w");
-  koutput = fopen("vx_tg_kspace_0.dat","w");
 
-  write_field_kspace(koutput,vx);
-  write_field_xspace(output,vx);
-  close(koutput);
+  write_field_kspace(vx,0);
+  write_field_xspace(vx,0);
+  write_field_kspace(vy,0);
+  write_field_xspace(vy,0);
+
   field_execute(vx, FFTW_FORWARD);
 
   /* main loop */
@@ -378,14 +390,13 @@ int main(int argc, char *argv[]) {
     
     t += dt;
     it++;
+    write_field_xspace(vx,it);
+    write_field_xspace(vy,it);
   }
 
-  output = fopen("vx_tg_real.dat","w");
-  koutput = fopen("vx_tg_kspace.dat","w");
-  write_field_xspace(output,vx);
-  write_field_kspace(koutput,vx);
-  close(output);
-  close(koutput);
-
+  write_field_kspace(vx,it);
+  write_field_kspace(vy,it);
+  destroy_field(vx);
+  destroy_field(vy);
   return 0;
 }
