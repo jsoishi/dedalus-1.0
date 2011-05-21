@@ -34,7 +34,6 @@ class Representation(object):
     def __init__(self, shape):
         pass
 
-
 class FourierData(Representation):
     """Container for data that can be Fourier transformed. Includes a
     wrapped and specifiable method for performing the FFT. 
@@ -86,7 +85,11 @@ class FourierData(Representation):
             raise KeyError("space must be either xspace or kspace")
         
         return self.data
-        
+
+    def initialize(self, data, space):
+        """should provide some way to initialize data
+        """
+        pass
         
     def set_fft(self, method):
         if method == 'fftw':
@@ -105,7 +108,7 @@ class FourierData(Representation):
         """take a derivative along dim"""
         if self._curr_space == 'xspace':
             self.backward()
-        return self.data * 1j*self.k[dim]
+        return self.data * -1j*self.k[dim]
 
 class FourierShearData(FourierData):
     """
