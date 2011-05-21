@@ -52,6 +52,7 @@ class Physics(object):
               return self.__DataClass(self.fields, t)
          else:
               return self.__DataClass(fields, t)
+
     def _setup_parameters(self, params):
         for k,v in params.iteritems():
             self.parameters[k] = v
@@ -82,18 +83,42 @@ class Hydro(Physics):
              self.aux_fields.append(self._representation(self._shape))
         self._setup_parameters(params)
     
-    def RHS(self):
-        self.vgradv()
-        self.pressure()
+    def RHS(self, data):
+        vgradv = self.vgradv(data)
+        pressure = self.pressure(data)
 
-    def pressure(self):
+        return
+    
+    def pressure(self, data):
         pass
 
-    def vgradv(self):
-         pass
+    def vgradv(self, data):
+         gradv = self.create_fields(data.time,fields=range(self._ndims**2))
+         i = 0
+         trans = {0: 'x', 1: 'y', 2: 'z'}
+         slices = self._ndims*(slice(None),)
+         for f in self.fields:
+              for dim in range(self._ndims):
+                  print "%i is d%s/d%s" % (i, f, trans[dim])
+                  gradv[i].data[slices] = data[f].deriv(trans[dim])
+                  i += 1
+         
+         return gradv
 
 if __name__ == "__main__":
-     from fourier_data import FourierData
-     a = Hydro((100,100),FourierData)
-     data = a.create_fields(0.)
-     print data.fields
+    import pylab as P
+    from fourier_data import FourierData
+    from init_cond import taylor_green
+    a = Hydro((100,100),FourierData)
+    data = a.create_fields(0.)
+    data['ux'], data['uy'] = taylor_green(data['ux'],data['uy'])
+    test = a.vgradv(data)
+    print test[1]._curr_space
+    for i in range(4):
+        P.subplot(2,2,i+1)
+        P.imshow(test[i]['xspace'].real)
+        tmp =test[i]['xspace'].real
+        print "%i (min, max) = (%10.5e, %10.5e)" % (i, tmp.min(), tmp.max())
+        P.colorbar()
+
+    P.show()
