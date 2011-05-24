@@ -100,7 +100,7 @@ class Hydro(Physics):
          for f in self.fields:
               for dim in range(self._ndims):
                   print "%i is d%s/d%s" % (i, f, trans[dim])
-                  gradv[i].data[slices] = data[f].deriv(trans[dim])
+                  gradv[i] = data[f].deriv(trans[dim])
                   i += 1
          
          return gradv
@@ -111,9 +111,8 @@ if __name__ == "__main__":
     from init_cond import taylor_green
     a = Hydro((100,100),FourierData)
     data = a.create_fields(0.)
-    data['ux'], data['uy'] = taylor_green(data['ux'],data['uy'])
+    taylor_green(data['ux'],data['uy'])
     test = a.vgradv(data)
-    print test[1]._curr_space
     for i in range(4):
         P.subplot(2,2,i+1)
         P.imshow(test[i]['xspace'].real)

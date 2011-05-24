@@ -15,3 +15,13 @@ class BaseData(object):
         if a is None:
             raise KeyError
         return a
+
+    def __setitem__(self, item, data):
+        """this needs to ensure the pointer for the field's data
+        member doesn't change for FFTW. Currently, we do that by
+        slicing the entire data array. This will fail if data is not
+        the same shape as the item fieldo.
+        """
+        f = self.fields[item]
+        slices = f.dim*(slice(None),)
+        f.data[slices] = data
