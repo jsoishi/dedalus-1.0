@@ -20,6 +20,7 @@ Objects
 * Physics
   -- this *defines* the necessary fields. 
   -- should therefore have a class factory to build fields
+  -- should manage parameters: nu, eta, Rayleigh number, &c
    -- subclass: MHD
    -- subclass: shear
    -- subclass: anelastic
