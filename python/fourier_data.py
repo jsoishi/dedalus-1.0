@@ -80,7 +80,7 @@ class FourierData(Representation):
         elif space == 'xspace':
             self.forward()
         elif space == 'kspace':
-            self.reverse()
+            self.backward()
         else:
             raise KeyError("space must be either xspace or kspace")
         

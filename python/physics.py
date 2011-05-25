@@ -75,7 +75,7 @@ class Hydro(Physics):
         if self._ndims == 3:
              self.fields.append('uz')
              self._naux = 9
-
+        self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0.}
         
         self.aux_fields = []
@@ -84,26 +84,52 @@ class Hydro(Physics):
         self._setup_parameters(params)
     
     def RHS(self, data):
+        RHS = self.create_fields(data.time)
         vgradv = self.vgradv(data)
-        pressure = self.pressure(data)
-
-        return
+        pressure = self.pressure(data, vgradv)
+        for f in self.fields:
+            RHS[f] = vgradv[f]['kspace'] + pressure[f]['kspace']
+        return RHS
     
-    def pressure(self, data):
-        pass
+    def gradv(self, data):
+        """compute stress tensor, du_j/dx_i
+
+        """
+        gradv = self.create_fields(data.time,fields=range(self._ndims**2))
+        i = 0
+
+        slices = self._ndims*(slice(None),)
+        for f in self.fields:
+            for dim in range(self._ndims):
+                gradv[i] = data[f].deriv(self._trans[dim])
+                i += 1
+                
+        return gradv
+
+    def pressure(self, data, vgradv):
+        pressure = self.create_fields(data.time)
+        tmp = na.array([data[f].k[self._trans[i]] * vgradv[f]['kspace'] for i,f in enumerate(self.fields)])
+        k2 = na.zeros(data['ux'].data.shape)
+        for k in data['ux'].k.values():
+            k2 += k**2
+
+        k2[k2 == 0] = 1.
+        for i,f in enumerate(self.fields):            
+            pressure[f] = data[f].k[self._trans[i]] * tmp.sum()/k2
+
+        return pressure
 
     def vgradv(self, data):
-         gradv = self.create_fields(data.time,fields=range(self._ndims**2))
-         i = 0
-         trans = {0: 'x', 1: 'y', 2: 'z'}
-         slices = self._ndims*(slice(None),)
-         for f in self.fields:
-              for dim in range(self._ndims):
-                  print "%i is d%s/d%s" % (i, f, trans[dim])
-                  gradv[i] = data[f].deriv(trans[dim])
-                  i += 1
-         
-         return gradv
+        gradv = self.gradv(data)
+        vgradv = self.create_fields(data.time)
+        trans = {0: 'ux', 1: 'uy', 2: 'uz'}
+        for i,f in enumerate(self.fields):
+            b = [i * self._ndims + j for j in range(self._ndims)]
+            tmp = na.array([data[trans[i]]['xspace'] * gradv[j]['xspace'] for i,j in enumerate(b)])
+            vgradv[f] = tmp.sum()
+            vgradv[f]._curr_space = 'xspace'
+        
+        return vgradv
 
 if __name__ == "__main__":
     import pylab as P
@@ -112,12 +138,12 @@ if __name__ == "__main__":
     a = Hydro((100,100),FourierData)
     data = a.create_fields(0.)
     taylor_green(data['ux'],data['uy'])
-    test = a.vgradv(data)
-    for i in range(4):
-        P.subplot(2,2,i+1)
-        P.imshow(test[i]['xspace'].real)
-        tmp =test[i]['xspace'].real
-        print "%i (min, max) = (%10.5e, %10.5e)" % (i, tmp.min(), tmp.max())
-        P.colorbar()
+    test = a.RHS(data)
+    # for i in range(4):
+    #     P.subplot(2,2,i+1)
+    #     P.imshow(test[i]['xspace'].real)
+    #     tmp =test[i]['xspace'].real
+    #     print "%i (min, max) = (%10.5e, %10.5e)" % (i, tmp.min(), tmp.max())
+    #     P.colorbar()
 
-    P.show()
+    # P.show()
