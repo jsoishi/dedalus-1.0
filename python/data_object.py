@@ -20,7 +20,7 @@ class BaseData(object):
         """this needs to ensure the pointer for the field's data
         member doesn't change for FFTW. Currently, we do that by
         slicing the entire data array. This will fail if data is not
-        the same shape as the item fieldo.
+        the same shape as the item field.
         """
         f = self.fields[item]
         slices = f.dim*(slice(None),)
