@@ -102,6 +102,7 @@ class FourierData(Representation):
 
     def backward(self):
         self.ifft()
+        self.data /= self.data.size
         self._curr_space = 'kspace'
 
     def deriv(self,dim):

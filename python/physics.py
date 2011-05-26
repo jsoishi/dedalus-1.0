@@ -88,7 +88,7 @@ class Hydro(Physics):
         vgradv = self.vgradv(data)
         pressure = self.pressure(data, vgradv)
         for f in self.fields:
-            RHS[f] = vgradv[f]['kspace'] + pressure[f]['kspace']
+            RHS[f] = -vgradv[f]['kspace'] + pressure[f]['kspace']
         return RHS
     
     def gradv(self, data):
@@ -138,12 +138,16 @@ if __name__ == "__main__":
     a = Hydro((100,100),FourierData)
     data = a.create_fields(0.)
     taylor_green(data['ux'],data['uy'])
+    vgv = a.vgradv(data)
+    #test = a.pressure(data,vgv)
     test = a.RHS(data)
-    # for i in range(4):
-    #     P.subplot(2,2,i+1)
-    #     P.imshow(test[i]['xspace'].real)
-    #     tmp =test[i]['xspace'].real
-    #     print "%i (min, max) = (%10.5e, %10.5e)" % (i, tmp.min(), tmp.max())
-    #     P.colorbar()
 
-    # P.show()
+    for i,f in enumerate(a.fields):
+        print test[f]._curr_space
+        P.subplot(1,2,i+1)
+        P.imshow(test[f]['xspace'].real)
+        tmp =test[f]['xspace'].imag
+        print "%s (min, max) = (%10.5e, %10.5e)" % (f, tmp.min(), tmp.max())
+        P.colorbar()
+
+    P.show()
