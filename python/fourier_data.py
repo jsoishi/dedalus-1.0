@@ -64,7 +64,7 @@ class FourierData(Representation):
         kk = []
         for i,dim in enumerate(self.data.shape):
             sl = i*(1,)+(dim,)+(self.dim-i-1)*(1,)
-            k = fpack.fftfreq(dim)*self.kny[i]
+            k = fpack.fftfreq(dim)*2.*self.kny[i]
             k.resize(sl)
             kk.append(k)
         self.k = dict(zip(names[3-self.dim:],kk))
