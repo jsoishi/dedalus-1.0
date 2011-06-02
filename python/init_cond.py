@@ -1,5 +1,10 @@
 import numpy as na
+"""
+NB: UNTIL we switch fftw backends, *all* data initializations must be
+done using data[:,:] or some other explicit indexing. otherwise, the
+pointer will be erased, and FFTs will fail!
 
+"""
 def taylor_green(ux, uy):
     if ux.dim == 2:
         ux.data[1,1] = -1j/4.
