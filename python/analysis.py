@@ -1,7 +1,29 @@
 import pylab as P
 import numpy as na
 import os
+from functools import wraps
 
+class AnalysisSet(object):
+    known_analysis = {}
+    def __init__(self, data, ti):
+        self.data = data
+        self.ti = ti
+        self.tasks = []
+
+    def add(self, name, cadence):
+        self.tasks.append((self.known_analysis[name], cadence))
+
+    def run(self):
+        for f, c in self.tasks:
+            if self.ti.iter % c != 0: continue
+            f(self.data, self.ti.iter)
+
+    @classmethod
+    def register_task(cls, func):
+        cls.known_analysis[func.func_name] = func
+
+
+@AnalysisSet.register_task
 def snapshot(data, it):
     P.subplot(121)
     P.title('t = %5.2f' % data.time)
@@ -16,7 +38,8 @@ def snapshot(data, it):
     P.savefig(outfile)
     P.clf()
 
-def print_energy(data):
+@AnalysisSet.register_task
+def print_energy(data, it):
     """compute energy in real space
 
     """
@@ -27,6 +50,7 @@ def print_energy(data):
 
     print "energy: %10.5e" % (energy.sum()/(8.*na.pi**2))
 
+@AnalysisSet.register_task
 def en_spec(data, it):
     kk = na.zeros(data['ux'].data.shape)
     for k in data['ux'].k.values():
