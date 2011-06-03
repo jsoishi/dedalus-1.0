@@ -18,6 +18,7 @@ def snapshot(data, it):
 
 def print_energy(data):
     """compute energy in real space
+
     """
 
     energy = na.zeros(data['ux']['xspace'].shape)
@@ -39,11 +40,13 @@ def en_spec(data, it):
     k = na.arange(nbins)
     spec = na.zeros(nbins)
     for i in range(nbins):
-        spec[i] = (4*na.pi*i**2*power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
+        #spec[i] = (4*na.pi*i**2*power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
+        spec[i] = (power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
 
     P.loglog(k,spec)
     from init_cond import mcwilliams_spec
     P.loglog(k,mcwilliams_spec(k,30.,0.5))
+    P.ylim(1e-20,1e-1)
     P.xlabel(r"$k$")
     P.ylabel(r"$E(k)$")
 
