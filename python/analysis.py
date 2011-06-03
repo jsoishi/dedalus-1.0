@@ -17,11 +17,14 @@ def snapshot(data, it):
     P.clf()
 
 def print_energy(data):
+    """compute energy in real space
+    """
+
     energy = na.zeros(data['ux']['xspace'].shape)
     for f in data.fields:
         energy += (data[f]['xspace']*data[f]['xspace'].conj()).real
 
-    print "energy: %10.5e" % energy.mean()
+    print "energy: %10.5e" % (energy.sum()/(8.*na.pi**2))
 
 def en_spec(data, it):
     kk = na.zeros(data['ux'].data.shape)
@@ -31,14 +34,16 @@ def en_spec(data, it):
     power = na.zeros(data['ux'].data.shape)
     for f in data.fields:
         power += (data[f]['kspace']*data[f]['kspace'].conj()).real
-
+    
     nbins = (data['ux'].k['x'].size)/2 
     k = na.arange(nbins)
     spec = na.zeros(nbins)
     for i in range(nbins):
-        spec[i] = (power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
+        spec[i] = (4*na.pi*i**2*power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
 
     P.loglog(k,spec)
+    from init_cond import mcwilliams_spec
+    P.loglog(k,mcwilliams_spec(k,30.,0.5))
     P.xlabel(r"$k$")
     P.ylabel(r"$E(k)$")
 
