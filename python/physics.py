@@ -107,28 +107,37 @@ class Hydro(Physics):
         return gradv
 
     def pressure(self, data, vgradv):
+        d = data['ux']
         pressure = self.create_fields(data.time)
-        tmp = na.array([data[f].k[self._trans[i]] * vgradv[f]['kspace'] for i,f in enumerate(self.fields)])
+        tmp = na.zeros_like(d.data)
+        for i,f in enumerate(self.fields):
+            tmp +=data[f].k[self._trans[i]] * vgradv[f]['kspace']
         k2 = na.zeros(data['ux'].data.shape)
         for k in data['ux'].k.values():
             k2 += k**2
 
         k2[k2 == 0] = 1.
         for i,f in enumerate(self.fields):            
-            pressure[f] = data[f].k[self._trans[i]] * tmp.sum(axis=0)/k2
+            pressure[f] = data[f].k[self._trans[i]] * tmp/k2
 
         return pressure
 
     def vgradv(self, data):
+        d = data['ux']
         gradv = self.gradv(data)
         vgradv = self.create_fields(data.time)
         trans = {0: 'ux', 1: 'uy', 2: 'uz'}
+
+        tmp = na.zeros_like(d.data)
+        
         for i,f in enumerate(self.fields):
             b = [i * self._ndims + j for j in range(self._ndims)]
-            tmp = na.array([data[trans[i]]['xspace'] * gradv[j]['xspace'] for i,j in enumerate(b)])
-            vgradv[f] = tmp.sum(axis=0)
+            for i,j, in enumerate(b):
+                tmp += data[trans[i]]['xspace'] * gradv[j]['xspace']
+            vgradv[f] = tmp
             vgradv[f]._curr_space = 'xspace'
-
+            tmp *= 0+0j
+            
         return vgradv
 
 if __name__ == "__main__":
