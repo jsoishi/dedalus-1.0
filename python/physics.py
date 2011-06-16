@@ -24,7 +24,7 @@ License:
 
 import numpy as na
 from data_object import create_data
-
+from yt.funcs import insert_ipython
 class Physics(object):
     """This is a base class for a physics object. It needs to provide
     a right hand side for a time integration scheme.
@@ -115,7 +115,7 @@ class Hydro(Physics):
 
         k2[k2 == 0] = 1.
         for i,f in enumerate(self.fields):            
-            pressure[f] = data[f].k[self._trans[i]] * tmp.sum()/k2
+            pressure[f] = data[f].k[self._trans[i]] * tmp.sum(axis=0)/k2
 
         return pressure
 
@@ -126,9 +126,9 @@ class Hydro(Physics):
         for i,f in enumerate(self.fields):
             b = [i * self._ndims + j for j in range(self._ndims)]
             tmp = na.array([data[trans[i]]['xspace'] * gradv[j]['xspace'] for i,j in enumerate(b)])
-            vgradv[f] = tmp.sum()
+            vgradv[f] = tmp.sum(axis=0)
             vgradv[f]._curr_space = 'xspace'
-        
+
         return vgradv
 
 if __name__ == "__main__":
