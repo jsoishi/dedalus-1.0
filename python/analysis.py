@@ -1,4 +1,5 @@
 import pylab as P
+from mpl_toolkits.axes_grid1 import AxesGrid
 import numpy as na
 import os
 from functools import wraps
@@ -24,19 +25,39 @@ class AnalysisSet(object):
 
 
 @AnalysisSet.register_task
-def snapshot(data, it):
-    P.subplot(121)
-    P.title('t = %5.2f' % data.time)
-    P.imshow(data['ux']['xspace'].real)#, vmin=-1, vmax=1)
-    P.colorbar()
-    P.subplot(122)
-    P.imshow(data['uy']['xspace'].real)#, vmin=-1, vmax=1)
-    P.colorbar()
+def field_snap(data, it):
+    """take a snapshot of all fields defined. currently only works in
+    2D; it will need a slice index for 3D.
+
+    """
+    fields = data.fields.keys()
+    fields.sort()
+    nvars = len(fields)
+    nrow = nvars / 3
+    if nrow == 0:
+        ncol = nvars % 3
+        nrow = 1
+    else:
+        ncol = 3
+    fig = P.figure(1,figsize=(24.*ncol/3.,24.*nrow/3.))
+    grid = AxesGrid(fig,111,
+                    nrows_ncols = (nrow, ncol),
+                    axes_pad=0.1,
+                    cbar_pad=0.,
+                    share_all=True,
+                    label_mode="1",
+                    cbar_location="top",
+                    cbar_mode="each")
+    for i,f in enumerate(fields):
+        im = grid[i].imshow(data[f]['xspace'].real, cmap='bone')
+        grid[i].text(0.05,0.95,f, transform=grid[i].transAxes, size=24,color='white')
+        grid.cbar_axes[i].colorbar(im)
+
     if not os.path.exists('frames'):
         os.mkdir('frames')
     outfile = "frames/snap_%04i.png" % it
-    P.savefig(outfile)
-    P.clf()
+    fig.savefig(outfile)
+    fig.clf()
 
 @AnalysisSet.register_task
 def print_energy(data, it):
