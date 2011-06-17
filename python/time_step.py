@@ -98,3 +98,34 @@ class RK2simplevisc(TimeStepBase):
         data.time += dt
         self.time += dt
         self.iter += 1
+
+class RK2simplehypervisc4(TimeStepBase):
+    def advance(self, data, dt):
+        """
+        from NR:
+          k1 = h * RHS(x_n, y_n)
+          k2 = h * RHS(x_n + 1/2*h, y_n + 1/2*k1)
+          y_n+1 = y_n + k2 +O(h**3)
+        """
+        tmp_fields = self.RHS.create_fields(data.time)
+        field_dt = self.RHS.create_fields(data.time)
+
+        k4 = na.zeros(data['ux'].data.shape)
+        for k in data['ux'].k.values():
+            k4 += k**4
+
+        # first step
+        viscosity = na.exp(-k4*dt/2.*self.RHS.parameters['nu'])
+        for f in self.RHS.fields:
+            field_dt[f] = self.RHS.RHS(data)[f]['kspace']
+            tmp_fields[f] = (data[f]['kspace'] + dt/2. * field_dt[f]['kspace'])*viscosity
+            
+        tmp_fields.time = data.time + dt/2.
+
+        # second step
+        for f in self.RHS.fields:
+            field_dt[f] = self.RHS.RHS(tmp_fields)[f]['kspace']
+            data[f] = (data[f]['kspace'] * viscosity + dt * field_dt[f]['kspace'])*viscosity
+        data.time += dt
+        self.time += dt
+        self.iter += 1
