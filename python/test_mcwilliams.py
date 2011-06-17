@@ -1,6 +1,6 @@
 from physics import Hydro
 from fourier_data import FourierData
-from time_stepper import RK2simple,RK2simplevisc
+from time_step import RK2simple,RK2simplevisc
 from init_cond import turb, mcwilliams_spec
 from analysis import AnalysisSet
 
