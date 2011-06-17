@@ -12,11 +12,8 @@ data = RHS.create_fields(0.)
 turb(data['ux'],data['uy'],mcwilliams_spec,k0=30, ampl=0.5)
 ti = RK2simplevisc(RHS,CFL=0.4)
 ti.stop_time(1.) # set stoptime
-ti.stop_iter(1) # max iterations
+ti.stop_iter(10) # max iterations
 ti.stop_walltime(3600.) # stop after 10 hours
-#an = Analysis(RHS)
-from yt.funcs import insert_ipython
-insert_ipython()
 
 an = AnalysisSet(data, ti)
 an.add("print_energy", 1)
@@ -30,9 +27,5 @@ while ti.ok:
     print "step: %i" % ti.iter
     ti.advance(data, dt)
     an.run()
-    #print "ux (min, max) = (%10.5e, %10.5e, %10.5e, %10.5e)" % ((data['ux']['xspace'].real).min(),(data['ux']['xspace'].imag).min(), (data['ux']['xspace'].real).max(), (data['ux']['xspace'].imag).max())
-    #print "uy (min, max) = (%10.5e, %10.5e, %10.5e, %10.5e)" % ((data['uy']['xspace'].real).min(),(data['uy']['xspace'].imag).min(), (data['uy']['xspace'].real).max(), (data['uy']['xspace'].imag).max())
-
-    #an.chk() # see if it's time for analysis
 
 ti.final_stats()

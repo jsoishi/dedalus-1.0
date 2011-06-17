@@ -40,11 +40,22 @@ def turb(ux, uy, spec, **kwargs):
         u.data[:,:] = ampl*na.exp(1j*2*na.pi*na.random.random(u.data.shape))
 
         # enforce symmetry in kspace to ensure data is real in
-        # xspace...doesn't work for 2D data yet
+        # xspace.
         nx = u.data.shape[0]
         u.data[-1:nx/2:-1,-1:nx/2:-1] = u.data[1:nx/2,1:nx/2].conj()
         u.data[nx/2-1:0:-1, -1:nx/2:-1] = u.data[nx/2+1:,1:nx/2].conj()
 
+        u.data[0,nx/2+1:] = u.data[0,nx/2-1:0:-1].conj()
+        u.data[nx/2+1:,0] = u.data[nx/2-1:0:-1,0].conj()
+        u.data[nx/2,nx/2+1:] = u.data[nx/2,nx/2-1:0:-1].conj()
+        u.data[nx/2+1:,nx/2] = u.data[nx/2-1:0:-1,nx/2].conj()
+
+        u.data[0:1,0:1].imag= 0.
+        u.data[nx/2:nx/2+1,nx/2:nx/2+1].imag = 0
+        u.data[0:1,nx/2:nx/2+1].imag = 0
+        u.data[nx/2:nx/2+1,0:1].imag = 0
+        u.data[0,0] = 0.
+        
         u.data[nx/2,:].imag = 0.
         u.data[:,nx/2].imag = 0.
         u.data[0,:].imag = 0.
