@@ -25,7 +25,7 @@ def sin_y(f,ampl=1.):
     f.data[1,0] = ampl*1j
     f.data[-1,0] = -f.data[0,1]
 
-def turb(ux, uy, spec, **kwargs):
+def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     """generate noise with a random phase and a spectrum given by
     the spec function.
 
@@ -61,8 +61,11 @@ def turb(ux, uy, spec, **kwargs):
         u.data[0,:].imag = 0.
         u.data[:,0].imag = 0.
 
+        u.data[:,:] *= na.sqrt(tot_en/2.)/u.data.sum()
 
-def mcwilliams_spec(k, k0, ampl):
+def mcwilliams_spec(k, k0):
+    """spectrum from McWilliams (1990), JFM 219:361-385
+
+    """
     spec = k**6./(k + 2.*k0)**18.
-    spec *= ampl/spec.sum()
     return spec

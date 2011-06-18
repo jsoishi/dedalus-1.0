@@ -9,7 +9,7 @@ RHS = Hydro(shape, FourierData)
 RHS.parameters['nu'] = 3.5e-8 # 10x mcwilliams
 data = RHS.create_fields(0.)
 
-turb(data['ux'],data['uy'],mcwilliams_spec,k0=30, ampl=0.5)
+turb(data['ux'],data['uy'],mcwilliams_spec,k0=23.)
 ti = RK2simplehypervisc4(RHS,CFL=0.4)
 ti.stop_time(1.) # set stoptime
 ti.stop_iter(1) # max iterations

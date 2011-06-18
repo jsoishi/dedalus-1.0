@@ -66,10 +66,12 @@ def print_energy(data, it):
     """
 
     energy = na.zeros(data['ux']['xspace'].shape)
+    e2 = na.zeros_like(energy)
     for f in data.fields:
         energy += (data[f]['xspace']*data[f]['xspace'].conj()).real
-
-    print "energy: %10.5e" % (energy.sum()/(8.*na.pi**2))
+        e2 += (data[f]['kspace']*data[f]['kspace'].conj()).real
+    print "k energy: %10.5e" % (0.5* e2.sum())
+    print "x energy: %10.5e" % (0.5*energy.sum()/energy.size)
 
 @AnalysisSet.register_task
 def en_spec(data, it):
@@ -80,7 +82,8 @@ def en_spec(data, it):
     power = na.zeros(data['ux'].data.shape)
     for f in data.fields:
         power += (data[f]['kspace']*data[f]['kspace'].conj()).real
-    
+
+    power *= 0.5
     nbins = (data['ux'].k['x'].size)/2 
     k = na.arange(nbins)
     spec = na.zeros(nbins)
@@ -90,8 +93,13 @@ def en_spec(data, it):
 
     P.loglog(k,spec)
     from init_cond import mcwilliams_spec
-    P.loglog(k,mcwilliams_spec(k,30.,0.5))
-    P.ylim(1e-20,1e-1)
+    mspec = mcwilliams_spec(k,30.)
+    mspec *= 0.5/mspec.sum()
+    print "E tot spec 1D = %10.5e" % mspec.sum()
+    print "E tot spec 2D = %10.5e" % spec.sum()
+    print "E0 2D = %10.5e" % spec[0]
+    P.loglog(k, mspec)
+    #P.ylim(1e-20,1e-1)
     P.xlabel(r"$k$")
     P.ylabel(r"$E(k)$")
 
