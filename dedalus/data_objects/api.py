@@ -1,4 +1,5 @@
-"""Conveninece wrapper for all tools necessary for a simulation.
+"""The Main Dedalus data object. This is dynamically created with a
+given representation when the physics class is initialized.
 
 Author: J. S. Oishi <jsoishi@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
@@ -20,24 +21,9 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+from .data_object import \
+    BaseData, \
+    create_data
 
-
-from dedalus.analysis.api import AnalysisSet
-
-from dedalus.data_objects.api import FourierData
-
-from dedalus.init_cond.api import \
-    taylor_green, \
-    sin_x, \
-    sin_y, \
-    turb,  \
-    mcwilliams_spec
-
-from dedalus.physics.api import Hydro
-
-from dedalus.time_stepping.api import \
-        RK2simple,\
-    RK2simplevisc, \
-    RK2simplehypervisc4
-
-
+from .fourier_data import \
+    FourierData

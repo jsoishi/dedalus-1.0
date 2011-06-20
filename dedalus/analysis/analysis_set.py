@@ -118,7 +118,7 @@ def en_spec(data, it):
         spec[i] = (power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
 
     P.loglog(k[1:],spec[1:])
-    from init_cond import mcwilliams_spec
+    from dedalus.init_cond.api import mcwilliams_spec
     mspec = mcwilliams_spec(k,30.)
     mspec *= 0.5/mspec.sum()
     print "E tot spec 1D = %10.5e" % mspec.sum()
