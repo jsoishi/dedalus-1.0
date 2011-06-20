@@ -25,3 +25,7 @@ class BaseData(object):
         f = self.fields[item]
         slices = f.dim*(slice(None),)
         f.data[slices] = data
+
+    def snapshot(self):
+        for f in fields:
+            pass
