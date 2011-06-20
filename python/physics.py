@@ -6,9 +6,9 @@ Affiliation: KIPAC/SLAC/Stanford
 License:
   Copyright (C) 2011 J. S. Oishi.  All Rights Reserved.
 
-  This file is part of pydro.
+  This file is part of dedalus.
 
-  pydro is free software; you can redistribute it and/or modify
+  dedalus is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation; either version 3 of the License, or
   (at your option) any later version.
@@ -89,6 +89,7 @@ class Hydro(Physics):
         pressure = self.pressure(data, vgradv)
         for f in self.fields:
             RHS[f] = -vgradv[f]['kspace'] + pressure[f]['kspace']
+            #RHS[f]['kspace'].ravel()[0] = 0.
         return RHS
     
     def gradv(self, data):
