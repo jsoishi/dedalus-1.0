@@ -84,9 +84,3 @@ def turb(ux, uy, spec, tot_en=0.5, **kwargs):
         u.data[0,:].imag = 0.
         u.data[:,0].imag = 0.
 
-def mcwilliams_spec(k, k0):
-    """spectrum from McWilliams (1990), JFM 219:361-385
-
-    """
-    spec = k**6./(k + 2.*k0)**18.
-    return spec
