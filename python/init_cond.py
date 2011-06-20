@@ -34,8 +34,9 @@ def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     for k in ux.k.values():
         kk += k**2
     kk = na.sqrt(kk)
-    ampl = na.sqrt(spec(kk,**kwargs)/ux.data.ndim)
-    
+    sp = spec(kk,**kwargs)
+    ampl = na.sqrt(sp/ux.data.ndim/sp.sum())
+
     for u in [ux,uy]:
         u.data[:,:] = ampl*na.exp(1j*2*na.pi*na.random.random(u.data.shape))
 
@@ -60,8 +61,6 @@ def turb(ux, uy, spec, tot_en=0.5, **kwargs):
         u.data[:,nx/2].imag = 0.
         u.data[0,:].imag = 0.
         u.data[:,0].imag = 0.
-
-        u.data[:,:] *= na.sqrt(tot_en/2.)/u.data.sum()
 
 def mcwilliams_spec(k, k0):
     """spectrum from McWilliams (1990), JFM 219:361-385
