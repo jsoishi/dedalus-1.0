@@ -23,7 +23,7 @@ License:
 """
 
 import numpy as na
-from data_object import create_data
+from dedalus.data_object.api import create_data
 from yt.funcs import insert_ipython
 class Physics(object):
     """This is a base class for a physics object. It needs to provide
