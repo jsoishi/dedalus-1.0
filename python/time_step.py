@@ -10,23 +10,43 @@ class TimeStepBase(object):
         self.CFL = CFL
         self.int_factor = int_factor
         self._is_ok = True
+        self._nsnap = 0
+        self._tlastsnap = 0.
+
+        # parameters
         self.iter = 0
         self.time = 0.
         self._stop_iter = 100000
         self._stop_time = -1.
         self._stop_wall = 3600.*24. # 24 hours
+        self._dnsnap  = 1
+        self._dtsnap = 0.
+
         self.__start_time = time.time()
+
     @property
     def ok(self):
         if self.iter >= self._stop_iter:
-            print "quitting on iterations"
+            print "Maximum number of iterations reached. Done."
             self._is_ok = False
         if self.time >= self._stop_time:
+            print "Time > stop time. Done"
             self._is_ok = False
         if (time.time() - self.__start_time) >= self._stop_wall:
+            print "Wall clock time exceeded. Done."
             self._is_ok = False
 
         return self._is_ok
+
+    def advance(self, data, dt):
+        if (self.iter % self._dnsnap) or (data.time - self._tlastsnap >= self._dtsnap):
+            #data.snapshot(self._nsnap)
+            self._nsnap += 1
+
+        self.do_advance(data,dt)
+
+    def do_advance(self, data, dt):
+        raise NotImplementedError("do_advance must be provided by subclass.")
 
     def stop_time(self,t):
         self._stop_time = t
@@ -44,7 +64,7 @@ class TimeStepBase(object):
 
 
 class RK2simple(TimeStepBase):
-    def advance(self, data, dt):
+    def do_advance(self, data, dt):
         """
         from NR:
           k1 = h * RHS(x_n, y_n)
@@ -69,7 +89,7 @@ class RK2simple(TimeStepBase):
         self.iter += 1
 
 class RK2simplevisc(TimeStepBase):
-    def advance(self, data, dt):
+    def do_advance(self, data, dt):
         """
         from NR:
           k1 = h * RHS(x_n, y_n)
@@ -100,7 +120,7 @@ class RK2simplevisc(TimeStepBase):
         self.iter += 1
 
 class RK2simplehypervisc4(TimeStepBase):
-    def advance(self, data, dt):
+    def do_advance(self, data, dt):
         """
         from NR:
           k1 = h * RHS(x_n, y_n)
