@@ -23,3 +23,6 @@ License:
 
 from .analysis_set import \
     AnalysisSet
+
+from .volume_average import \
+    VolumeAverageSet

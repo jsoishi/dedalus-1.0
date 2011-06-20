@@ -22,7 +22,10 @@ License:
 """
 
 
-from dedalus.analysis.api import AnalysisSet
+from dedalus.analysis.api import \
+    AnalysisSet, \
+    VolumeAverageSet
+
 
 from dedalus.data_objects.api import FourierData
 

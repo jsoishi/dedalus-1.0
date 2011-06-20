@@ -37,18 +37,24 @@ class AnalysisSet(object):
         self.ti = ti
         self.tasks = []
 
-    def add(self, name, cadence):
-        self.tasks.append((self.known_analysis[name], cadence))
+    def add(self, name, cadence, options={}):
+        self.tasks.append((self.known_analysis[name], cadence, options))
 
     def run(self):
-        for f, c in self.tasks:
+        for f, c, kwargs in self.tasks:
             if self.ti.iter % c != 0: continue
-            f(self.data, self.ti.iter)
+            if len(kwargs) == 0:
+                f(self.data, self.ti.iter)
+            else:
+                f(self.data, self.ti.iter, **kwargs)
 
     @classmethod
     def register_task(cls, func):
         cls.known_analysis[func.func_name] = func
 
+@AnalysisSet.register_task
+def volume_average(data, it, va_obj=None):
+    va_obj.run()
 
 @AnalysisSet.register_task
 def field_snap(data, it):
