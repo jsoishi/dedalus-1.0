@@ -91,15 +91,14 @@ def en_spec(data, it):
         #spec[i] = (4*na.pi*i**2*power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
         spec[i] = (power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
 
-    P.loglog(k,spec)
+    P.loglog(k[1:],spec[1:])
     from init_cond import mcwilliams_spec
     mspec = mcwilliams_spec(k,30.)
     mspec *= 0.5/mspec.sum()
     print "E tot spec 1D = %10.5e" % mspec.sum()
     print "E tot spec 2D = %10.5e" % spec.sum()
     print "E0 2D = %10.5e" % spec[0]
-    P.loglog(k, mspec)
-    #P.ylim(1e-20,1e-1)
+    P.loglog(k[1:], mspec[1:])
     P.xlabel(r"$k$")
     P.ylabel(r"$E(k)$")
 
