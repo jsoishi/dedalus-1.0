@@ -21,6 +21,5 @@ License:
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from .analysis import \
+from .analysis_set import \
     AnalysisSet
-    
