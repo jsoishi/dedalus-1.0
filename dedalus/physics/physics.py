@@ -113,9 +113,7 @@ class Hydro(Physics):
         tmp = na.zeros_like(d.data)
         for i,f in enumerate(self.fields):
             tmp +=data[f].k[self._trans[i]] * vgradv[f]['kspace']
-        k2 = na.zeros(data['ux'].data.shape)
-        for k in data['ux'].k.values():
-            k2 += k**2
+        k2 = data['ux'].k2()
 
         k2[k2 == 0] = 1.
         for i,f in enumerate(self.fields):            
