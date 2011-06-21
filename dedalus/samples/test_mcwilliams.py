@@ -30,7 +30,7 @@ data = RHS.create_fields(0.)
 turb(data['ux'],data['uy'],mcwilliams_spec,k0=23.)
 ti = RK2simplehypervisc4(RHS,CFL=0.4)
 ti.stop_time(1.) # set stoptime
-ti.stop_iter(10) # max iterations
+ti.stop_iter(100) # max iterations
 ti.stop_walltime(3600.) # stop after 10 hours
 
 vs = VolumeAverageSet(data)
@@ -40,8 +40,8 @@ vs.add("vort_cenk","%10.5e")
 
 an = AnalysisSet(data, ti)
 an.add("field_snap", 20)
-an.add("en_spec",20)
-an.add("volume_average",10,{'va_obj': vs})
+an.add("en_spec",10)
+an.add("volume_average",5,{'va_obj': vs})
 
 
 #main loop
