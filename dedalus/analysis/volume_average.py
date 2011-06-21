@@ -59,3 +59,28 @@ def ekin(data):
         en += 0.5*(data[f]['kspace']*data[f]['kspace'].conj()).real
 
     return en.sum()
+
+@VolumeAverageSet.register_task
+def enstrophy(data):
+    """compute enstrophy 
+
+    HARDCODED FOR 2D CARTESIAN ONLY!
+
+    """
+    aux = data.__class__(['vortz'],data.time)
+    aux['vortz'] = data['uy'].deriv('x') - data['ux'].deriv('y')
+    
+    enstrophy = (aux['vortz']['xspace']**2).real
+    return enstrophy.mean()
+
+@VolumeAverageSet.register_task
+def vort_cenk(data):
+    """Centroid wavenumber from McWilliams 1990.
+
+    """
+    k2 = data['ux'].k2()
+    en = na.zeros(data['ux']['kspace'].shape)
+    for f in data.fields:
+        en += 0.5*(data[f]['kspace']*data[f]['kspace'].conj()).real
+    
+    return (k2[1:,1:]**1.5*en[1:,1:]).sum()/(k2[1:,1:]*en[1:,1:]).sum()
