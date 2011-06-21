@@ -111,6 +111,12 @@ class FourierData(Representation):
             self.backward()
         return self.data * -1j*self.k[dim]
 
+    def k2(self):
+        k2 = na.zeros(self.data.shape)
+        for k in self.k.values():
+            k2 += k**2
+        return k2
+
 class FourierShearData(FourierData):
     """
 
