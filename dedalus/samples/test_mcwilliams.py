@@ -20,12 +20,7 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
-from physics import Hydro
-from fourier_data import FourierData
-from time_step import RK2simple,RK2simplevisc, RK2simplehypervisc4
-from init_cond import turb, mcwilliams_spec
-from analysis import AnalysisSet
+from dedalus.mods import *
 
 shape = (450,450)
 RHS = Hydro(shape, FourierData)
@@ -35,16 +30,22 @@ data = RHS.create_fields(0.)
 turb(data['ux'],data['uy'],mcwilliams_spec,k0=23.)
 ti = RK2simplehypervisc4(RHS,CFL=0.4)
 ti.stop_time(1.) # set stoptime
-ti.stop_iter(100) # max iterations
+ti.stop_iter(10) # max iterations
 ti.stop_walltime(3600.) # stop after 10 hours
 
+vs = VolumeAverageSet(data)
+vs.add("ekin","%10.5e")
+vs.add("enstrophy","%10.5e")
+vs.add("vort_cenk","%10.5e")
+
 an = AnalysisSet(data, ti)
-an.add("print_energy", 1)
-an.add("field_snap", 10)
-an.add("en_spec",5)
+an.add("field_snap", 20)
+an.add("en_spec",20)
+an.add("volume_average",10,{'va_obj': vs})
+
+
 #main loop
 dt = 2.5e-3
-#snapshot(data,0)
 an.run()
 while ti.ok:
     print "step: %i" % ti.iter
