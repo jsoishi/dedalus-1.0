@@ -24,7 +24,6 @@ License:
 
 import numpy as na
 from dedalus.data_objects.api import create_data
-from yt.funcs import insert_ipython
 class Physics(object):
     """This is a base class for a physics object. It needs to provide
     a right hand side for a time integration scheme.
