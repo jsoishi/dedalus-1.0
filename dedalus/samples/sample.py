@@ -21,11 +21,7 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
-from physics import Hydro
-from fourier_data import FourierData
-from time_step import RK2simple,RK2simplevisc
-from init_cond import taylor_green
+from dedalus.mods import *
 
 shape = (100,100) 
 RHS = Hydro(shape, FourierData)

@@ -109,7 +109,17 @@ class FourierData(Representation):
         """take a derivative along dim"""
         if self._curr_space == 'xspace':
             self.backward()
-        return self.data * -1j*self.k[dim]
+        
+        der = self.data * -1j*self.k[dim]
+        n = self.data.shape
+        der[n[0]/2,n[1]/2+1:] = der[n[0]/2,n[1]/2-1:0:-1].conj()
+        der[n[0]/2+1:,n[1]/2] = der[n[0]/2-1:0:-1,n[1]/2].conj()
+        der[0:1,0:1].imag = 0
+        der[n[0]/2:n[0]/2+1,n[1]/2:n[1]/2+1].imag=0
+        der[n[0]/2:n[0]/2+1,0:1].imag=0
+        der[0:1,n[1]/2:n[1]/2+1].imag=0
+
+        return der
 
     def k2(self):
         k2 = na.zeros(self.data.shape)
