@@ -23,8 +23,9 @@ License:
 """
 
 import numpy as na
-from dedalus.data_objects.api import create_data
-from yt.funcs import insert_ipython
+from dedalus.data_objects.api import create_data, zero_nyquist
+
+from dedalus.funcs import insert_ipython
 class Physics(object):
     """This is a base class for a physics object. It needs to provide
     a right hand side for a time integration scheme.
@@ -103,6 +104,7 @@ class Hydro(Physics):
         for f in self.fields:
             for dim in range(self._ndims):
                 gradv[i] = data[f].deriv(self._trans[dim])
+                zero_nyquist(gradv[i].data)
                 i += 1
                 
         return gradv
@@ -118,6 +120,7 @@ class Hydro(Physics):
         k2[k2 == 0] = 1.
         for i,f in enumerate(self.fields):            
             pressure[f] = data[f].k[self._trans[i]] * tmp/k2
+            zero_nyquist(pressure[f].data)
 
         return pressure
 
