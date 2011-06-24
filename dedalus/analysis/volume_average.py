@@ -92,3 +92,11 @@ def ux_imag(data):
 @VolumeAverageSet.register_task
 def uy_imag(data):
     return data['uy']['xspace'].imag.mean()
+
+@VolumeAverageSet.register_task
+def ux_imag_max(data):
+    return data['ux']['xspace'].imag.max()
+
+@VolumeAverageSet.register_task
+def uy_imag_max(data):
+    return data['uy']['xspace'].imag.max()
