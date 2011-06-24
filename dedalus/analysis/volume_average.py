@@ -84,3 +84,11 @@ def vort_cenk(data):
         en += 0.5*(data[f]['kspace']*data[f]['kspace'].conj()).real
     
     return (k2[1:,1:]**1.5*en[1:,1:]).sum()/(k2[1:,1:]*en[1:,1:]).sum()
+
+@VolumeAverageSet.register_task
+def ux_imag(data):
+    return data['ux']['xspace'].imag.mean()
+
+@VolumeAverageSet.register_task
+def uy_imag(data):
+    return data['uy']['xspace'].imag.mean()
