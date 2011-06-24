@@ -37,11 +37,15 @@ vs = VolumeAverageSet(data)
 vs.add("ekin","%10.5e")
 vs.add("enstrophy","%10.5e")
 vs.add("vort_cenk","%10.5e")
+vs.add("ux_imag", "%10.5e")
+vs.add("uy_imag", "%10.5e")
+vs.add("ux_imag_max", "%10.5e")
+vs.add("uy_imag_max", "%10.5e")
 
 an = AnalysisSet(data, ti)
 an.add("field_snap", 20)
 an.add("en_spec",10)
-an.add("volume_average",5,{'va_obj': vs})
+an.add("volume_average",1,{'va_obj': vs})
 
 
 #main loop
