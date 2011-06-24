@@ -1,5 +1,4 @@
-"""The Main Dedalus data object. This is dynamically created with a
-given representation when the physics class is initialized.
+"""functions to enforce hermitian symmetry.
 
 Author: J. S. Oishi <jsoishi@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
@@ -21,14 +20,28 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from .data_object import \
-    BaseData, \
-    create_data
 
-from .fourier_data import \
-    FourierData
+import numpy as na
 
-from .hermitianize import \
-    enforce_hermitian, \
-    zero_nyquist
-    
+def enforce_hermitian(data):
+    """only works for 2D!!!
+
+    """
+    n = data.shape
+    data[n[0]/2,n[1]/2+1:] = data[n[0]/2,n[1]/2-1:0:-1].conj()
+    data[n[0]/2+1:,n[1]/2] = data[n[0]/2-1:0:-1,n[1]/2].conj()
+    data[0:1,0:1].imag = 0
+    data[n[0]/2:n[0]/2+1,n[1]/2:n[1]/2+1].imag=0
+    data[n[0]/2:n[0]/2+1,0:1].imag=0
+    data[0:1,n[1]/2:n[1]/2+1].imag=0
+
+def zero_nyquist(data):
+    """this zeros the nyquist modes: necessary for using even numbers
+    of fourier modes.
+
+    WORKS ONLY FOR 2D!!
+
+    """
+    n = data.shape
+    data[n[0]/2,:] = 0
+    data[:,n[1]/2] = 0

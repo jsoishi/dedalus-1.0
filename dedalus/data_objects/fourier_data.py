@@ -20,10 +20,10 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
 import numpy as na
 import numpy.fft as fpack
 import fftw3
+from .hermitianize import enforce_hermitian
 
 class Representation(object):
     """a representation of a field. it stores data and provides
@@ -111,14 +111,6 @@ class FourierData(Representation):
             self.backward()
         
         der = self.data * -1j*self.k[dim]
-        n = self.data.shape
-        der[n[0]/2,n[1]/2+1:] = der[n[0]/2,n[1]/2-1:0:-1].conj()
-        der[n[0]/2+1:,n[1]/2] = der[n[0]/2-1:0:-1,n[1]/2].conj()
-        der[0:1,0:1].imag = 0
-        der[n[0]/2:n[0]/2+1,n[1]/2:n[1]/2+1].imag=0
-        der[n[0]/2:n[0]/2+1,0:1].imag=0
-        der[0:1,n[1]/2:n[1]/2+1].imag=0
-
         return der
 
     def k2(self):
