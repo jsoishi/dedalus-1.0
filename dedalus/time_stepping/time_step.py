@@ -82,7 +82,9 @@ class TimeStepBase(object):
 
     def final_stats(self):
         stop_time = time.time()
-        print "total wall time: %10.5e sec" % (stop_time - self.__start_time)
+        total_wtime = stop_time - self.__start_time
+        print "total wall time: %10.5e sec" % total_wtime
+        print "%10.5e sec/step " %(total_wtime/self.iter)
         print "Simulation complete. Status: awesome"
 
 
