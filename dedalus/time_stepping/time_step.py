@@ -23,7 +23,7 @@ License:
 
 import time
 import numpy as na
-from yt.funcs import insert_ipython
+from dedalus.funcs import insert_ipython
 class TimeStepBase(object):
     def __init__(self, RHS, CFL=0.4, int_factor=None):
         """a very simple Runga-Kutta 2 integrator
