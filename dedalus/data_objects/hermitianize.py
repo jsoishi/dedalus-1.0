@@ -34,15 +34,15 @@ def enforce_hermitian(data):
     n = data.shape
     
     # Flip about origin
-    nonzero = [slice(1, None, 1) for i in xrange(data.ndim)]
-    nonzero_flip = [slice(-1, 0, -1) for i in xrange(data.ndim)]
+    nonzero = [slice(1, None, 1)] * data.ndim 
+    nonzero_flip = [slice(-1, 0, -1)] * data.ndim
     S = data[..., :n[-1] / 2]
     data[..., n[-1] / 2:][nonzero] = S[nonzero_flip].conj()
     
     # Enforce Hermitian symmetry in final Nyquist space
     if data.ndim > 1:
-        nonzero = [slice(1, None, 1) for i in xrange(data.ndim - 1)]
-        nonzero_flip = [slice(-1, 0, -1) for i in xrange(data.ndim - 1)]
+        nonzero = [slice(1, None, 1)] * (data.ndim - 1)
+        nonzero_flip = [slice(-1, 0, -1)] * (data.ndim - 1)
         
         S = data[..., 0:n[-2] / 2, n[-1] / 2]
         print 'got here'
@@ -52,7 +52,7 @@ def zero_nyquist(data):
     """Zero out the Nyquist space in each dimension."""
     
     n = data.shape
-    nyspace = [slice(None) for i in xrange(data.ndim)]
+    nyspace = [slice(None)] * data.ndim 
     
     # Pick out Nyquist space for each dimension and set to zero
     for i in xrange(data.ndim):

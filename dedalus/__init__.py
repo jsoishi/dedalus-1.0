@@ -12,7 +12,7 @@ tools for inline analysis and plotting go here.
 
 data_objects
 ------------
-The basic data objects of Dedalus definie both the spatial data layout
+The basic data objects of Dedalus define both the spatial data layout
 *and* the spatial derivative operator on that data. Currently, only
 periodic domains represented by Fourier basis functions are supported.
 
