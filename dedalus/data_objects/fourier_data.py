@@ -23,7 +23,6 @@ License:
 import numpy as na
 import numpy.fft as fpack
 import fftw3
-from .hermitianize import enforce_hermitian
 
 class Representation(object):
     """a representation of a field. it stores data and provides
