@@ -45,7 +45,6 @@ def enforce_hermitian(data):
         nonzero_flip = [slice(-1, 0, -1)] * (data.ndim - 1)
         
         S = data[..., 0:n[-2] / 2, n[-1] / 2]
-        print 'got here'
         data[..., n[-2] / 2:, n[-1] / 2][nonzero] = S[nonzero_flip].conj()
     
 def zero_nyquist(data):
