@@ -54,6 +54,20 @@ class Physics(object):
          else:
               return self.__DataClass(fields, t)
 
+    def create_dealias_field(self, t, fields=None):
+        """data object to implement Orszag 3/2 rule for non-linear
+        terms.
+
+        """
+        name = "%sDealiasData" % self.__class__.__name__
+        shape = [3*d/2 for d in self._shape]
+        data_class = create_data(self._representation, shape, name)
+
+        if fields == None:
+            return data_class(self.fields, t)
+        else:
+            return data_class(fields, t)
+
     def _setup_parameters(self, params):
         for k,v in params.iteritems():
             self.parameters[k] = v
@@ -83,16 +97,18 @@ class Hydro(Physics):
         for i in range(self._naux):
              self.aux_fields.append(self._representation(self._shape))
         self._setup_parameters(params)
-    
+        self._RHS = self.create_fields(0.)
+
     def RHS(self, data):
-        RHS = self.create_fields(data.time)
         vgradv = self.vgradv(data)
         pressure = self.pressure(data, vgradv)
         for f in self.fields:
-            RHS[f] = -vgradv[f]['kspace'] + pressure[f]['kspace']
-            #RHS[f]['kspace'].ravel()[0] = 0.
-        return RHS
-    
+            self._RHS[f] = -vgradv[f]['kspace'] + pressure[f]['kspace']
+            #self._RHS[f]['kspace'].ravel()[0] = 0.
+        self._RHS.time = data.time        
+
+        return self._RHS
+
     def gradv(self, data):
         """compute stress tensor, du_j/dx_i
 
@@ -124,22 +140,48 @@ class Hydro(Physics):
 
         return pressure
 
+    def vgradv_aliased(self, data):
+        d = data['ux']
+        gradv = self.gradv(data)
+        vgradv = self.create_fields(data.time)
+        trans = {0: 'ux', 1: 'uy', 2: 'uz'}
+        for i,f in enumerate(self.fields):
+            b = [i * self._ndims + j for j in range(self._ndims)]
+            tmp = na.zeros_like(d.data)
+            for ii, j in enumerate(b):
+                tmp += data[trans[i]]['xspace'] * gradv[j]['xspace']
+            vgradv[f] = tmp
+            tmp *= 0+0j
+
+        return vgradv
+
     def vgradv(self, data):
         d = data['ux']
         gradv = self.gradv(data)
         vgradv = self.create_fields(data.time)
         trans = {0: 'ux', 1: 'uy', 2: 'uz'}
 
-        tmp = na.zeros_like(d.data)
-        
+        q = self.create_dealias_field(data.time,['u','gu','ugu'])
         for i,f in enumerate(self.fields):
             b = [i * self._ndims + j for j in range(self._ndims)]
-            for i,j, in enumerate(b):
-                tmp += data[trans[i]]['xspace'] * gradv[j]['xspace']
-            vgradv[f] = tmp
-            vgradv[f]._curr_space = 'xspace'
+            tmp = na.zeros_like(q['ugu'].data)
+            for ii,j, in enumerate(b):
+                q['u'].data[:]= 0+0j
+                q['u']._curr_space = 'kspace'
+                q['gu'].data[:] = 0+0j
+                q['gu']._curr_space = 'kspace'
+                zero_nyquist(data[trans[ii]]['kspace'])
+                q['u'] = na.fft.fftshift(data[trans[ii]]['kspace'])
+                q['u'] = na.fft.fftshift(q['u']['kspace'])
+                q['gu'] = na.fft.fftshift(gradv[j]['kspace'])
+                q['gu'] = na.fft.fftshift(q['gu']['kspace'])
+                tmp += q['u']['xspace'] * q['gu']['xspace']
+            tmp.imag = 0.
+            q['ugu'] = tmp
+            q['ugu']._curr_space = 'xspace'
+            vgradv[f] = q['ugu']['kspace']
             tmp *= 0+0j
-            
+
         return vgradv
 
 if __name__ == "__main__":

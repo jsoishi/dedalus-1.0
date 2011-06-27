@@ -23,6 +23,7 @@ License:
 import numpy as na
 import numpy.fft as fpack
 import fftw3
+from .hermitianize import zero_nyquist
 
 class Representation(object):
     """a representation of a field. it stores data and provides
@@ -102,20 +103,25 @@ class FourierData(Representation):
     def backward(self):
         self.ifft()
         self.data /= self.data.size
+        zero_nyquist(self.data)
         self._curr_space = 'kspace'
 
     def deriv(self,dim):
         """take a derivative along dim"""
         if self._curr_space == 'xspace':
             self.backward()
-        
         der = self.data * -1j*self.k[dim]
         return der
 
-    def k2(self):
+    def k2(self, no_zero=False):
+        """returns k**2. if no_zero is set, will set the mean mode to
+        1. useful for division when the mean is not important.
+        """
         k2 = na.zeros(self.data.shape)
         for k in self.k.values():
             k2 += k**2
+        if no_zero:
+            k2[k2 == 0] = 1.
         return k2
 
 class FourierShearData(FourierData):

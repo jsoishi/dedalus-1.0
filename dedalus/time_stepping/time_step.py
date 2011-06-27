@@ -23,6 +23,8 @@ License:
 
 import time
 import numpy as na
+from dedalus.funcs import insert_ipython
+
 class TimeStepBase(object):
     def __init__(self, RHS, CFL=0.4, int_factor=None):
         """a very simple Runga-Kutta 2 integrator
@@ -81,7 +83,9 @@ class TimeStepBase(object):
 
     def final_stats(self):
         stop_time = time.time()
-        print "total wall time: %10.5e sec" % (stop_time - self.__start_time)
+        total_wtime = stop_time - self.__start_time
+        print "total wall time: %10.5e sec" % total_wtime
+        print "%10.5e sec/step " %(total_wtime/self.iter)
         print "Simulation complete. Status: awesome"
 
 

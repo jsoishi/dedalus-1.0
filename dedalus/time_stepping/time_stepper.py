@@ -23,7 +23,7 @@ License:
 
 import time
 import numpy as na
-from yt.funcs import insert_ipython
+from dedalus.funcs import insert_ipython
 class TimeStepper:
     """copied from pencil code
 
