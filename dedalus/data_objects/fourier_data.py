@@ -23,7 +23,7 @@ License:
 import numpy as na
 import numpy.fft as fpack
 import fftw3
-from .hermitianize import enforce_hermitian
+from .hermitianize import enforce_hermitian, zero_nyquist
 
 class Representation(object):
     """a representation of a field. it stores data and provides
@@ -103,6 +103,7 @@ class FourierData(Representation):
     def backward(self):
         self.ifft()
         self.data /= self.data.size
+        zero_nyquist(self.data)
         self._curr_space = 'kspace'
 
     def deriv(self,dim):

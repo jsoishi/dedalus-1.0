@@ -43,12 +43,15 @@ class BaseData(object):
     def __setitem__(self, item, data):
         """this needs to ensure the pointer for the field's data
         member doesn't change for FFTW. Currently, we do that by
-        slicing the entire data array. This will fail if data is not
-        the same shape as the item field.
+        slicing the entire data array. 
         """
         f = self.fields[item]
-        slices = f.dim*(slice(None),)
-        f.data[slices] = data
+        if data.size < f.data.size:
+            sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
+            f.data[sli] = data
+        else:
+            sli = [slice(i) for i in f.data.shape]
+            f.data[:] = data[sli]
 
     def snapshot(self):
         for f in fields:
