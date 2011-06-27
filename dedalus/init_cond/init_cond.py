@@ -78,3 +78,20 @@ def turb(ux, uy, spec, tot_en=0.5, **kwargs):
         u.data[0:1,nx/2:nx/2+1].imag = 0
         u.data[nx/2:nx/2+1,0:1].imag = 0
         u.data[0,0] = 0.
+
+    remove_compressible(ux,uy)
+
+
+def remove_compressible(ux,uy, renorm=False):
+    """project off compressible parts of velocity fields. if renorm is
+    set, will renormalize so ux and uy have the same normalization as
+    before (not implemented yet.
+    """
+    if renorm:
+        raise NotImplementedError
+    ku = na.zeros_like(ux.data)
+    for k, f in zip(('x','y'),(ux,uy)):
+        ku += f.data * f.k[k]
+
+    ux.data[:,:] -= ku * ux.k['x']/ux.k2(no_zero=True)
+    uy.data[:,:] -= ku * uy.k['y']/uy.k2(no_zero=True)
