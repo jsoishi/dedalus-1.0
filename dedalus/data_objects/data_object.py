@@ -53,6 +53,9 @@ class BaseData(object):
             sli = [slice(i) for i in f.data.shape]
             f.data[:] = data[sli]
 
+    def zero(self, item):
+        self.fields[item].data[:] = 0.
+
     def snapshot(self):
         for f in fields:
             pass
