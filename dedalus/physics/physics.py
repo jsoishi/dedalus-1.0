@@ -94,8 +94,8 @@ class Hydro(Physics):
         params = {'nu': 0.}
         
         self.aux_fields = []
-        for i in range(self._naux):
-             self.aux_fields.append(self._representation(self._shape))
+        # for i in range(self._naux):
+        #      self.aux_fields.append(self._representation(self._shape))
         self._setup_parameters(params)
         self._RHS = self.create_fields(0.)
 
@@ -140,22 +140,10 @@ class Hydro(Physics):
 
         return pressure
 
-    def vgradv_aliased(self, data):
-        d = data['ux']
-        gradv = self.gradv(data)
-        vgradv = self.create_fields(data.time)
-        trans = {0: 'ux', 1: 'uy', 2: 'uz'}
-        for i,f in enumerate(self.fields):
-            b = [i * self._ndims + j for j in range(self._ndims)]
-            tmp = na.zeros_like(d.data)
-            for ii, j in enumerate(b):
-                tmp += data[trans[i]]['xspace'] * gradv[j]['xspace']
-            vgradv[f] = tmp
-            tmp *= 0+0j
-
-        return vgradv
-
     def vgradv(self, data):
+        """dealiased vgradv term
+
+        """
         d = data['ux']
         gradv = self.gradv(data)
         vgradv = self.create_fields(data.time)
@@ -183,6 +171,25 @@ class Hydro(Physics):
             tmp *= 0+0j
 
         return vgradv
+
+    def vgradv_aliased(self, data):
+        """fully aliased vgradv term.
+
+        """
+        d = data['ux']
+        gradv = self.gradv(data)
+        vgradv = self.create_fields(data.time)
+        trans = {0: 'ux', 1: 'uy', 2: 'uz'}
+        for i,f in enumerate(self.fields):
+            b = [i * self._ndims + j for j in range(self._ndims)]
+            tmp = na.zeros_like(d.data)
+            for ii, j in enumerate(b):
+                tmp += data[trans[i]]['xspace'] * gradv[j]['xspace']
+            vgradv[f] = tmp
+            tmp *= 0+0j
+
+        return vgradv
+
 
 if __name__ == "__main__":
     import pylab as P
