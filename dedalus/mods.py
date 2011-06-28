@@ -34,7 +34,8 @@ from dedalus.init_cond.api import \
     sin_x, \
     sin_y, \
     turb,  \
-    mcwilliams_spec
+    mcwilliams_spec, \
+    MIT_vortices
 
 from dedalus.physics.api import Hydro
 

@@ -25,7 +25,8 @@ from .init_cond import \
     taylor_green, \
     sin_x, \
     sin_y, \
-    turb
+    turb, \
+    MIT_vortices
 
 from .turb_spectra import \
     mcwilliams_spec

@@ -95,3 +95,23 @@ def remove_compressible(ux,uy, renorm=False):
 
     ux.data[:,:] -= ku * ux.k['x']/ux.k2(no_zero=True)
     uy.data[:,:] -= ku * uy.k['y']/uy.k2(no_zero=True)
+
+def MIT_vortices(data):
+    """define the 2D vortices from the MIT 18.336 sample matlab script at 
+
+    http://math.mit.edu/cse/codes/mit18336_spectral_ns2d.m
+
+    """
+    
+    sh = data['ux'].data.shape
+    x, y = na.meshgrid(na.r_[0:sh[0]]*2*na.pi/sh[0],na.r_[0:sh[1]]*2*na.pi/sh[1])
+    aux = data.__class__(['w','psi'],0.)
+    aux['w']=na.exp(-((x-na.pi)**2+(y-na.pi+na.pi/4)**2)/(0.2)) \
+        +na.exp(-((x-na.pi)**2+(y-na.pi-na.pi/4)**2)/(0.2)) \
+        -0.5*na.exp(-((x-na.pi-na.pi/4)**2+(y-na.pi-na.pi/4)**2)/(0.4))
+    aux['w']._curr_space = 'xspace'
+    aux['psi'] = aux['w']['kspace']/aux['w'].k2(no_zero=True)
+
+    data['ux'] = aux['psi'].deriv('y')
+    data['uy'] = -aux['psi'].deriv('x')
+    
