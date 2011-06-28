@@ -81,10 +81,11 @@ def field_snap(data, it):
                     cbar_location="top",
                     cbar_mode="each")
     for i,f in enumerate(fields):
-        im = grid[i].imshow(data[f]['xspace'].real, cmap='bone')
+        im = grid[i].imshow(data[f]['xspace'].real)
         grid[i].text(0.05,0.95,f, transform=grid[i].transAxes, size=24,color='white')
         grid.cbar_axes[i].colorbar(im)
-
+    tstr = 't = %5.2f' % data.time
+    grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
     if not os.path.exists('frames'):
         os.mkdir('frames')
     outfile = "frames/snap_%04i.png" % it
