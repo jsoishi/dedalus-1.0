@@ -53,6 +53,15 @@ class BaseData(object):
             sli = [slice(i) for i in f.data.shape]
             f.data[:] = data[sli]
 
+    def add_field(self, field):
+        """add a new field. There is a SIGNIFICANT performace penalty
+        for doing this (creating the FFTW plan), so make sure it does
+        not happen inside any loops you care about performance on....
+
+        """
+        if field not in self.fields.keys():
+            self.fields[field] = self.representation(self.shape)
+
     def zero(self, item):
         self.fields[item].data[:] = 0.
 
