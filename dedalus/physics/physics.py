@@ -131,9 +131,8 @@ class Hydro(Physics):
         tmp = na.zeros_like(d.data)
         for i,f in enumerate(self.fields):
             tmp +=data[f].k[self._trans[i]] * vgradv[f]['kspace']
-        k2 = data['ux'].k2()
+        k2 = data['ux'].k2(no_zero=True)
 
-        k2[k2 == 0] = 1.
         for i,f in enumerate(self.fields):            
             pressure[f] = data[f].k[self._trans[i]] * tmp/k2
             zero_nyquist(pressure[f].data)
