@@ -116,7 +116,6 @@ class Hydro(Physics):
         gradv = self.create_fields(data.time,fields=range(self._ndims**2))
         i = 0
 
-        slices = self._ndims*(slice(None),)
         for f in self.fields:
             for dim in range(self._ndims):
                 gradv[i] = data[f].deriv(self._trans[dim])
