@@ -65,6 +65,10 @@ class BaseData(object):
     def zero(self, item):
         self.fields[item].data[:] = 0.
 
+    def zero_all(self):
+        for f in self.fields.keys():
+            self.zero(f)
+
     def snapshot(self):
         for f in fields:
             pass
