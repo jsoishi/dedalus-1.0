@@ -90,6 +90,11 @@ class TimeStepBase(object):
 
 
 class RK2simple(TimeStepBase):
+    def __init__(self, *arg, **kwargs):
+        TimeStepBase.__init__(self, *arg, **kwargs)
+        self.tmp_fields = self.RHS.create_fields(0.)
+        self.field_dt = self.RHS.create_fields(0.)
+
     def do_advance(self, data, dt):
         """
         from NR:
@@ -97,24 +102,25 @@ class RK2simple(TimeStepBase):
           k2 = h * RHS(x_n + 1/2*h, y_n + 1/2*k1)
           y_n+1 = y_n + k2 +O(h**3)
         """
-        tmp_fields = self.RHS.create_fields(data.time)
-        field_dt = self.RHS.create_fields(data.time)
-
+        self.tmp_fields.time = data.time
+        self.field_dt.time = data.time
         # first step
         for f in self.RHS.fields:
-            field_dt[f] = self.RHS.RHS(data)[f]['kspace']
-            tmp_fields[f] = data[f]['kspace'] + dt/2. * field_dt[f]['kspace']
-        tmp_fields.time = data.time + dt/2.
+            self.field_dt[f] = self.RHS.RHS(data)[f]['kspace']
+            self.tmp_fields[f] = data[f]['kspace'] + dt/2. * self.field_dt[f]['kspace']
+        self.tmp_fields.time = data.time + dt/2.
 
         # second step
         for f in self.RHS.fields:
             field_dt[f] = self.RHS.RHS(tmp_fields)[f]['kspace']
-            data[f] = data[f]['kspace'] + dt * field_dt[f]['kspace']
+            data[f] = data[f]['kspace'] + dt * self.field_dt[f]['kspace']
         data.time += dt
         self.time += dt
         self.iter += 1
+        self.tmp_fields.zero_all() 
+        self.field_dt.zero_all()
 
-class RK2simplevisc(TimeStepBase):
+class RK2simplevisc(RK2simple):
     def do_advance(self, data, dt):
         """
         from NR:
@@ -122,30 +128,29 @@ class RK2simplevisc(TimeStepBase):
           k2 = h * RHS(x_n + 1/2*h, y_n + 1/2*k1)
           y_n+1 = y_n + k2 +O(h**3)
         """
-        tmp_fields = self.RHS.create_fields(data.time)
-        field_dt = self.RHS.create_fields(data.time)
+        self.tmp_fields.time = data.time
+        self.field_dt.time = data.time
 
-        k2 = na.zeros(data['ux'].data.shape)
-        for k in data['ux'].k.values():
-            k2 += k**2
-
+        k2 = data['ux'].k2()
         # first step
         viscosity = na.exp(-k2*dt/2.*self.RHS.parameters['nu'])
         for f in self.RHS.fields:
-            field_dt[f] = self.RHS.RHS(data)[f]['kspace']
-            tmp_fields[f] = (data[f]['kspace'] + dt/2. * field_dt[f]['kspace'])*viscosity
+            self.field_dt[f] = self.RHS.RHS(data)[f]['kspace']
+            self.tmp_fields[f] = (data[f]['kspace'] + dt/2. * self.field_dt[f]['kspace'])*viscosity
             
-        tmp_fields.time = data.time + dt/2.
+        self.tmp_fields.time = data.time + dt/2.
 
         # second step
         for f in self.RHS.fields:
-            field_dt[f] = self.RHS.RHS(tmp_fields)[f]['kspace']
-            data[f] = (data[f]['kspace'] * viscosity + dt * field_dt[f]['kspace'])*viscosity
+            self.field_dt[f] = self.RHS.RHS(self.tmp_fields)[f]['kspace']
+            data[f] = (data[f]['kspace'] * viscosity + dt * self.field_dt[f]['kspace'])*viscosity
         data.time += dt
         self.time += dt
         self.iter += 1
+        self.tmp_fields.zero_all() 
+        self.field_dt.zero_all()
 
-class RK2simplehypervisc4(TimeStepBase):
+class RK2simplehypervisc4(RK2simple):
     def do_advance(self, data, dt):
         """
         from NR:
@@ -153,8 +158,8 @@ class RK2simplehypervisc4(TimeStepBase):
           k2 = h * RHS(x_n + 1/2*h, y_n + 1/2*k1)
           y_n+1 = y_n + k2 +O(h**3)
         """
-        tmp_fields = self.RHS.create_fields(data.time)
-        field_dt = self.RHS.create_fields(data.time)
+        self.tmp_fields.time = data.time
+        self.field_dt.time = data.time
 
         k4 = na.zeros(data['ux'].data.shape)
         for k in data['ux'].k.values():
@@ -162,16 +167,31 @@ class RK2simplehypervisc4(TimeStepBase):
 
         # first step
         viscosity = na.exp(-k4*dt/2.*self.RHS.parameters['nu'])
+        self.field_dt = self.RHS.RHS(data)
         for f in self.RHS.fields:
-            field_dt[f] = self.RHS.RHS(data)[f]['kspace']
-            tmp_fields[f] = (data[f]['kspace'] + dt/2. * field_dt[f]['kspace'])*viscosity
+            self.tmp_fields[f] = (data[f]['kspace'] + dt/2. * self.field_dt[f]['kspace'])*viscosity
             
-        tmp_fields.time = data.time + dt/2.
+        self.tmp_fields.time = data.time + dt/2.
 
         # second step
+        self.field_dt = self.RHS.RHS(self.tmp_fields)
         for f in self.RHS.fields:
-            field_dt[f] = self.RHS.RHS(tmp_fields)[f]['kspace']
-            data[f] = (data[f]['kspace'] * viscosity + dt * field_dt[f]['kspace'])*viscosity
+            data[f] = (data[f]['kspace'] * viscosity + dt * self.field_dt[f]['kspace'])*viscosity
+        data.time += dt
+        self.time += dt
+        self.iter += 1
+        #self.tmp_fields.zero_all() 
+        #self.field_dt.zero_all()
+
+class CrankNicholsonVisc(TimeStepBase):
+    def do_advance(self, data, dt):
+        k2 = data['ux'].k2()
+        top = (1./dt - 0.5*self.RHS.parameters['nu']*k2)
+        bottom  = (1./dt + 0.5*self.RHS.parameters['nu']*k2)
+        deriv = self.RHS.RHS(data)
+        for f in deriv.fields:
+            data[f] = top/bottom * data[f]['kspace'] - 1./bottom * deriv[f]['kspace']
+
         data.time += dt
         self.time += dt
         self.iter += 1
