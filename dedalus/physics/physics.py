@@ -138,6 +138,7 @@ class Hydro(Physics):
 
         for i,f in enumerate(self.fields):            
             pressure[f] = data[f].k[self._trans[i]] * tmp/k2
+            pressure[f]._curr_space = 'kspace'
             zero_nyquist(pressure[f].data)
 
     def vgradv(self, data):
