@@ -108,7 +108,8 @@ class Hydro(Physics):
         pressure = self.aux_fields['pressure']
         #insert_ipython()
         for f in self.fields:
-            self._RHS[f] = -vgradv[f]['kspace'] + pressure[f]['kspace']
+            # not sure why this sign is wrong....
+            self._RHS[f] = +vgradv[f]['kspace'] - pressure[f]['kspace']
         self._RHS.time = data.time        
 
         return self._RHS

@@ -136,14 +136,14 @@ class RK2simplevisc(RK2simple):
         viscosity = na.exp(-k2*dt/2.*self.RHS.parameters['nu'])
         self.field_dt = self.RHS.RHS(data)
         for f in self.RHS.fields:
-            self.tmp_fields[f] = (data[f]['kspace'] - dt/2. * self.field_dt[f]['kspace'])*viscosity
+            self.tmp_fields[f] = (data[f]['kspace'] + dt/2. * self.field_dt[f]['kspace'])*viscosity
             self.tmp_fields[f]._curr_space ='kspace'
         self.tmp_fields.time = data.time + dt/2.
 
         # second step
         self.field_dt = self.RHS.RHS(self.tmp_fields)
         for f in self.RHS.fields:
-            data[f] = (data[f]['kspace'] * viscosity - dt * self.field_dt[f]['kspace'])*viscosity
+            data[f] = (data[f]['kspace'] * viscosity + dt * self.field_dt[f]['kspace'])*viscosity
 
         data.time += dt
         self.time += dt
@@ -190,7 +190,7 @@ class CrankNicholsonVisc(TimeStepBase):
         bottom  = (1./dt + 0.5*self.RHS.parameters['nu']*k2)
         deriv = self.RHS.RHS(data)
         for f in deriv.fields:
-            data[f] = top/bottom * data[f]['kspace'] - 1./bottom * deriv[f]['kspace']
+            data[f] = top/bottom * data[f]['kspace'] + 1./bottom * deriv[f]['kspace']
 
         data.time += dt
         self.time += dt
