@@ -183,7 +183,8 @@ class Hydro(Physics):
         gradv = self.aux_fields['gradv']
         vgradv = self.aux_fields['vgradv']
         trans = {0: 'ux', 1: 'uy', 2: 'uz'}
-        dealias = (na.abs(d.k['x']) > 2/3. *self._shape[0]/2.) & (na.abs(d.k['y']) > 2/3. * self._shape[1]/2.)
+        dealias = (na.abs(d.k['x']) > 2/3. *self._shape[0]/2.) | (na.abs(d.k['y']) > 2/3. * self._shape[1]/2.)
+        insert_ipython()
         tmp = na.zeros_like(d.data)
         for i,f in enumerate(self.fields):
             b = [i * self._ndims + j for j in range(self._ndims)]
