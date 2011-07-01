@@ -72,9 +72,9 @@ class Physics(object):
         for k,v in params.iteritems():
             self.parameters[k] = v
 
-    def _setup_aux_fields(self, aux):
-         for f in aux:
-              self.aux_fields[f] = representation(self,shape)
+    def _setup_aux_fields(self, t, aux, aux_comp):
+         for f, c in zip(aux, aux_comp):
+              self.aux_fields[f] = self.create_fields(t, c)
 
     def RHS(self):
         pass
@@ -86,25 +86,29 @@ class Hydro(Physics):
     def __init__(self,*args):
         Physics.__init__(self, *args)
         self.fields = ['ux','uy']
-        self._naux = 4
+        self._aux = ['vgradv','pressure','gradv']
+        aux_types = [None, None, range(4)]
         if self._ndims == 3:
              self.fields.append('uz')
-             self._naux = 9
+             aux_types[-1] = range(9)
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0.}
-        
-        self.aux_fields = []
-        # for i in range(self._naux):
-        #      self.aux_fields.append(self._representation(self._shape))
+
+        self.q = self.create_dealias_field(0.,['u','gu','ugu'])
+        self._setup_aux_fields(0., self._aux,aux_types)
         self._setup_parameters(params)
         self._RHS = self.create_fields(0.)
 
     def RHS(self, data):
-        vgradv = self.vgradv(data)
-        pressure = self.pressure(data, vgradv)
+        #self.vgradv(data)
+        self.vgradv_23dealias(data)
+        #self.vgradv_aliased(data)
+        self.pressure(data)
+        vgradv = self.aux_fields['vgradv']
+        pressure = self.aux_fields['pressure']
+        #insert_ipython()
         for f in self.fields:
             self._RHS[f] = -vgradv[f]['kspace'] + pressure[f]['kspace']
-            #self._RHS[f]['kspace'].ravel()[0] = 0.
         self._RHS.time = data.time        
 
         return self._RHS
@@ -113,20 +117,20 @@ class Hydro(Physics):
         """compute stress tensor, du_j/dx_i
 
         """
-        gradv = self.create_fields(data.time,fields=range(self._ndims**2))
+        gradv = self.aux_fields['gradv']
         i = 0
 
         for f in self.fields:
             for dim in range(self._ndims):
                 gradv[i] = data[f].deriv(self._trans[dim])
+                gradv[i]._curr_space = 'kspace'
                 zero_nyquist(gradv[i].data)
                 i += 1
-                
-        return gradv
 
-    def pressure(self, data, vgradv):
+    def pressure(self, data):
         d = data['ux']
-        pressure = self.create_fields(data.time)
+        pressure = self.aux_fields['pressure']
+        vgradv = self.aux_fields['vgradv']
         tmp = na.zeros_like(d.data)
         for i,f in enumerate(self.fields):
             tmp +=data[f].k[self._trans[i]] * vgradv[f]['kspace']
@@ -136,58 +140,75 @@ class Hydro(Physics):
             pressure[f] = data[f].k[self._trans[i]] * tmp/k2
             zero_nyquist(pressure[f].data)
 
-        return pressure
-
     def vgradv(self, data):
-        """dealiased vgradv term
+        """dealiased vgradv term. This uses temporary dealias fields
+        with 3/2 as many points as the shape of the data object.
 
         """
         d = data['ux']
-        gradv = self.gradv(data)
-        vgradv = self.create_fields(data.time)
+        self.gradv(data)
+        gradv = self.aux_fields['gradv']
+        vgradv = self.aux_fields['vgradv']
         trans = {0: 'ux', 1: 'uy', 2: 'uz'}
-
-        q = self.create_dealias_field(data.time,['u','gu','ugu'])
+        self.q.zero_all()
         for i,f in enumerate(self.fields):
             b = [i * self._ndims + j for j in range(self._ndims)]
-            tmp = na.zeros_like(q['ugu'].data)
+            tmp = na.zeros_like(self.q['ugu'].data)
             for ii,j, in enumerate(b):
-                q['u'].data[:]= 0+0j
-                q['u']._curr_space = 'kspace'
-                q['gu'].data[:] = 0+0j
-                q['gu']._curr_space = 'kspace'
+                self.q['u'].data[:]= 0+0j
+                self.q['u']._curr_space = 'kspace'
+                self.q['gu'].data[:] = 0+0j
+                self.q['gu']._curr_space = 'kspace'
                 zero_nyquist(data[trans[ii]]['kspace'])
-                q['u'] = na.fft.fftshift(data[trans[ii]]['kspace'])
-                q['u'] = na.fft.fftshift(q['u']['kspace'])
-                q['gu'] = na.fft.fftshift(gradv[j]['kspace'])
-                q['gu'] = na.fft.fftshift(q['gu']['kspace'])
-                tmp += q['u']['xspace'] * q['gu']['xspace']
+                self.q['u'] = na.fft.fftshift(data[trans[ii]]['kspace'])
+                self.q['u'] = na.fft.fftshift(self.q['u']['kspace'])
+                self.q['gu'] = na.fft.fftshift(gradv[j]['kspace'])
+                self.q['gu'] = na.fft.fftshift(self.q['gu']['kspace'])
+                tmp += self.q['u']['xspace'] * self.q['gu']['xspace']
             tmp.imag = 0.
-            q['ugu'] = tmp
-            q['ugu']._curr_space = 'xspace'
-            vgradv[f] = q['ugu']['kspace']
+            self.q['ugu'] = tmp
+            self.q['ugu']._curr_space = 'xspace'
+            vgradv[f] = self.q['ugu']['kspace']
             tmp *= 0+0j
 
-        return vgradv
+    def vgradv_23dealias(self, data):
+        """this computes the vgradv dealiased using 2/3 of the total
+        resolution.
+
+        """
+        d = data['ux']
+        self.gradv(data)
+        gradv = self.aux_fields['gradv']
+        vgradv = self.aux_fields['vgradv']
+        trans = {0: 'ux', 1: 'uy', 2: 'uz'}
+        dealias = (na.abs(d.k['x']) > 2/3. *self._shape[0]/2.) & (na.abs(d.k['y']) > 2/3. * self._shape[1]/2.)
+        tmp = na.zeros_like(d.data)
+        for i,f in enumerate(self.fields):
+            b = [i * self._ndims + j for j in range(self._ndims)]
+            for ii, j in enumerate(b):
+                tmp += data[trans[ii]]['xspace'] * gradv[j]['xspace']
+            vgradv[f] = tmp.real
+            vgradv[f]._curr_space = 'xspace'
+            vgradv[f]['kspace'][dealias] = 0.
+            tmp *= 0+0j
 
     def vgradv_aliased(self, data):
         """fully aliased vgradv term.
 
         """
         d = data['ux']
-        gradv = self.gradv(data)
-        vgradv = self.create_fields(data.time)
+        self.gradv(data)
+        gradv = self.aux_fields['gradv']
+        vgradv = self.aux_fields['vgradv']
         trans = {0: 'ux', 1: 'uy', 2: 'uz'}
+        tmp = na.zeros_like(d.data)
         for i,f in enumerate(self.fields):
             b = [i * self._ndims + j for j in range(self._ndims)]
-            tmp = na.zeros_like(d.data)
             for ii, j in enumerate(b):
-                tmp += data[trans[i]]['xspace'] * gradv[j]['xspace']
+                tmp += data[trans[ii]]['xspace'] * gradv[j]['xspace']
             vgradv[f] = tmp
+            vgradv[f]._curr_space = 'xspace'
             tmp *= 0+0j
-
-        return vgradv
-
 
 if __name__ == "__main__":
     import pylab as P
