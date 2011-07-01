@@ -105,14 +105,14 @@ class RK2simple(TimeStepBase):
         self.tmp_fields.time = data.time
         self.field_dt.time = data.time
         # first step
+        self.field_dt = self.RHS.RHS(data)
         for f in self.RHS.fields:
-            self.field_dt[f] = self.RHS.RHS(data)[f]['kspace']
             self.tmp_fields[f] = data[f]['kspace'] + dt/2. * self.field_dt[f]['kspace']
         self.tmp_fields.time = data.time + dt/2.
 
         # second step
+        self.field_dt = self.RHS.RHS(tmp_fields)
         for f in self.RHS.fields:
-            field_dt[f] = self.RHS.RHS(tmp_fields)[f]['kspace']
             data[f] = data[f]['kspace'] + dt * self.field_dt[f]['kspace']
         data.time += dt
         self.time += dt
@@ -134,16 +134,17 @@ class RK2simplevisc(RK2simple):
         k2 = data['ux'].k2()
         # first step
         viscosity = na.exp(-k2*dt/2.*self.RHS.parameters['nu'])
+        self.field_dt = self.RHS.RHS(data)
         for f in self.RHS.fields:
-            self.field_dt[f] = self.RHS.RHS(data)[f]['kspace']
-            self.tmp_fields[f] = (data[f]['kspace'] + dt/2. * self.field_dt[f]['kspace'])*viscosity
-            
+            self.tmp_fields[f] = (data[f]['kspace'] - dt/2. * self.field_dt[f]['kspace'])*viscosity
+            self.tmp_fields[f]._curr_space ='kspace'
         self.tmp_fields.time = data.time + dt/2.
 
         # second step
+        self.field_dt = self.RHS.RHS(self.tmp_fields)
         for f in self.RHS.fields:
-            self.field_dt[f] = self.RHS.RHS(self.tmp_fields)[f]['kspace']
-            data[f] = (data[f]['kspace'] * viscosity + dt * self.field_dt[f]['kspace'])*viscosity
+            data[f] = (data[f]['kspace'] * viscosity - dt * self.field_dt[f]['kspace'])*viscosity
+
         data.time += dt
         self.time += dt
         self.iter += 1
@@ -172,7 +173,6 @@ class RK2simplehypervisc4(RK2simple):
             self.tmp_fields[f] = (data[f]['kspace'] + dt/2. * self.field_dt[f]['kspace'])*viscosity
             
         self.tmp_fields.time = data.time + dt/2.
-
         # second step
         self.field_dt = self.RHS.RHS(self.tmp_fields)
         for f in self.RHS.fields:
