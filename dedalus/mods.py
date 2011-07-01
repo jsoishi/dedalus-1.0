@@ -40,8 +40,8 @@ from dedalus.init_cond.api import \
 from dedalus.physics.api import Hydro
 
 from dedalus.time_stepping.api import \
-        RK2simple,\
+    RK2simple,\
     RK2simplevisc, \
-    RK2simplehypervisc4
-
+    RK2simplehypervisc4, \
+    CrankNicholsonVisc
 
