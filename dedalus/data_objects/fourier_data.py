@@ -93,8 +93,28 @@ class FourierData(Representation):
         
     def set_fft(self, method):
         if method == 'fftw':
-            self.fft = fftw3.Plan(self.data,direction='forward', flags=['measure'])
-            self.ifft = fftw3.Plan(self.data,direction='backward', flags=['measure'])
+            self.fplan = fftw3.Plan(self.data,direction='forward', flags=['measure'])
+            self.rplan = fftw3.Plan(self.data,direction='backward', flags=['measure'])
+            self.fft = self.fwd_fftw
+            self.ifft = self.rev_fftw
+        if method == 'numpy':
+            self.fft = self.fwd_np
+            self.ifft = self.rev_np
+
+    def fwd_fftw(self):
+        self.fplan()
+        self.data.imag = 0.
+
+    def rev_fftw(self):
+        self.rplan()
+        self.data /= self.data.size
+
+    def fwd_np(self):
+        self.data = fpack.fftn(self.data)
+        self.data.imag = 0
+
+    def rev_np(self):
+        self.data = fpack.ifftn(self.data)
 
     def forward(self):
         self.fft()
@@ -102,7 +122,7 @@ class FourierData(Representation):
 
     def backward(self):
         self.ifft()
-        self.data /= self.data.size
+        #self.data /= self.data.size
         zero_nyquist(self.data)
         self._curr_space = 'kspace'
 
@@ -110,7 +130,7 @@ class FourierData(Representation):
         """take a derivative along dim"""
         if self._curr_space == 'xspace':
             self.backward()
-        der = self.data * -1j*self.k[dim]
+        der = self.data * 1j*self.k[dim]
         return der
 
     def k2(self, no_zero=False):
