@@ -1,4 +1,5 @@
-"""API for physics
+"""Auxiliary equation class. This holds simple ODEs that need to be
+solved in addition to the fluid variables.
 
 Author: J. S. Oishi <jsoishi@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
@@ -21,8 +22,14 @@ License:
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from .physics import \
-    Hydro,\
-    LinearCollisionlessCosmology
+class AuxEquation(object):
+    def __init__(self, RHS, init_cond=0.):
+        """a simple class to hold the current value and Right Hand
+        Side (RHS) of an ODE.
 
-    
+        """
+        self.RHS = RHS
+        self.value = init_cond
+
+    def __setitem__(self, data):
+        self.value = data
