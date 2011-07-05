@@ -210,6 +210,40 @@ class Hydro(Physics):
             vgradv[f] = tmp
             vgradv[f]._curr_space = 'xspace'
             tmp *= 0+0j
+            
+class MHD(Hydro):
+    """
+    Magnetohydrodynamics.
+    """
+    
+    def __init__(self, *args):
+        Hydro.__init__(self, *args)
+        
+        # Add data fields for magnetic field components
+        self.fields += ['Bx', 'By', 'Bz'][0:self._ndims]
+        self._aux += ['Ax', 'Ay', 'Az'][0:self._ndims]
+        aux_types = [None, None, range(self._ndims ** 2), None, None, None]
+        
+        self._trans = {0: 'x', 1: 'y', 2: 'z'}
+        params = {'nu': 0., 'eta': 0.}
+
+        # Build now, unless derived class
+        if self.__class__.__name__ == 'MHD':
+            self.q = self.create_dealias_field(0.,['u','gu','ugu'])
+            self._setup_aux_fields(0., self._aux,aux_types)
+            self._setup_parameters(params)
+            self._RHS = self.create_fields(0.)
+
+            
+            
+            
+            
+
+            
+            
+            
+            
+            
 
 if __name__ == "__main__":
     import pylab as P
