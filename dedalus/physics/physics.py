@@ -231,8 +231,8 @@ class MHD(Hydro):
         
         # Add data fields for magnetic field components
         self.fields += ['Bx', 'By', 'Bz'][0:self._ndims]
-        self._aux += ['Ax', 'Ay', 'Az'][0:self._ndims]
-        aux_types = [None, None, range(self._ndims ** 2), None, None, None]
+        self._aux += ['lorentz', 'Ax', 'Ay', 'Az'][0:self._ndims + 1]
+        aux_types = [None, None, range(self._ndims ** 2), None, None, None, None]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'eta': 0.}
@@ -244,9 +244,26 @@ class MHD(Hydro):
             self._setup_parameters(params)
             self._RHS = self.create_fields(0.)
 
+    def RHS(self, data):
+        """Compute time derivative of fields."""
+        self.vgradv(data, dealias='2/3')
+        self.pressure(data)
+        self.lorentz(data)
+        vgradv = self.aux_fields['vgradv']
+        pressure = self.aux_fields['pressure']
+        lorentz = self.auxfields['lorentz']
+        #insert_ipython()
+        for f in self.fields:
+            # not sure why this sign is wrong....
+            self._RHS[f] = +vgradv[f]['kspace'] - pressure[f]['kspace'] + lorentz[f]['kspace']
+        self._RHS.time = data.time        
+
+        return self._RHS
             
-            
-            
+    def lorentz(self, data):
+        """Compute Lorentz force on fluid."""
+        
+        pass
             
 
             
