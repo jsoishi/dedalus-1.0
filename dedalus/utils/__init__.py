@@ -1,4 +1,4 @@
-"""API for physics
+"""utility functions
 
 Author: J. S. Oishi <jsoishi@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
@@ -20,9 +20,3 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
-from .physics import \
-    Hydro,\
-    LinearCollisionlessCosmology
-
-    

@@ -27,7 +27,9 @@ from dedalus.funcs import insert_ipython
 
 class TimeStepBase(object):
     def __init__(self, RHS, CFL=0.4, int_factor=None):
-        """a very simple Runga-Kutta 2 integrator
+        """Base class for dedalus time stepping methods. Provides
+        stopping controls, statistics, and (eventually) a snapshotting
+        trigger.
 
         """
         self.RHS = RHS
@@ -91,6 +93,9 @@ class TimeStepBase(object):
 
 class RK2simple(TimeStepBase):
     def __init__(self, *arg, **kwargs):
+        """a very simple Runga-Kutta 2 integrator
+
+        """
         TimeStepBase.__init__(self, *arg, **kwargs)
         self.tmp_fields = self.RHS.create_fields(0.)
         self.field_dt = self.RHS.create_fields(0.)
@@ -108,12 +113,19 @@ class RK2simple(TimeStepBase):
         self.field_dt = self.RHS.RHS(data)
         for f in self.RHS.fields:
             self.tmp_fields[f] = data[f]['kspace'] + dt/2. * self.field_dt[f]['kspace']
+            self.tmp_fields[f]._curr_space ='kspace'
+        for a in self.RHS.aux_eqns.values():
+            a_tmp = a.value + dt/2. * a.RHS(a.value)
         self.tmp_fields.time = data.time + dt/2.
 
         # second step
-        self.field_dt = self.RHS.RHS(tmp_fields)
+        self.field_dt = self.RHS.RHS(self.tmp_fields)
         for f in self.RHS.fields:
             data[f] = data[f]['kspace'] + dt * self.field_dt[f]['kspace']
+            self.tmp_fields[f]._curr_space ='kspace'
+        for a in self.RHS.aux_eqns.values():
+            a.value = a.value + dt/2. * a.RHS(a_tmp)
+
         data.time += dt
         self.time += dt
         self.iter += 1
@@ -171,12 +183,13 @@ class RK2simplehypervisc4(RK2simple):
         self.field_dt = self.RHS.RHS(data)
         for f in self.RHS.fields:
             self.tmp_fields[f] = (data[f]['kspace'] + dt/2. * self.field_dt[f]['kspace'])*viscosity
-            
+            self.tmp_fields[f]._curr_space ='kspace'            
         self.tmp_fields.time = data.time + dt/2.
         # second step
         self.field_dt = self.RHS.RHS(self.tmp_fields)
         for f in self.RHS.fields:
             data[f] = (data[f]['kspace'] * viscosity + dt * self.field_dt[f]['kspace'])*viscosity
+            self.tmp_fields[f]._curr_space ='kspace'
         data.time += dt
         self.time += dt
         self.iter += 1

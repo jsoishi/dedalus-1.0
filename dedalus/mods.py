@@ -26,7 +26,6 @@ from dedalus.analysis.api import \
     AnalysisSet, \
     VolumeAverageSet
 
-
 from dedalus.data_objects.api import FourierData
 
 from dedalus.init_cond.api import \
@@ -37,7 +36,10 @@ from dedalus.init_cond.api import \
     mcwilliams_spec, \
     MIT_vortices
 
-from dedalus.physics.api import Hydro
+from dedalus.physics.api import \
+    Hydro, \
+    LinearCollisionlessCosmology
+
 
 from dedalus.time_stepping.api import \
     RK2simple,\

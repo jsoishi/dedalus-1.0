@@ -1,4 +1,4 @@
-"""API for physics
+"""Cosmology metric functions
 
 Author: J. S. Oishi <jsoishi@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
@@ -21,8 +21,10 @@ License:
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from .physics import \
-    Hydro,\
-    LinearCollisionlessCosmology
+import numpy as na
 
-    
+def friedmann(a, H0, Omega_r, Omega_m, Omega_l):
+    """right hand side of the first Friedmann equation.
+
+    """
+    return H0*na.sqrt(Omega_r / a**4 + Omega_m / a**3 + Omega_l)
