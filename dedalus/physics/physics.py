@@ -23,8 +23,8 @@ License:
 """
 
 import numpy as na
-from dedalus.data_objects.api import create_data, zero_nyquist
-
+from dedalus.data_objects.api import create_data, zero_nyquist, AuxEquation
+from dedalus.utils.api import friedmann
 from dedalus.funcs import insert_ipython
 class Physics(object):
     """This is a base class for a physics object. It needs to provide
@@ -39,6 +39,7 @@ class Physics(object):
         self.parameters = {}
         self.fields = {}
         self.aux_fields = {}
+        self.aux_eqns = {}
     
     def __getitem__(self, item):
          a = self.parameters.get(item, None)
@@ -76,6 +77,18 @@ class Physics(object):
          for f, c in zip(aux, aux_comp):
               self.aux_fields[f] = self.create_fields(t, c)
 
+    def _setup_aux_eqns(self, aux_eqns, RHS, ics):
+        """ create auxiliary ODEs to be solved alongside the spatial gradients.
+
+        inputs
+        ------
+        aux_eqns -- a list of names for the equations
+        RHS -- 
+
+        """
+        for f, r, ic in zip(aux_eqns, RHS, ics):
+            self.aux_eqns[f] = AuxEquation(r, ic)
+
     def RHS(self):
         pass
 
@@ -86,7 +99,7 @@ class Hydro(Physics):
     def __init__(self,*args):
         Physics.__init__(self, *args)
         self.fields = ['ux','uy']
-        self._aux = ['vgradv','pressure','gradv']
+        self._aux_fields = ['vgradv','pressure','gradv']
         aux_types = [None, None, range(4)]
         if self._ndims == 3:
              self.fields.append('uz')
@@ -95,7 +108,7 @@ class Hydro(Physics):
         params = {'nu': 0.}
 
         self.q = self.create_dealias_field(0.,['u','gu','ugu'])
-        self._setup_aux_fields(0., self._aux,aux_types)
+        self._setup_aux_fields(0., self._aux_fields,aux_types)
         self._setup_parameters(params)
         self._RHS = self.create_fields(0.)
 
@@ -183,7 +196,7 @@ class Hydro(Physics):
         gradv = self.aux_fields['gradv']
         vgradv = self.aux_fields['vgradv']
         trans = {0: 'ux', 1: 'uy', 2: 'uz'}
-        dealias = (na.abs(d.k['x']) > 2/3. *self._shape[0]/2.) & (na.abs(d.k['y']) > 2/3. * self._shape[1]/2.)
+        dealias = (na.abs(d.k['x']) > 2/3. *self._shape[0]/2.) | (na.abs(d.k['y']) > 2/3. * self._shape[1]/2.)
         tmp = na.zeros_like(d.data)
         for i,f in enumerate(self.fields):
             b = [i * self._ndims + j for j in range(self._ndims)]
@@ -211,6 +224,63 @@ class Hydro(Physics):
             vgradv[f] = tmp
             vgradv[f]._curr_space = 'xspace'
             tmp *= 0+0j
+
+class LinearCollisionlessCosmology(Physics):
+    """This class implements linear, collisionless cosmology. 
+
+    parameters
+    ----------
+    Omega_r - energy density in radiation
+    Omega_m - energy density in matter
+    Omega_l - energy density in dark energy (cosmological constant)
+    H0      - hubble constant now (100 if all units are in km/s/Mpc)
+    solves
+    ------
+    d_t d = - div(v_)
+    d_t v = -grad(Phi) - H v
+    laplacian(Phi) = 3 H^2 d / 2
+
+    """
+    def __init__(self,*args):
+        Physics.__init__(self, *args)
+        self.fields = ['delta','ux','uy']
+        self._aux_fields = ['gradphi']
+        aux_types = [None]
+        if self._ndims == 3:
+             self.fields.append('uz')
+        self._trans = {0: 'x', 1: 'y', 2: 'z'}
+        params = {'Omega_r': 0.,
+                  'Omega_m': 0.,
+                  'Omega_l': 0.,
+                  'H0': 100.}
+        self._setup_parameters(params)
+        self._setup_aux_fields(0., self._aux_fields,aux_types)
+        aux_eqn_rhs = lambda a: friedmann(a,self.parameters['H0'],self.parameters['Omega_r'], self.parameters['Omega_m'], self.parameters['Omega_l'])
+        
+        self._setup_aux_eqns(['H'],[aux_eqn_rhs], [1e-5])
+
+        self._RHS = self.create_fields(0.)
+
+    def RHS(self, data):
+        self.density_RHS(data)
+        
+        return self._RHS
+
+    def density_RHS(self, data):
+        pass
+
+    def vel_RHS(self, data):
+        self.grad_phi(data)
+        gradphi = self.aux_fields['gradphi']
+        for i,f in enumerate(self.fields[1:]):
+            self._RHS[f] = -gradphi[f]['kspace'] - self.aux_eqns['H'] * data[f]['kspace']
+        
+    def grad_phi(self, data):
+        gradphi = self.aux_fields['gradphi']
+        tmp = -3./2. * self.parameters['H0'] * data['delta']['kspace']/data['delta'].k2(no_zero=True)
+        
+        for i,f in enumerate(self.fields[1:]):
+            gradphi[f] = data[f].k(self._trans(i)) * tmp
 
 if __name__ == "__main__":
     import pylab as P

@@ -32,3 +32,5 @@ from .hermitianize import \
     enforce_hermitian, \
     zero_nyquist
     
+from .aux_equation import \
+    AuxEquation
