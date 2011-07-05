@@ -26,6 +26,7 @@ import numpy as na
 from dedalus.data_objects.api import create_data, zero_nyquist, AuxEquation
 from dedalus.utils.api import friedmann
 from dedalus.funcs import insert_ipython
+
 class Physics(object):
     """This is a base class for a physics object. It needs to provide
     a right hand side for a time integration scheme.
@@ -98,24 +99,21 @@ class Hydro(Physics):
     """
     def __init__(self,*args):
         Physics.__init__(self, *args)
-        self.fields = ['ux','uy']
+        self.fields = ['ux', 'uy', 'uz'][0:self._ndims]
         self._aux_fields = ['vgradv','pressure','gradv']
-        aux_types = [None, None, range(4)]
-        if self._ndims == 3:
-             self.fields.append('uz')
-             aux_types[-1] = range(9)
+        aux_types = [None, None, range(self._ndims ** 2)]
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0.}
 
-        self.q = self.create_dealias_field(0.,['u','gu','ugu'])
-        self._setup_aux_fields(0., self._aux_fields,aux_types)
-        self._setup_parameters(params)
-        self._RHS = self.create_fields(0.)
+        # Build now, unless derived class
+        if self.__class__.__name__ == 'Hydro':
+            self.q = self.create_dealias_field(0.,['u','gu','ugu'])
+            self._setup_aux_fields(0., self._aux_fields,aux_types)
+            self._setup_parameters(params)
+            self._RHS = self.create_fields(0.)
 
     def RHS(self, data):
-        #self.vgradv(data)
-        self.vgradv_23dealias(data)
-        #self.vgradv_aliased(data)
+        self.vgradv(data, dealias='2/3')
         self.pressure(data)
         vgradv = self.aux_fields['vgradv']
         pressure = self.aux_fields['pressure']
@@ -155,76 +153,106 @@ class Hydro(Physics):
             pressure[f]._curr_space = 'kspace'
             zero_nyquist(pressure[f].data)
 
-    def vgradv(self, data):
-        """dealiased vgradv term. This uses temporary dealias fields
-        with 3/2 as many points as the shape of the data object.
-
+    def vgradv(self, data, dealias='2/3'):
         """
-        d = data['ux']
-        self.gradv(data)
-        gradv = self.aux_fields['gradv']
-        vgradv = self.aux_fields['vgradv']
-        trans = {0: 'ux', 1: 'uy', 2: 'uz'}
-        self.q.zero_all()
-        for i,f in enumerate(self.fields):
-            b = [i * self._ndims + j for j in range(self._ndims)]
-            tmp = na.zeros_like(self.q['ugu'].data)
-            for ii,j, in enumerate(b):
-                self.q['u'].data[:]= 0+0j
-                self.q['u']._curr_space = 'kspace'
-                self.q['gu'].data[:] = 0+0j
-                self.q['gu']._curr_space = 'kspace'
-                zero_nyquist(data[trans[ii]]['kspace'])
-                self.q['u'] = na.fft.fftshift(data[trans[ii]]['kspace'])
-                self.q['u'] = na.fft.fftshift(self.q['u']['kspace'])
-                self.q['gu'] = na.fft.fftshift(gradv[j]['kspace'])
-                self.q['gu'] = na.fft.fftshift(self.q['gu']['kspace'])
-                tmp += self.q['u']['xspace'] * self.q['gu']['xspace']
-            tmp.imag = 0.
-            self.q['ugu'] = tmp
-            self.q['ugu']._curr_space = 'xspace'
-            vgradv[f] = self.q['ugu']['kspace']
-            tmp *= 0+0j
-
-    def vgradv_23dealias(self, data):
-        """this computes the vgradv dealiased using 2/3 of the total
-        resolution.
-
+        Calculate vgradv term, with options for dealiasing.
+        
+        Dealiasing options: 
+            None        No dealiasing
+            '2/3'       Dealias by keeping lower 2/3 modes, and zeroing others
+            '3/2'       Dealias by extending to 3/2 larger temp fields
+        
         """
-        d = data['ux']
-        self.gradv(data)
-        gradv = self.aux_fields['gradv']
-        vgradv = self.aux_fields['vgradv']
-        trans = {0: 'ux', 1: 'uy', 2: 'uz'}
-        dealias = (na.abs(d.k['x']) > 2/3. *self._shape[0]/2.) | (na.abs(d.k['y']) > 2/3. * self._shape[1]/2.)
-        tmp = na.zeros_like(d.data)
-        for i,f in enumerate(self.fields):
-            b = [i * self._ndims + j for j in range(self._ndims)]
-            for ii, j in enumerate(b):
-                tmp += data[trans[ii]]['xspace'] * gradv[j]['xspace']
-            vgradv[f] = tmp.real
-            vgradv[f]._curr_space = 'xspace'
-            vgradv[f]['kspace'][dealias] = 0.
-            tmp *= 0+0j
+        
+        if dealias not in [None, '2/3', '3/2']:
+            raise ValueError('Dealising method not implemented.')
 
-    def vgradv_aliased(self, data):
-        """fully aliased vgradv term.
+        if dealias == '3/2':
+            # Uses temporary dealias fields with 3/2 as many points 
+            # as the shape of the data object.
 
-        """
-        d = data['ux']
-        self.gradv(data)
-        gradv = self.aux_fields['gradv']
-        vgradv = self.aux_fields['vgradv']
-        trans = {0: 'ux', 1: 'uy', 2: 'uz'}
-        tmp = na.zeros_like(d.data)
-        for i,f in enumerate(self.fields):
-            b = [i * self._ndims + j for j in range(self._ndims)]
-            for ii, j in enumerate(b):
-                tmp += data[trans[ii]]['xspace'] * gradv[j]['xspace']
-            vgradv[f] = tmp
-            vgradv[f]._curr_space = 'xspace'
-            tmp *= 0+0j
+            d = data['ux']
+            self.gradv(data)
+            gradv = self.aux_fields['gradv']
+            vgradv = self.aux_fields['vgradv']
+            trans = {0: 'ux', 1: 'uy', 2: 'uz'}
+            self.q.zero_all()
+            for i,f in enumerate(self.fields):
+                b = [i * self._ndims + j for j in range(self._ndims)]
+                tmp = na.zeros_like(self.q['ugu'].data)
+                for ii,j, in enumerate(b):
+                    self.q['u'].data[:]= 0+0j
+                    self.q['u']._curr_space = 'kspace'
+                    self.q['gu'].data[:] = 0+0j
+                    self.q['gu']._curr_space = 'kspace'
+                    zero_nyquist(data[trans[ii]]['kspace'])
+                    self.q['u'] = na.fft.fftshift(data[trans[ii]]['kspace'])
+                    self.q['u'] = na.fft.fftshift(self.q['u']['kspace'])
+                    self.q['gu'] = na.fft.fftshift(gradv[j]['kspace'])
+                    self.q['gu'] = na.fft.fftshift(self.q['gu']['kspace'])
+                    tmp += self.q['u']['xspace'] * self.q['gu']['xspace']
+                tmp.imag = 0.
+                self.q['ugu'] = tmp
+                self.q['ugu']._curr_space = 'xspace'
+                vgradv[f] = self.q['ugu']['kspace']
+                tmp *= 0+0j
 
+        else:
+            d = data['ux']
+            self.gradv(data)
+            gradv = self.aux_fields['gradv']
+            vgradv = self.aux_fields['vgradv']
+            trans = {0: 'ux', 1: 'uy', 2: 'uz'}
+            tmp = na.zeros_like(d.data)
+            
+            if dealias == '2/3': 
+                dmask = ((na.abs(d.k['x']) > 2/3. *self._shape[0]/2.) | 
+                         (na.abs(d.k['y']) > 2/3. * self._shape[1]/2.))
+            
+            for i,f in enumerate(self.fields):
+                b = [i * self._ndims + j for j in range(self._ndims)]
+                for ii, j in enumerate(b):
+                    tmp += data[trans[ii]]['xspace'] * gradv[j]['xspace']
+                vgradv[f] = tmp
+                vgradv[f]._curr_space = 'xspace'
+                if dealias == '2/3':
+                    vgradv[f] = tmp.real
+                    vgradv[f]['kspace'][dmask] = 0.
+                tmp *= 0+0j
+ 
+            
+class MHD(Hydro):
+    """
+    Magnetohydrodynamics.
+    """
+    
+    def __init__(self, *args):
+        Hydro.__init__(self, *args)
+        
+        # Add data fields for magnetic field components
+        self.fields += ['Bx', 'By', 'Bz'][0:self._ndims]
+        self._aux += ['Ax', 'Ay', 'Az'][0:self._ndims]
+        aux_types = [None, None, range(self._ndims ** 2), None, None, None]
+        
+        self._trans = {0: 'x', 1: 'y', 2: 'z'}
+        params = {'nu': 0., 'eta': 0.}
+
+        # Build now, unless derived class
+        if self.__class__.__name__ == 'MHD':
+            self.q = self.create_dealias_field(0.,['u','gu','ugu'])
+            self._setup_aux_fields(0., self._aux,aux_types)
+            self._setup_parameters(params)
+            self._RHS = self.create_fields(0.)
+
+            
+            
+            
+            
+
+            
+            
+            
+            
 class LinearCollisionlessCosmology(Physics):
     """This class implements linear, collisionless cosmology. 
 
@@ -280,7 +308,7 @@ class LinearCollisionlessCosmology(Physics):
         tmp = -3./2. * self.parameters['H0'] * data['delta']['kspace']/data['delta'].k2(no_zero=True)
         
         for i,f in enumerate(self.fields[1:]):
-            gradphi[f] = data[f].k(self._trans(i)) * tmp
+            gradphi[f] = data[f].k(self._trans(i)) * tmp    
 
 if __name__ == "__main__":
     import pylab as P
