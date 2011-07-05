@@ -85,19 +85,18 @@ class Hydro(Physics):
     """
     def __init__(self,*args):
         Physics.__init__(self, *args)
-        self.fields = ['ux','uy']
+        self.fields = ['ux', 'uy', 'uz'][0:self._ndims]
         self._aux = ['vgradv','pressure','gradv']
-        aux_types = [None, None, range(4)]
-        if self._ndims == 3:
-             self.fields.append('uz')
-             aux_types[-1] = range(9)
+        aux_types = [None, None, range(self._ndims ** 2)]
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0.}
 
-        self.q = self.create_dealias_field(0.,['u','gu','ugu'])
-        self._setup_aux_fields(0., self._aux,aux_types)
-        self._setup_parameters(params)
-        self._RHS = self.create_fields(0.)
+        # Build now, unless derived class
+        if self.__class__.__name__ == 'Hydro':
+            self.q = self.create_dealias_field(0.,['u','gu','ugu'])
+            self._setup_aux_fields(0., self._aux,aux_types)
+            self._setup_parameters(params)
+            self._RHS = self.create_fields(0.)
 
     def RHS(self, data):
         #self.vgradv(data)
