@@ -24,35 +24,49 @@ License:
 
 import numpy as na
 
-def enforce_hermitian(data):
-    """Make nonzero array entries Hermitian-symmetric about origin.  
-    Not currently in use: this symmetry should propogate from real
-    initial conditions.
+def enforce_hermitian(data, verbose=False):
+    """
+    Make array Hermitian-symmetric about origin (ifftn(data) will be real).  
+    Note: this symmetry should propogate from real initial conditions.
     
     """
  
     n = data.shape
+    if verbose: print n
     
-    # Flip about origin
-    nonzero = [slice(1, None, 1) for i in xrange(data.ndim)]
-    nonzero_flip = [slice(-1, 0, -1) for i in xrange(data.ndim)]
+    if data.size == 1: 
+        if verbose: print data
+        data.imag = 0
+        return
+    
+    # Flip about k-origin
+    nonzero = [slice(1, None, 1)] * data.ndim 
+    nonzero_flip = [slice(-1, 0, -1)] * data.ndim
     S = data[..., :n[-1] / 2]
     data[..., n[-1] / 2:][nonzero] = S[nonzero_flip].conj()
     
     # Enforce Hermitian symmetry in final Nyquist space
-    if data.ndim > 1:
-        nonzero = [slice(1, None, 1) for i in xrange(data.ndim - 1)]
-        nonzero_flip = [slice(-1, 0, -1) for i in xrange(data.ndim - 1)]
-        
-        S = data[..., 0:n[-2] / 2, n[-1] / 2]
-        print 'got here'
-        data[..., n[-2] / 2:, n[-1] / 2][nonzero] = S[nonzero_flip].conj()
+    if verbose: print 'Descending on a Nyquist:'
+    enforce_hermitian(data[..., n[-1] / 2], verbose=verbose)
+ 
+    # Enforce Hermitian symmetry in zero spaces
+    zspace = [slice(None)] * data.ndim
+
+    for i in xrange(data.ndim):
+        if data.ndim == 1:
+            zspace[i] = slice(0, 1)
+        else:
+            zspace[i] = 0
+        if verbose: print 'Descending on a zero:'
+        enforce_hermitian(data[zspace], verbose=verbose)
+        zspace[i] = slice(None)
+ 
     
 def zero_nyquist(data):
     """Zero out the Nyquist space in each dimension."""
     
     n = data.shape
-    nyspace = [slice(None) for i in xrange(data.ndim)]
+    nyspace = [slice(None)] * data.ndim 
     
     # Pick out Nyquist space for each dimension and set to zero
     for i in xrange(data.ndim):
