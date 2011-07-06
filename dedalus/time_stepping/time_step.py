@@ -204,6 +204,10 @@ class RK2simplehypervisc4(RK2simple):
         #self.field_dt.zero_all()
 
 class CrankNicholsonVisc(TimeStepBase):
+    """Crank-Nicholson timestepping, copied from MIT script,
+    mit18336_spectral_ns2d.m
+
+    """
     def do_advance(self, data, dt):
         k2 = data['ux'].k2()
         top = (1./dt - 0.5*self.RHS.parameters['nu']*k2)
