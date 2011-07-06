@@ -329,7 +329,7 @@ class LinearCollisionlessCosmology(Physics):
         tmp = -3./2. * self.parameters['H0'] * data['delta']['kspace']/data['delta'].k2(no_zero=True)
         
         for i,f in enumerate(self.fields[1:]):
-            gradphi[f] = data[f].k(self._trans(i)) * tmp    
+            gradphi[f] = data[f].k(self._trans(i)) * tmp
 
 if __name__ == "__main__":
     import pylab as P
