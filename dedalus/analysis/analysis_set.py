@@ -81,7 +81,7 @@ def field_snap(data, it):
                     cbar_location="top",
                     cbar_mode="each")
     for i,f in enumerate(fields):
-        im = grid[i].imshow(data[f]['xspace'].real)
+        im = grid[i].imshow(data[f]['xspace'].real, origin='lower')
         grid[i].text(0.05,0.95,f, transform=grid[i].transAxes, size=24,color='white')
         grid.cbar_axes[i].colorbar(im)
     tstr = 't = %5.2f' % data.time
