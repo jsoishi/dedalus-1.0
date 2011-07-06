@@ -78,9 +78,9 @@ class FourierData(Representation):
         if space == self._curr_space:
             pass
         elif space == 'xspace':
-            self.forward()
-        elif space == 'kspace':
             self.backward()
+        elif space == 'kspace':
+            self.forward()
         else:
             raise KeyError("space must be either xspace or kspace")
         
@@ -103,11 +103,11 @@ class FourierData(Representation):
 
     def fwd_fftw(self):
         self.fplan()
-        self.data.imag = 0.
+        self.data /= self.data.size
 
     def rev_fftw(self):
         self.rplan()
-        self.data /= self.data.size
+        self.data.imag = 0.
 
     def fwd_np(self):
         self.data = fpack.fftn(self.data)
@@ -118,17 +118,17 @@ class FourierData(Representation):
 
     def forward(self):
         self.fft()
-        self._curr_space = 'xspace'
+        zero_nyquist(self.data)
+        self._curr_space = 'kspace'
 
     def backward(self):
         self.ifft()
-        zero_nyquist(self.data)
-        self._curr_space = 'kspace'
+        self._curr_space = 'xspace'
 
     def deriv(self,dim):
         """take a derivative along dim"""
         if self._curr_space == 'xspace':
-            self.backward()
+            self.forward()
         der = self.data * 1j*self.k[dim]
         return der
 

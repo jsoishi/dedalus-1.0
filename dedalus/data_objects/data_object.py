@@ -75,6 +75,7 @@ class BaseData(object):
         filename = "snap_%05i.cpu%04i" % (nsnap, 0)
         outfile = h5py.File(filename, mode='w')
         grp = outfile.create_group('/data')
+        dset = outfile.create_dataset('time',data=self.time)
         for f in self.fields.keys():
             dset = grp.create_dataset(f,data=self[f].data)
             dset.attrs["space"] = self[f]._curr_space
