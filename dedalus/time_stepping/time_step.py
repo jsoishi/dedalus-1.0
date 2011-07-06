@@ -133,6 +133,9 @@ class RK2simple(TimeStepBase):
         self.field_dt.zero_all()
 
 class RK2simplevisc(RK2simple):
+    """Runga-Kutta 2 with integrating factor for viscosity. 
+
+    """
     def do_advance(self, data, dt):
         """
         from NR:
@@ -164,6 +167,10 @@ class RK2simplevisc(RK2simple):
         self.field_dt.zero_all()
 
 class RK2simplehypervisc4(RK2simple):
+    """Runga-Kutta 2 with integrating factor for 4th order
+    hyperviscosity (i.e., \nu_4 \nabla^4 )
+
+    """
     def do_advance(self, data, dt):
         """
         from NR:
