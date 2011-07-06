@@ -113,9 +113,11 @@ class Hydro(Physics):
         self._RHS = self.create_fields(0.)
 
     def RHS(self, data):
-        #self.vgradv(data)
+        """compute right hand side of fluid equations, populating
+        self._RHS with the time derivatives of the fields.
+
+        """
         self.vgradv_23dealias(data)
-        #self.vgradv_aliased(data)
         self.pressure(data)
         vgradv = self.aux_fields['vgradv']
         pressure = self.aux_fields['pressure']
