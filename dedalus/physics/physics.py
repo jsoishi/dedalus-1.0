@@ -257,16 +257,35 @@ class MHD(Hydro):
         pressure = self.aux_fields['pressure']
         lorentz = self.auxfields['lorentz']
         #insert_ipython()
-        for f in self.fields:
+        for f in ['ux', 'uy', 'uz'][0:self._ndims]:
             # not sure why this sign is wrong....
             self._RHS[f] = +vgradv[f]['kspace'] - pressure[f]['kspace'] + lorentz[f]['kspace']
+        for f in ['Bx', 'By', 'Bz'][0:self._ndims]:
+            self._RHS[f] = 0. #PASS
         self._RHS.time = data.time        
 
         return self._RHS
+        
+    def pressure(self, data):
+        """Compute total pressure (including magnetic)."""
+
+        B2 = 0.
+        for Bi in ['Bx', 'By', 'Bz'][0:self._ndims]:
+            B2 += data[Bi].data ** 2
+        d = data['ux']
+        pressure = self.aux_fields['pressure']
+        vgradv = self.aux_fields['vgradv']
+        tmp = na.zeros_like(d.data)
+        for i,f in enumerate(['ux', 'uy', 'uz'][0:self._ndims]):
+            tmp += data[f].k[self._trans[i]] * vgradv[f]['kspace']
+        k2 = data['ux'].k2(no_zero=True)
+        for i,f in enumerate(['ux', 'uy', 'uz'][0:self._ndims]):            
+            pressure[f] = data[f].k[self._trans[i]] * tmp/k2 + B2 / 8 / na.pi
+            pressure[f]._curr_space = 'kspace'
+            zero_nyquist(pressure[f].data)
             
     def lorentz(self, data):
         """Compute Lorentz force on fluid."""
-        
         pass
             
 
