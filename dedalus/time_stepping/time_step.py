@@ -66,7 +66,6 @@ class TimeStepBase(object):
 
     def advance(self, data, dt):
         if ((self.iter % self._dnsnap) == 0) or (data.time - self._tlastsnap >= self._dtsnap):
-            print (self.iter % self._dnsnap == 0)
             data.snapshot(self._nsnap)
             self._nsnap += 1
 
