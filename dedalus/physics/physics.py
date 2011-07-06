@@ -257,7 +257,7 @@ class LinearCollisionlessCosmology(Physics):
                   'H0': 100.}
         self._setup_parameters(params)
         self._setup_aux_fields(0., self._aux_fields,aux_types)
-        aux_eqn_rhs = lambda a: friedmann(a,self.parameters['H0'],self.parameters['Omega_r'], self.parameters['Omega_m'], self.parameters['Omega_l'])
+        aux_eqn_rhs = lambda a: a*friedmann(a,self.parameters['H0'],self.parameters['Omega_r'], self.parameters['Omega_m'], self.parameters['Omega_l'])
         
         self._setup_aux_eqns(['H'],[aux_eqn_rhs], [1e-5])
 
