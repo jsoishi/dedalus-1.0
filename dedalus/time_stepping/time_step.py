@@ -66,7 +66,7 @@ class TimeStepBase(object):
 
     def advance(self, data, dt):
         if (self.iter % self._dnsnap) or (data.time - self._tlastsnap >= self._dtsnap):
-            #data.snapshot(self._nsnap)
+            data.snapshot(self._nsnap)
             self._nsnap += 1
 
         self.do_advance(data,dt)
@@ -133,6 +133,9 @@ class RK2simple(TimeStepBase):
         self.field_dt.zero_all()
 
 class RK2simplevisc(RK2simple):
+    """Runga-Kutta 2 with integrating factor for viscosity. 
+
+    """
     def do_advance(self, data, dt):
         """
         from NR:
@@ -164,6 +167,10 @@ class RK2simplevisc(RK2simple):
         self.field_dt.zero_all()
 
 class RK2simplehypervisc4(RK2simple):
+    """Runga-Kutta 2 with integrating factor for 4th order
+    hyperviscosity (i.e., \nu_4 \nabla^4 )
+
+    """
     def do_advance(self, data, dt):
         """
         from NR:
@@ -197,6 +204,10 @@ class RK2simplehypervisc4(RK2simple):
         #self.field_dt.zero_all()
 
 class CrankNicholsonVisc(TimeStepBase):
+    """Crank-Nicholson timestepping, copied from MIT script,
+    mit18336_spectral_ns2d.m
+
+    """
     def do_advance(self, data, dt):
         k2 = data['ux'].k2()
         top = (1./dt - 0.5*self.RHS.parameters['nu']*k2)

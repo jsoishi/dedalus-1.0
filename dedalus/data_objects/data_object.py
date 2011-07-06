@@ -22,6 +22,8 @@ License:
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import h5py
+
 def create_data(representation, shape, name):
     new_class = type(name, (BaseData,), {'representation': representation,
                                            'shape': shape})
@@ -69,6 +71,13 @@ class BaseData(object):
         for f in self.fields.keys():
             self.zero(f)
 
-    def snapshot(self):
-        for f in fields:
-            pass
+    def snapshot(self, nsnap):
+        filename = "snap_%05i.cpu%04i" % (nsnap, 0)
+        outfile = h5py.File(filename, mode='w')
+        grp = outfile.create_group('/data')
+        for f in self.fields.keys():
+            dset = grp.create_dataset(f,data=self[f].data)
+            dset.attrs["space"] = self[f]._curr_space
+
+        outfile.close()
+
