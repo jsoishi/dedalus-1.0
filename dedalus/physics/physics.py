@@ -117,30 +117,38 @@ class Hydro(Physics):
         self._RHS with the time derivatives of the fields.
 
         """
-        self.vgradv(data, dealias='2/3')
+        self.XgradX(data, self.fields, 'v', dealias='2/3')
         self.pressure(data)
         vgradv = self.aux_fields['vgradv']
         pressure = self.aux_fields['pressure']
         #insert_ipython()
         for f in self.fields:
-            # not sure why this sign is wrong....
             self._RHS[f] = -vgradv[f]['kspace'] + pressure[f]['kspace']
         self._RHS.time = data.time        
 
         return self._RHS
 
-    def gradv(self, data):
-        """compute stress tensor, du_j/dx_i
+    def gradX(self, data, fieldlist, outfield):
+        """
+        Compute stress tensor, dX_j/dr_i
+        
+        Inputs:
+            data        Data object
+            fieldlist   List of fields that make up the vector X
+            outfield    Name of the vector (output assigned to field "grad_")
 
         """
-        gradv = self.aux_fields['gradv']
-        i = 0
+        
+        # Reference
+        gradx = self.aux_fields['grad' + outfield]
 
-        for f in self.fields:
-            for dim in range(self._ndims):
-                gradv[i] = data[f].deriv(self._trans[dim])
-                gradv[i]._curr_space = 'kspace'
-                zero_nyquist(gradv[i].data)
+        # Construct Jacobian
+        i = 0
+        for f in fieldlist:
+            for dim in xrange(len(fieldlist)):
+                gradx[i] = data[f].deriv(self._trans[dim])
+                gradx[i]._curr_space = 'kspace'
+                zero_nyquist(gradx[i].data)
                 i += 1
 
     def pressure(self, data):
@@ -157,10 +165,15 @@ class Hydro(Physics):
             pressure[f]._curr_space = 'kspace'
             zero_nyquist(pressure[f].data)
 
-    def vgradv(self, data, dealias='2/3'):
+    def XgradX(self, data, fieldlist, outfield, dealias='2/3'):
         """
-        Calculate vgradv term, with options for dealiasing.
+        Calculate "X dot (grad X)" term, with options for dealiasing.
         
+        Inputs:
+            data        Data object
+            fieldlist   List of fields that make up the vector X
+            outfield    Name of the vector (output assigned to field "_grad_")
+            
         Dealiasing options: 
             None        No dealiasing
             '2/3'       Dealias by keeping lower 2/3 modes, and zeroing others
@@ -174,6 +187,8 @@ class Hydro(Physics):
         if dealias == '3/2':
             # Uses temporary dealias fields with 3/2 as many points 
             # as the shape of the data object.
+            
+            # ****** THIS HAS NOT BEEN UPDATED TO WORK WITH NEW HANDLING ******
 
             d = data['ux']
             self.gradv(data)
@@ -202,26 +217,30 @@ class Hydro(Physics):
                 tmp *= 0+0j
 
         else:
-            d = data['ux']
-            self.gradv(data)
-            gradv = self.aux_fields['gradv']
-            vgradv = self.aux_fields['vgradv']
-            trans = {0: 'ux', 1: 'uy', 2: 'uz'}
-            tmp = na.zeros_like(d.data)
+            # Perform gradX calculation and place references
+            self.gradX(data, fieldlist, outfield)
+            gradx = self.aux_fields['grad' + outfield]
+            xgradx = self.aux_fields[outfield + 'grad' + outfield]
+
+            # Setup data container and dealias mask
+            sampledata = data[fieldlist[0]]
+            tmp = na.zeros_like(sampledata.data)
             
+            # Orszag 2/3 dealias mask (picks out coefficients to zero)
             if dealias == '2/3': 
-                dmask = ((na.abs(d.k['x']) > 2/3. *self._shape[0]/2.) | 
-                         (na.abs(d.k['y']) > 2/3. * self._shape[1]/2.))
+                dmask = ((na.abs(sampledata.k['x']) > 2/3. *self._shape[0]/2.) | 
+                         (na.abs(sampledata.k['y']) > 2/3. * self._shape[1]/2.))
             
-            for i,f in enumerate(self.fields):
-                b = [i * self._ndims + j for j in range(self._ndims)]
+            # Below just adapted for fieldlist use, no other modifications
+            for i,f in enumerate(fieldlist):
+                b = [i * len(fieldlist) + j for j in xrange(len(fieldlist))]
                 for ii, j in enumerate(b):
-                    tmp += data[trans[ii]]['xspace'] * gradv[j]['xspace']
-                vgradv[f] = tmp
-                vgradv[f]._curr_space = 'xspace'
+                    tmp += data[fieldlist[ii]]['xspace'] * gradx[j]['xspace']
+                xgradx[f] = tmp
+                xgradx[f]._curr_space = 'xspace'
                 if dealias == '2/3':
-                    vgradv[f] = tmp.real
-                    vgradv[f]['kspace'][dmask] = 0.
+                    xgradx[f] = tmp.real
+                    xgradx[f]['kspace'][dmask] = 0.
                 tmp *= 0+0j
  
             
@@ -235,8 +254,10 @@ class MHD(Hydro):
         
         # Add data fields for magnetic field components
         self.fields += ['Bx', 'By', 'Bz'][0:self._ndims]
-        self._aux += ['lorentz', 'Ax', 'Ay', 'Az'][0:self._ndims + 1]
-        aux_types = [None, None, range(self._ndims ** 2), None, None, None, None]
+        self._aux_fields = ['vgradv','Ptotal','gradv', 'lorentz', 'BgradB', 'gradB'] + \ 
+                           ['Ax', 'Ay', 'Az'][0:self._ndims]
+        aux_types = [None, None, range(self._ndims ** 2), None, None, range(self._ndims ** 2)] +\
+                    [None] * self._ndims
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'eta': 0.}
@@ -249,25 +270,25 @@ class MHD(Hydro):
             self._RHS = self.create_fields(0.)
 
     def RHS(self, data):
-        """Compute time derivative of fields."""
-        self.vgradv(data, dealias='2/3')
+        """Compute time derivative of fields. VERY INCOMPLETE"""
+        self.XgradX(data, self.fields[0:self._ndims], 'v', dealias='2/3')
+        self.XgradX(data, self.fields[self._ndims:], 'B', dealias='2/3')
         self.pressure(data)
-        self.lorentz(data)
+
         vgradv = self.aux_fields['vgradv']
         pressure = self.aux_fields['pressure']
-        lorentz = self.auxfields['lorentz']
-        #insert_ipython()
+        BgradB = self.auxfields['BgradB']
+        
         for f in ['ux', 'uy', 'uz'][0:self._ndims]:
-            # not sure why this sign is wrong....
-            self._RHS[f] = +vgradv[f]['kspace'] - pressure[f]['kspace'] + lorentz[f]['kspace']
+            self._RHS[f] = -vgradv[f]['kspace'] + BgradB[f]['kspace'] + pressure[f]['kspace']
         for f in ['Bx', 'By', 'Bz'][0:self._ndims]:
             self._RHS[f] = 0. #PASS
         self._RHS.time = data.time        
 
         return self._RHS
         
-    def pressure(self, data):
-        """Compute total pressure (including magnetic)."""
+    def total_pressure(self, data):
+        """Compute total pressure (including magnetic). VERY INCOMPLETE"""
 
         B2 = 0.
         for Bi in ['Bx', 'By', 'Bz'][0:self._ndims]:
@@ -283,11 +304,7 @@ class MHD(Hydro):
             pressure[f] = data[f].k[self._trans[i]] * tmp/k2 + B2 / 8 / na.pi
             pressure[f]._curr_space = 'kspace'
             zero_nyquist(pressure[f].data)
-            
-    def lorentz(self, data):
-        """Compute Lorentz force on fluid."""
-        pass
-            
+
 
             
             
