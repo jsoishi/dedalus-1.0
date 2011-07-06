@@ -110,7 +110,7 @@ def MIT_vortices(data):
         +na.exp(-((x-na.pi)**2+(y-na.pi-na.pi/4)**2)/(0.2)) \
         -0.5*na.exp(-((x-na.pi-na.pi/4)**2+(y-na.pi-na.pi/4)**2)/(0.4))
     aux['w']._curr_space = 'xspace'
-    aux['psi'] = -aux['w']['kspace']/aux['w'].k2(no_zero=True)
+    aux['psi'] = aux['w']['kspace']/aux['w'].k2(no_zero=True)
 
     data['ux'] = aux['psi'].deriv('y')
     data['uy'] = -aux['psi'].deriv('x')

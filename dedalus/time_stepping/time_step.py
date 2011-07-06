@@ -65,7 +65,7 @@ class TimeStepBase(object):
         return self._is_ok
 
     def advance(self, data, dt):
-        if (self.iter % self._dnsnap) or (data.time - self._tlastsnap >= self._dtsnap):
+        if (self.iter % self._dnsnap == 0) or (data.time - self._tlastsnap >= self._dtsnap):
             data.snapshot(self._nsnap)
             self._nsnap += 1
 
@@ -82,6 +82,9 @@ class TimeStepBase(object):
 
     def stop_walltime(self, wt):
         self._stop_wall = wt
+
+    def set_nsnap(self, n):
+        self._dnsnap = n
 
     def final_stats(self):
         stop_time = time.time()
