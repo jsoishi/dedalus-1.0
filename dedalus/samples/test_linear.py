@@ -10,7 +10,8 @@ RHS.parameters['H0'] = 3.24077649e-18
 ti = RK2simple(RHS)
 
 ti.stop_time(3.15e7*1e9)
-
+ti.set_nsnap(1000)
+ti.set_dtsnap(1e17)
 dt=3.15e7*1e6
 outfile = open('scale_factor.dat','w')
 while ti.ok:
