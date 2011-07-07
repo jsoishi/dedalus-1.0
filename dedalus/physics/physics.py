@@ -241,6 +241,7 @@ class Hydro(Physics):
             self.gradX(data, fieldlist, outfield)
             gradx = self.aux_fields['grad' + outfield]
             xgradx = self.aux_fields[outfield + 'grad' + outfield]
+            N = len(fieldlist)
 
             # Setup temporary data container and dealias mask
             sampledata = data[fieldlist[0]]
@@ -251,16 +252,18 @@ class Hydro(Physics):
                 dmask = ((na.abs(sampledata.k['x']) > 2/3. *self._shape[0]/2.) | 
                          (na.abs(sampledata.k['y']) > 2/3. * self._shape[1]/2.))
             
-            # Construct XgradX *********************needs work
+            # Construct XgradX **************** Proper dealiasing?
             for i,f in enumerate(fieldlist):
-                b = [i * len(fieldlist) + j for j in xrange(len(fieldlist))]
-                for ii, j in enumerate(b):
-                    tmp += data[fieldlist[ii]]['xspace'] * gradx[j]['xspace']
+                for j in xrange(N):
+                    tmp += data[fieldlist[j]['xspace'] * gradx[N * i + j]['xspace']
+
                 xgradx[f] = tmp
                 xgradx[f]._curr_space = 'xspace'
+                
                 if dealias == '2/3':
                     xgradx[f] = tmp.real
                     xgradx[f]['kspace'][dmask] = 0.
+                    
                 tmp *= 0+0j
  
             
