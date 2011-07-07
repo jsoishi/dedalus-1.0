@@ -255,7 +255,7 @@ class Hydro(Physics):
             # Construct XgradX **************** Proper dealiasing?
             for i,f in enumerate(fieldlist):
                 for j in xrange(N):
-                    tmp += data[fieldlist[j]['xspace'] * gradx[N * i + j]['xspace']
+                    tmp += data[fieldlist[j]]['xspace'] * gradx[N * i + j]['xspace']
 
                 xgradx[f] = tmp
                 xgradx[f]._curr_space = 'xspace'
@@ -266,7 +266,6 @@ class Hydro(Physics):
                     
                 tmp *= 0+0j
  
-            
 class MHD(Hydro):
     """Incompressible magnetohydrodynamics."""
     
