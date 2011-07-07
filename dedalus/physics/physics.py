@@ -99,18 +99,17 @@ class Hydro(Physics):
     """
     def __init__(self,*args):
         Physics.__init__(self, *args)
+        
         self.fields = ['ux', 'uy', 'uz'][0:self._ndims]
         self._aux_fields = ['vgradv','pressure','gradv']
         aux_types = [None, None, range(self._ndims ** 2)]
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0.}
 
-        # Build now, unless derived class
-        if self.__class__.__name__ == 'Hydro':
-            self.q = self.create_dealias_field(0.,['u','gu','ugu'])
-            self._setup_aux_fields(0., self._aux_fields,aux_types)
-            self._setup_parameters(params)
-            self._RHS = self.create_fields(0.)
+        self.q = self.create_dealias_field(0.,['u','gu','ugu'])
+        self._setup_aux_fields(0., self._aux_fields,aux_types)
+        self._setup_parameters(params)
+        self._RHS = self.create_fields(0.)
 
     def RHS(self, data):
         """compute right hand side of fluid equations, populating
@@ -121,7 +120,7 @@ class Hydro(Physics):
         self.pressure(data)
         vgradv = self.aux_fields['vgradv']
         pressure = self.aux_fields['pressure']
-        #insert_ipython()
+        
         for f in self.fields:
             self._RHS[f] = -vgradv[f]['kspace'] + pressure[f]['kspace']
         self._RHS.time = data.time        
@@ -250,10 +249,10 @@ class MHD(Hydro):
     """
     
     def __init__(self, *args):
-        Hydro.__init__(self, *args)
+        Physics.__init__(self, *args)
         
         # Add data fields for magnetic field components
-        self.fields += ['Bx', 'By', 'Bz'][0:self._ndims]
+        self.fields = ['ux', 'uy', 'uz'][0:self._ndims] + ['Bx', 'By', 'Bz'][0:self._ndims]
         self._aux_fields = ['vgradv','Ptotal','gradv', 'lorentz', 'BgradB', 'gradB'] + \ 
                            ['Ax', 'Ay', 'Az'][0:self._ndims]
         aux_types = [None, None, range(self._ndims ** 2), None, None, range(self._ndims ** 2)] +\
@@ -262,18 +261,16 @@ class MHD(Hydro):
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'eta': 0.}
 
-        # Build now, unless derived class
-        if self.__class__.__name__ == 'MHD':
-            self.q = self.create_dealias_field(0.,['u','gu','ugu'])
-            self._setup_aux_fields(0., self._aux,aux_types)
-            self._setup_parameters(params)
-            self._RHS = self.create_fields(0.)
+        self.q = self.create_dealias_field(0.,['u','gu','ugu'])
+        self._setup_aux_fields(0., self._aux,aux_types)
+        self._setup_parameters(params)
+        self._RHS = self.create_fields(0.)
 
     def RHS(self, data):
         """Compute time derivative of fields. VERY INCOMPLETE"""
         self.XgradX(data, self.fields[0:self._ndims], 'v', dealias='2/3')
         self.XgradX(data, self.fields[self._ndims:], 'B', dealias='2/3')
-        self.pressure(data)
+        self.total_pressure(data)
 
         vgradv = self.aux_fields['vgradv']
         pressure = self.aux_fields['pressure']
@@ -301,7 +298,7 @@ class MHD(Hydro):
             tmp += data[f].k[self._trans[i]] * vgradv[f]['kspace']
         k2 = data['ux'].k2(no_zero=True)
         for i,f in enumerate(['ux', 'uy', 'uz'][0:self._ndims]):            
-            pressure[f] = data[f].k[self._trans[i]] * tmp/k2 + B2 / 8 / na.pi
+            pressure[f] = data[f].k[self._trans[i]] * tmp/k2
             pressure[f]._curr_space = 'kspace'
             zero_nyquist(pressure[f].data)
 
