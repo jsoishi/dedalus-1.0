@@ -1,10 +1,10 @@
 import pylab as P
-from init_cond import sin_y
-from fourier_data import FourierShearData
+from dedalus.mods import *
+from dedalus.data_objects.api import FourierShearData
 
 f = FourierShearData((128,128),-1)
 
-f = sin_y(f)
+sin_y(f)
 
 P.subplot(121)
 P.imshow(f['xspace',5.].real)
