@@ -253,7 +253,7 @@ class MHD(Hydro):
         
         # Add data fields for magnetic field components
         self.fields = ['ux', 'uy', 'uz'][0:self._ndims] + ['Bx', 'By', 'Bz'][0:self._ndims]
-        self._aux_fields = ['vgradv','Ptotal','gradv', 'lorentz', 'BgradB', 'gradB'] + \ 
+        self._aux_fields = ['vgradv','Ptotal','gradv', 'lorentz', 'BgradB', 'gradB'] + \
                            ['Ax', 'Ay', 'Az'][0:self._ndims]
         aux_types = [None, None, range(self._ndims ** 2), None, None, range(self._ndims ** 2)] +\
                     [None] * self._ndims
