@@ -100,11 +100,12 @@ class Hydro(Physics):
         Physics.__init__(self, *args)
         
         # Setup data fields
-        self.fields = ['ux', 'uy', 'uz'][0:self._ndims]
-        self._aux_fields = ['vgradv','pressure','gradv']
-        aux_types = [None, None, range(self._ndims ** 2)]
+        self.ufields = ['ux', 'uy', 'uz'][0:self._ndims]
+        self.fields = self.ufields
+        self._aux_fields = ['pressure','gradu','ugradu']
+        aux_types = [None, range(self._ndims ** 2), None]
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
-        params = {'nu': 0.}
+        params = {'nu': 0., 'rho0': 1.}
 
         self.q = self.create_dealias_field(0.,['u','gu','ugu'])
         self._setup_aux_fields(0., self._aux_fields, aux_types)
@@ -112,17 +113,25 @@ class Hydro(Physics):
         self._RHS = self.create_fields(0.)
 
     def RHS(self, data):
-        """compute right hand side of fluid equations, populating
-        self._RHS with the time derivatives of the fields.
+        """
+        Compute right hand side of fluid equations, populating self._RHS with
+        the time derivatives of the fields.
+
+        u_t + nu k^2 u = -ugradu - i k p / rho0
 
         """
-        self.XgradX(data, self.fields, 'v', dealias='2/3')
+        
+        # Compute terms
+        self.XgradX(data, self.ufields, 'u', dealias='2/3')
         self.pressure(data)
-        vgradv = self.aux_fields['vgradv']
+        
+        # Place references
+        ugradu = self.aux_fields['ugradu']
         pressure = self.aux_fields['pressure']
         
+        # Construct time derivatives
         for f in self.fields:
-            self._RHS[f] = -vgradv[f]['kspace'] + pressure[f]['kspace']
+            self._RHS[f] = -ugradu[f]['kspace'] - pressure[f]['kspace']
         self._RHS.time = data.time        
 
         return self._RHS
@@ -150,16 +159,29 @@ class Hydro(Physics):
                 zero_nyquist(gradx[N * i + j].data)
 
     def pressure(self, data):
-        d = data['ux']
+        """
+        Compute pressure term: i k p / rho0
+        
+        p / rho0 = i k * ugradu / k^2     
+        ==> pressure term = - k (k * ugradu / k^2)
+        
+        """
+        
+        # Place references
+        ugradu = self.aux_fields['ugradu']
         pressure = self.aux_fields['pressure']
-        vgradv = self.aux_fields['vgradv']
-        tmp = na.zeros_like(d.data)
-        for i,f in enumerate(self.fields):
-            tmp +=data[f].k[self._trans[i]] * vgradv[f]['kspace']
-        k2 = data['ux'].k2(no_zero=True)
+        
+        # Setup temporary data container
+        sampledata = data['ux']
+        tmp = na.zeros_like(sampledata.data)
+        k2 = sampledata.k2(no_zero=True)
+        
+        # Construct term
+        for i,f in enumerate(self.ufields):
+            tmp += data[f].k[self._trans[i]] * ugradu[f]['kspace']
 
-        for i,f in enumerate(self.fields):            
-            pressure[f] = data[f].k[self._trans[i]] * tmp/k2
+        for i,f in enumerate(self.ufields):            
+            pressure[f] = -data[f].k[self._trans[i]] * tmp / k2
             pressure[f]._curr_space = 'kspace'
             zero_nyquist(pressure[f].data)
 
@@ -189,9 +211,9 @@ class Hydro(Physics):
             # ****** THIS HAS NOT BEEN UPDATED TO WORK WITH NEW HANDLING ******
 
             d = data['ux']
-            self.gradv(data)
-            gradv = self.aux_fields['gradv']
-            vgradv = self.aux_fields['vgradv']
+            self.gradu(data)
+            gradu = self.aux_fields['gradu']
+            ugradu = self.aux_fields['ugradu']
             trans = {0: 'ux', 1: 'uy', 2: 'uz'}
             self.q.zero_all()
             for i,f in enumerate(self.fields):
@@ -205,13 +227,13 @@ class Hydro(Physics):
                     zero_nyquist(data[trans[ii]]['kspace'])
                     self.q['u'] = na.fft.fftshift(data[trans[ii]]['kspace'])
                     self.q['u'] = na.fft.fftshift(self.q['u']['kspace'])
-                    self.q['gu'] = na.fft.fftshift(gradv[j]['kspace'])
+                    self.q['gu'] = na.fft.fftshift(gradu[j]['kspace'])
                     self.q['gu'] = na.fft.fftshift(self.q['gu']['kspace'])
                     tmp += self.q['u']['xspace'] * self.q['gu']['xspace']
                 tmp.imag = 0.
                 self.q['ugu'] = tmp
                 self.q['ugu']._curr_space = 'xspace'
-                vgradv[f] = self.q['ugu']['kspace']
+                ugradu[f] = self.q['ugu']['kspace']
                 tmp *= 0+0j
 
         else:
@@ -229,7 +251,7 @@ class Hydro(Physics):
                 dmask = ((na.abs(sampledata.k['x']) > 2/3. *self._shape[0]/2.) | 
                          (na.abs(sampledata.k['y']) > 2/3. * self._shape[1]/2.))
             
-            # Below just adapted for fieldlist use, no other modifications
+            # Construct XgradX *********************needs work
             for i,f in enumerate(fieldlist):
                 b = [i * len(fieldlist) + j for j in xrange(len(fieldlist))]
                 for ii, j in enumerate(b):
@@ -252,12 +274,12 @@ class MHD(Hydro):
         self.fields = (['ux', 'uy', 'uz'][0:self._ndims] + 
                        ['Bx', 'By', 'Bz'][0:self._ndims])
         self._aux_fields = (['Ax', 'Ay', 'Az'][0:self._ndims] + 
-                            ['Ptotal', 'gradv', 'vgradv', 'gradB', 'BgradB'])
+                            ['Ptotal', 'gradu', 'ugradu', 'gradB', 'BgradB'])
         aux_types = [None] * self._ndims + [None, range(self._ndims ** 2), None,
                                             range(self._ndims ** 2), None]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
-        params = {'nu': 0., 'eta': 0., 'rho0': 1.}
+        params = {'nu': 0., 'rho0': 1., 'eta': 0.}
 
         self.q = self.create_dealias_field(0.,['u','gu','ugu'])
         self._setup_aux_fields(0., self._aux_fields, aux_types)
@@ -265,23 +287,31 @@ class MHD(Hydro):
         self._RHS = self.create_fields(0.)
 
     def RHS(self, data):
-        """Compute time derivative of fields. NEEDS INDUCTION"""
+        """
+        Compute right hand side of fluid equations, populating self._RHS with
+        the time derivatives of the fields.
+        
+        u_t + nu k^2 u = -ugradu + BgradB / (4 pi rho0) - i k Ptot / rho0
+        
+        *****NEEDS INDUCTION******
+
+        """
         
         # Compute terms
-        self.XgradX(data, self.fields[0:self._ndims], 'v', dealias='2/3')
-        self.XgradX(data, self.fields[self._ndims:], 'B', dealias='2/3')
+        self.XgradX(data, ['ux', 'uy', 'uz'][0:self._ndims], 'u', dealias='2/3')
+        self.XgradX(data, ['Bx', 'By', 'Bz'][0:self._ndims], 'B', dealias='2/3')
         self.total_pressure(data)
 
         # Place references
-        vgradv = self.aux_fields['vgradv']
+        ugradu = self.aux_fields['ugradu']
         Ptotal = self.aux_fields['Ptotal']
         BgradB = self.auxfields['BgradB']
         pr4 = 4 * na.pi * self.parameters['rho0']
         
         # Construct time derivatives
         for f in ['ux', 'uy', 'uz'][0:self._ndims]:
-            self._RHS[f] = (BgradB[f]['kspace'] / pr4 - vgradv[f]['kspace'] + 
-                            Ptotal[f]['kspace'])
+            self._RHS[f] = (BgradB[f]['kspace'] / pr4 - ugradu[f]['kspace'] + 
+                            Ptotal[f]['kspace'] / )
         for f in ['Bx', 'By', 'Bz'][0:self._ndims]:
             self._RHS[f] = 0. #PASS
         self._RHS.time = data.time        
@@ -293,10 +323,10 @@ class MHD(Hydro):
 
         d = data['ux']
         pressure = self.aux_fields['pressure']
-        vgradv = self.aux_fields['vgradv']
+        ugradu = self.aux_fields['ugradu']
         tmp = na.zeros_like(d.data)
         for i,f in enumerate(['ux', 'uy', 'uz'][0:self._ndims]):
-            tmp += data[f].k[self._trans[i]] * vgradv[f]['kspace']
+            tmp += data[f].k[self._trans[i]] * ugradu[f]['kspace']
         k2 = data['ux'].k2(no_zero=True)
         for i,f in enumerate(['ux', 'uy', 'uz'][0:self._ndims]):            
             pressure[f] = data[f].k[self._trans[i]] * tmp/k2
@@ -372,7 +402,7 @@ if __name__ == "__main__":
     a = Hydro((100,100),FourierData)
     data = a.create_fields(0.)
     taylor_green(data['ux'],data['uy'])
-    vgv = a.vgradv(data)
+    vgv = a.ugradu(data)
     #test = a.pressure(data,vgv)
     test = a.RHS(data)
 
