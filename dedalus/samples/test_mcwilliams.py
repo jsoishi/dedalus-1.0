@@ -33,6 +33,8 @@ ti.stop_time(1.) # set stoptime
 ti.stop_iter(100) # max iterations
 ti.stop_walltime(3600.) # stop after 10 hours
 
+ti.set_nsnap(1000)
+ti.set_dtsnap(1.)
 vs = VolumeAverageSet(data)
 vs.add("ekin","%10.5e")
 vs.add("enstrophy","%10.5e")

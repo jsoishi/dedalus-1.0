@@ -26,7 +26,8 @@ from .data_object import \
     create_data
 
 from .fourier_data import \
-    FourierData
+    FourierData, \
+    FourierShearData
 
 from .hermitianize import \
     enforce_hermitian, \

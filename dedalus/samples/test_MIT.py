@@ -33,6 +33,8 @@ ti = CrankNicholsonVisc(RHS)
 ti.stop_time(100.) # set stoptime
 #ti.stop_iter(10) # max iterations
 ti.stop_walltime(3600.) # stop after 10 hours
+ti.set_nsnap(100) # save data every 100 timesteps
+ti.set_dtsnap(100.)
 
 vs = VolumeAverageSet(data)
 vs.add("ekin","%10.5e")
