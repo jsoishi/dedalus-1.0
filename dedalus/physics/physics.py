@@ -147,7 +147,7 @@ class Hydro(Physics):
 
         """
         
-        # Place reference
+        # Place references
         gradx = self.aux_fields['grad' + outfield]
         N = len(fieldlist)
 
@@ -311,7 +311,7 @@ class MHD(Hydro):
         # Construct time derivatives
         for f in ['ux', 'uy', 'uz'][0:self._ndims]:
             self._RHS[f] = (BgradB[f]['kspace'] / pr4 - ugradu[f]['kspace'] + 
-                            Ptotal[f]['kspace'] / )
+                            Ptotal[f]['kspace'] )
         for f in ['Bx', 'By', 'Bz'][0:self._ndims]:
             self._RHS[f] = 0. #PASS
         self._RHS.time = data.time        
