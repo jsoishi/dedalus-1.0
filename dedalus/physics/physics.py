@@ -1,10 +1,11 @@
 """Physics class. This defines fields, and provides a right hand side
 to time integrators.
 
-Author: J. S. Oishi <jsoishi@gmail.com>
+Authors: J. S. Oishi <jsoishi@gmail.com>
+         K. J. Burns <kburns@berkeley.edu>
 Affiliation: KIPAC/SLAC/Stanford
 License:
-  Copyright (C) 2011 J. S. Oishi.  All Rights Reserved.
+  Copyright (C) 2011 J. S. Oishi, K. J. Burns.  All Rights Reserved.
 
   This file is part of dedalus.
 
