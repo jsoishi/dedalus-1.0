@@ -62,19 +62,26 @@ def field_snap(data, it):
     2D; it will need a slice index for 3D.
 
     """
+    
+    # Retrieve field names
     fields = data.fields.keys()
     fields.sort()
+    
+    # Determine imag grid size
     nvars = len(fields)
-    nrow = nvars / 3
-    if nrow == 0:
-        ncol = nvars % 3
-        nrow = 1
+    if nvars in [4, 9]:
+        nrow = ncol = na.sqrt(nvars)
     else:
-        ncol = 3
+        nrow = na.int(na.ceil(nvars / 3.))
+        ncol = na.min([nvars, 3])
+    nrow = na.int(nrow)
+    ncol = na.int(ncol)
+    
+    # Plot
     fig = P.figure(1,figsize=(24.*ncol/3.,24.*nrow/3.))
     grid = AxesGrid(fig,111,
                     nrows_ncols = (nrow, ncol),
-                    axes_pad=0.1,
+                    axes_pad=0.3,
                     cbar_pad=0.,
                     share_all=True,
                     label_mode="1",

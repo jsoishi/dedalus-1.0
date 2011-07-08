@@ -323,8 +323,9 @@ class MHD(Hydro):
             self._RHS[f] = (-ugradu[f]['kspace'] + BgradB[f]['kspace'] / pr4 -
                             Ptotal[f]['kspace'])
         for f in self.Bfields:
-            self._RHS[f] = 0. #PASS  ****** NEEDS INDUCTION *******
-            
+            pass
+            #self._RHS[f] = ****** NEEDS INDUCTION *******
+
         self._RHS.time = data.time        
         return self._RHS
         
@@ -339,7 +340,7 @@ class MHD(Hydro):
 
         # Place references
         ugradu = self.aux_fields['ugradu']
-        BgradB = self.auxfields['BgradB']
+        BgradB = self.aux_fields['BgradB']
         Ptotal = self.aux_fields['Ptotal']
         pr4 = 4 * na.pi * self.parameters['rho0']
 
@@ -355,9 +356,9 @@ class MHD(Hydro):
         
         # Construct full term
         for i,f in enumerate(self.ufields):            
-            pressure[f] = -data[f].k[self._trans[i]] * tmp / k2
-            pressure[f]._curr_space = 'kspace'
-            zero_nyquist(pressure[f].data)
+            Ptotal[f] = -data[f].k[self._trans[i]] * tmp / k2
+            Ptotal[f]._curr_space = 'kspace'
+            zero_nyquist(Ptotal[f].data)
 
 
             
