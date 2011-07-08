@@ -104,6 +104,7 @@ class Hydro(Physics):
         self.fields = self.ufields
         self._aux_fields = ['pressure','gradu','ugradu']
         aux_types = [None, range(self._ndims ** 2), None]
+        
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1.}
 
@@ -132,8 +133,8 @@ class Hydro(Physics):
         # Construct time derivatives
         for f in self.fields:
             self._RHS[f] = -ugradu[f]['kspace'] - pressure[f]['kspace']
+            
         self._RHS.time = data.time        
-
         return self._RHS
 
     def gradX(self, data, fieldlist, outfield):
@@ -160,10 +161,10 @@ class Hydro(Physics):
 
     def pressure(self, data):
         """
-        Compute pressure term: i k p / rho0
+        Compute pressure term for ufields: i k p / rho0
         
         p / rho0 = i k * ugradu / k^2     
-        ==> pressure term = - k (k * ugradu / k^2)
+        ==> pressure term = - k (k * ugradu) / k^2
         
         """
         
@@ -176,10 +177,11 @@ class Hydro(Physics):
         tmp = na.zeros_like(sampledata.data)
         k2 = sampledata.k2(no_zero=True)
         
-        # Construct term
+        # Construct k * ugradu
         for i,f in enumerate(self.ufields):
             tmp += data[f].k[self._trans[i]] * ugradu[f]['kspace']
 
+        # Construct full term
         for i,f in enumerate(self.ufields):            
             pressure[f] = -data[f].k[self._trans[i]] * tmp / k2
             pressure[f]._curr_space = 'kspace'
@@ -187,7 +189,7 @@ class Hydro(Physics):
 
     def XgradX(self, data, fieldlist, outfield, dealias='2/3'):
         """
-        Calculate "X dot (grad X)" term, with options for dealiasing.
+        Calculate "X dot (grad X)" term for ufields, with dealiasing options.
         
         Inputs:
             data        Data object
@@ -203,6 +205,9 @@ class Hydro(Physics):
         
         if dealias not in [None, '2/3', '3/2']:
             raise ValueError('Dealising method not implemented.')
+            
+        if len(fieldlist) != len(self.ufields):
+            raise ValueError('X and u must have same number of dimensions')
 
         if dealias == '3/2':
             # Uses temporary dealias fields with 3/2 as many points 
@@ -253,7 +258,7 @@ class Hydro(Physics):
                          (na.abs(sampledata.k['y']) > 2/3. * self._shape[1]/2.))
             
             # Construct XgradX **************** Proper dealiasing?
-            for i,f in enumerate(fieldlist):
+            for i,f in enumerate(self.ufields):
                 for j in xrange(N):
                     tmp += data[fieldlist[j]]['xspace'] * gradx[N * i + j]['xspace']
 
@@ -273,12 +278,14 @@ class MHD(Hydro):
         Physics.__init__(self, *args)
         
         # Setup data fields
-        self.fields = (['ux', 'uy', 'uz'][0:self._ndims] + 
-                       ['Bx', 'By', 'Bz'][0:self._ndims])
+        self.ufields = ['ux', 'uy', 'uz'][0:self._ndims]
+        self.Bfields = ['Bx', 'By', 'Bz'][0:self._ndims]
+        self.fields = self.ufields + self.Bfields
         self._aux_fields = (['Ax', 'Ay', 'Az'][0:self._ndims] + 
                             ['Ptotal', 'gradu', 'ugradu', 'gradB', 'BgradB'])
-        aux_types = [None] * self._ndims + [None, range(self._ndims ** 2), None,
-                                            range(self._ndims ** 2), None]
+        aux_types = [self.Bfields] * self._ndims + [self.ufields, 
+                     range(self._ndims ** 2), self.ufields, 
+                     range(self._ndims ** 2), self.ufields]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1., 'eta': 0.}
@@ -300,38 +307,54 @@ class MHD(Hydro):
         """
         
         # Compute terms
-        self.XgradX(data, ['ux', 'uy', 'uz'][0:self._ndims], 'u', dealias='2/3')
-        self.XgradX(data, ['Bx', 'By', 'Bz'][0:self._ndims], 'B', dealias='2/3')
+        self.XgradX(data, self.ufields, 'u', dealias='2/3')
+        self.XgradX(data, self.Bfields, 'B', dealias='2/3')
         self.total_pressure(data)
 
         # Place references
         ugradu = self.aux_fields['ugradu']
+        BgradB = self.aux_fields['BgradB']
         Ptotal = self.aux_fields['Ptotal']
-        BgradB = self.auxfields['BgradB']
         pr4 = 4 * na.pi * self.parameters['rho0']
         
         # Construct time derivatives
-        for f in ['ux', 'uy', 'uz'][0:self._ndims]:
-            self._RHS[f] = (BgradB[f]['kspace'] / pr4 - ugradu[f]['kspace'] + 
-                            Ptotal[f]['kspace'] )
-        for f in ['Bx', 'By', 'Bz'][0:self._ndims]:
-            self._RHS[f] = 0. #PASS
+        for f in self.ufields:
+            self._RHS[f] = (-ugradu[f]['kspace'] + BgradB[f]['kspace'] / pr4 -
+                            Ptotal[f]['kspace'])
+        for f in self.Bfields:
+            self._RHS[f] = 0. #PASS  ****** NEEDS INDUCTION *******
+            
         self._RHS.time = data.time        
-
         return self._RHS
         
     def total_pressure(self, data):
-        """Compute total pressure (including magnetic). NOT RIGHT!!"""
+        """
+        Compute total pressure term (including magnetic): i k Ptot / rho0
+        
+        Ptot / rho0 = i k * ugradu / k^2 - i k * BgradB / (4 pi rho0 k^2)  
+        ==> pressure term = - k (k * ugradu - k * BgradB / (4 pi rho0)) / k^2
+        
+        """
 
-        d = data['ux']
-        pressure = self.aux_fields['pressure']
+        # Place references
         ugradu = self.aux_fields['ugradu']
-        tmp = na.zeros_like(d.data)
-        for i,f in enumerate(['ux', 'uy', 'uz'][0:self._ndims]):
+        BgradB = self.auxfields['BgradB']
+        Ptotal = self.aux_fields['Ptotal']
+        pr4 = 4 * na.pi * self.parameters['rho0']
+
+        # Setup temporary data container
+        sampledata = data['ux']
+        tmp = na.zeros_like(sampledata.data)
+        k2 = sampledata.k2(no_zero=True)
+
+        # Construct k * ugradu - k * BgradB / (4 pi rho0)
+        for i,f in enumerate(self.ufields):
             tmp += data[f].k[self._trans[i]] * ugradu[f]['kspace']
-        k2 = data['ux'].k2(no_zero=True)
-        for i,f in enumerate(['ux', 'uy', 'uz'][0:self._ndims]):            
-            pressure[f] = data[f].k[self._trans[i]] * tmp/k2
+            tmp -= data[f].k[self._trans[i]] * BgradB[f]['kspace'] / pr4
+        
+        # Construct full term
+        for i,f in enumerate(self.ufields):            
+            pressure[f] = -data[f].k[self._trans[i]] * tmp / k2
             pressure[f]._curr_space = 'kspace'
             zero_nyquist(pressure[f].data)
 
