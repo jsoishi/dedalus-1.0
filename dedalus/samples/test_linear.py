@@ -6,7 +6,7 @@ data = RHS.create_fields(0.)
 RHS.parameters['Omega_r'] = 8.4e-5
 RHS.parameters['Omega_m'] = 0.276
 RHS.parameters['Omega_l'] = 0.724
-RHS.parameters['H0'] = 3.24077649e-18
+RHS.parameters['H0'] = 3.24077649e-18 # 100 km/s/Mpc in seconds
 ti = RK2simple(RHS)
 
 ti.stop_time(3.15e7*1e9)
