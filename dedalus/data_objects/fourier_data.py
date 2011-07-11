@@ -1,4 +1,4 @@
-"""Data object for fourier transformable fields
+"""Representation object for fourier transformable fields
 
 Author: J. S. Oishi <jsoishi@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
@@ -34,7 +34,7 @@ class Representation(object):
     def __init__(self, shape):
         pass
 
-class FourierData(Representation):
+class FourierRepresentation(Representation):
     """Container for data that can be Fourier transformed. Includes a
     wrapped and specifiable method for performing the FFT. 
 
@@ -143,7 +143,7 @@ class FourierData(Representation):
             k2[k2 == 0] = 1.
         return k2
 
-class FourierShearData(FourierData):
+class FourierShearRepresentation(FourierRepresentation):
     """
 
     """
@@ -158,7 +158,7 @@ class FourierShearData(FourierData):
 
         """
         self.shear_rate = S
-        FourierData.__init__(self, shape, **kwargs)
+        FourierRepresentation.__init__(self, shape, **kwargs)
 
 
         # for now, only numpy's fft is supported
@@ -210,7 +210,7 @@ class FourierShearData(FourierData):
         self._curr_space = 'kspace'
 
     
-class SphericalHarmonicData(FourierData):
+class SphericalHarmonicRepresentation(FourierRepresentation):
     """Dedalus should eventually support spherical and cylindrical geometries.
 
     """
