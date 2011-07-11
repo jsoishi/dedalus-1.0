@@ -196,7 +196,7 @@ class FourierShearData(FourierData):
 
     def backward(self,time):
         deltay = self.shear_rate*time 
-        x = na.linspace(-na.pi,na.pi,endpoint=False)
+        x = na.linspace(-na.pi,na.pi,self._shape[-1],endpoint=False)
         z_,y_,x_ = N.ogrid[0:self.data.shape[0],
                            0:self.data.shape[1],
                            0:self.data.shape[2]]
