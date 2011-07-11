@@ -124,7 +124,10 @@ class Hydro(Physics):
         """
         
         # Compute terms
-        self.XgradX(data, self.ufields, 'u', dealias='2/3')
+        ulist = [data[f] for f in self.ufields]
+        gradulist = self.aux_fields['gradu'].fields
+        ugradulist = self.aux_fields['ugradu'].fields
+        self.XgradX(ulist, gradulist, ugradulist, dealias='2/3')
         self.pressure(data)
         
         # Place references
@@ -138,27 +141,28 @@ class Hydro(Physics):
         self._RHS.time = data.time        
         return self._RHS
 
-    def gradX(self, data, fieldlist, outfield):
+    def gradX(self, Xlist, outlist):
         """
         Compute Jacobian: JX_ij = dX_i/dx_j
         
         Inputs:
-            data        Data object
-            fieldlist   List of fields that make up the vector X
-            outfield    Name of the vector (output assigned to field "grad_")
+            Xlist       List of Representation objects that make up the vector X
+            outlist     List of Representation objects for output
 
         """
         
+        if len(Xlist) ** 2 != len(outlist):
+            raise ValueError('Dimension mismatch')
+        
         # Place references
-        gradx = self.aux_fields['grad' + outfield]
-        N = len(fieldlist)
+        N = len(Xlist)
 
         # Construct Jacobian
-        for i,f in enumerate(fieldlist):
+        for i,f in enumerate(Xlist):
             for j in xrange(N):
-                gradx[N * i + j] = data[f].deriv(self._trans[j])
-                gradx[N * i + j]._curr_space = 'kspace'
-                zero_nyquist(gradx[N * i + j].data)
+                outlist[N * i + j].data = f.deriv(self._trans[j])
+                outlist[N * i + j]._curr_space = 'kspace'
+                zero_nyquist(outlist[N * i + j].data)
 
     def pressure(self, data):
         """
@@ -188,14 +192,14 @@ class Hydro(Physics):
             pressure[f]._curr_space = 'kspace'
             zero_nyquist(pressure[f].data)
 
-    def XgradX(self, data, fieldlist, outfield, dealias='2/3'):
+    def XgradX(self, Xlist, gradXlist, outlist, dealias='2/3'):
         """
         Calculate "X dot (grad X)" term for ufields, with dealiasing options.
         
         Inputs:
-            data        Data object
-            fieldlist   List of fields that make up the vector X
-            outfield    Name of the vector (output assigned to field "_grad_")
+            Xlist       List of Representation objects that make up the vector X
+            gradXlist   List of Representation objects for components of gradX
+            outlist     List of Representation objects for output
             
         Dealiasing options: 
             None        No dealiasing
@@ -207,8 +211,8 @@ class Hydro(Physics):
         if dealias not in [None, '2/3', '3/2']:
             raise ValueError('Dealising method not implemented.')
             
-        if len(fieldlist) != len(self.ufields):
-            raise ValueError('X and u must have same number of dimensions')
+        if len(Xlist) != len(outlist):
+            raise ValueError('Dimension mismatch')
 
         if dealias == '3/2':
             # Uses temporary dealias fields with 3/2 as many points 
@@ -244,13 +248,11 @@ class Hydro(Physics):
 
         else:
             # Perform gradX calculation and place references
-            self.gradX(data, fieldlist, outfield)
-            gradx = self.aux_fields['grad' + outfield]
-            xgradx = self.aux_fields[outfield + 'grad' + outfield]
-            N = len(fieldlist)
+            self.gradX(Xlist, gradXlist)
+            N = len(Xlist)
 
             # Setup temporary data container and dealias mask
-            sampledata = data[fieldlist[0]]
+            sampledata = Xlist[0]
             tmp = na.zeros_like(sampledata.data)
             
             if dealias == '2/3': 
@@ -259,16 +261,16 @@ class Hydro(Physics):
                          (na.abs(sampledata.k['y']) > 2/3. * self._shape[1]/2.))
             
             # Construct XgradX **************** Proper dealiasing?
-            for i,f in enumerate(self.ufields):
+            for i,f in enumerate(outlist):
                 for j in xrange(N):
-                    tmp += data[fieldlist[j]]['xspace'] * gradx[N * i + j]['xspace']
+                    tmp += Xlist[j]['xspace'] * gradXlist[N * i + j]['xspace']
 
-                xgradx[f] = tmp
-                xgradx[f]._curr_space = 'xspace'
+                f = tmp
+                f._curr_space = 'xspace'
                 
                 if dealias == '2/3':
-                    xgradx[f] = tmp.real
-                    xgradx[f]['kspace'][dmask] = 0.
+                    f = tmp.real
+                    f['kspace'][dmask] = 0.
                     
                 tmp *= 0+0j
  
