@@ -126,6 +126,7 @@ class RK2simple(TimeStepBase):
 
         # second step
         self.field_dt = self.RHS.RHS(self.tmp_fields)
+        
         for f in self.RHS.fields:
             data[f] = data[f]['kspace'] + dt * self.field_dt[f]['kspace']
             self.tmp_fields[f]._curr_space ='kspace'
