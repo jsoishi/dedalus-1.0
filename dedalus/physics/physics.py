@@ -360,9 +360,51 @@ class MHD(Hydro):
             Ptotal[f]._curr_space = 'kspace'
             zero_nyquist(Ptotal[f].data)
 
+    def XcrossY(self, data, Xlist, Ylist, space):
+        """
+        Return list of X cross Y components.
+        
+        Inputs:
+            data        Data object
+            Xlist       List of fields that make up the vector X
+            Ylist       List of fields that make up the vector Y
+            space       Space for cross product
+        
+        Note:   
+            2D inputs result in single output, sign indicating Z-direction
+            3D inputs result in 3D output (list of three component fields)
 
+        """            
+        
+        if len(Xlist) != len(Ylist):
+            raise ValueError('Inputs of different dimension')
             
+        N = len(Xlist)
+        [out0, out1, out2] = [np.zeros_like(Xlist[0]), 
+                              np.zeros_like(Xlist[0]), 
+                              np.zeros_like(Xlist[0])]
             
+        # Place references
+        X0 = data[Xlist[0]][space]
+        X1 = data[Xlist[1]][space]
+        if N == 3: X2 = data[Xlist[2]][space]
+            
+        Y0 = data[Ylist[0]][space]
+        Y1 = data[Ylist[1]][space]
+        if N == 3: Y2 = data[Ylist[2]][space]
+
+        # Calculate cross product, only have Z-component if N == 2
+        if N == 3:
+            out0 = X1 * Y2 - X2 * Y1
+            out1 = X2 * Y0 - X0 * Y2
+            
+        out2 = X0 * Y1 - X1 * Y0
+        
+        return [out0, out1, out2]
+        
+        
+            
+        
             
             
 class LinearCollisionlessCosmology(Physics):
