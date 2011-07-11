@@ -47,6 +47,11 @@ def sin_y(f,ampl=1.):
     f.data[1,0] = ampl*1j
     f.data[-1,0] = -f.data[0,1]
 
+def sin_k(f, kindex, ampl=1.):
+    f.data[tuple(kindex)] = ampl*1j
+    f.data[tuple(-1*na.array(kindex))] = -f.data[tuple(kindex)]
+
+
 def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     """generate noise with a random phase and a spectrum given by
     the spec function.
