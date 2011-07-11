@@ -280,11 +280,11 @@ class MHD(Hydro):
         
         # Setup data fields
         self.ufields = ['ux', 'uy', 'uz'][0:self._ndims]
-        self.Bfields = ['Bx', 'By', 'Bz'][0:self._ndims]
-        self.fields = self.ufields + self.Bfields
-        self._aux_fields = (['Ax', 'Ay', 'Az'][0:self._ndims] + 
+        self.Afields = ['Ax', 'Ay', 'Az']
+        self.fields = self.ufields + self.Afields
+        self._aux_fields = (['Bx', 'By', 'Bz'][0:self._ndims] + 
                             ['Ptotal', 'gradu', 'ugradu', 'gradB', 'BgradB'])
-        aux_types = [self.Bfields] * self._ndims + [self.ufields, 
+        aux_types = [self.Afields] * self._ndims + [self.ufields, 
                      range(self._ndims ** 2), self.ufields, 
                      range(self._ndims ** 2), self.ufields]
         
@@ -302,6 +302,8 @@ class MHD(Hydro):
         the time derivatives of the fields.
         
         u_t + nu k^2 u = -ugradu + BgradB / (4 pi rho0) - i k Ptot / rho0
+        
+        A_t + eta k^2 A = ucrossB + eta k (k * A)
         
         *****NEEDS INDUCTION******
 
@@ -328,6 +330,12 @@ class MHD(Hydro):
 
         self._RHS.time = data.time        
         return self._RHS
+        
+    def getB(self, data):
+        """Compute magnetic field from vector potential."""
+        
+        [B0, B1, B2] = self.curl(data, self.Afields)
+            
         
     def total_pressure(self, data):
         """
@@ -371,8 +379,7 @@ class MHD(Hydro):
             space       Space for cross product
         
         Note:   
-            2D inputs result in single output, sign indicating Z-direction
-            3D inputs result in 3D output (list of three component fields)
+            2D and 3D inputs both result in 3D output
 
         """            
         
@@ -402,10 +409,42 @@ class MHD(Hydro):
         
         return [out0, out1, out2]
         
+    def curlX(self, data, Xlist):
+        """
+        Return list of components of curl X.
         
+        Inputs:
+            data        Data object
+            Xlist       List of fields that make up the vector X
             
+        Note:
+            2D and 3D inputs both result in 3D output
+            
+        """
         
+        N = len(Xlist)
+        [out0, out1, out2] = [np.zeros_like(Xlist[0]), 
+                              np.zeros_like(Xlist[0]), 
+                              np.zeros_like(Xlist[0])]
             
+        # Place references
+        #data[f].deriv(self._trans[j])
+        X0 = data[Xlist[0]]
+        X1 = data[Xlist[1]]
+        if N == 3: X2 = data[Xlist[2]]
+
+        # Calculate curl, only have Z-component if N == 2
+        if N == 3:
+            out0 = X2.deriv(self._trans[1]) - X1.deriv(self._trans[2])
+            out1 = X0.deriv(self._trans[2]) - X2.deriv(self._trans[0])
+            
+        out2 = X1.deriv(self._trans[0]) - X0.deriv(self._trans[1])
+        
+        return [out0, out1, out2]
+    
+    
+    
+    
             
 class LinearCollisionlessCosmology(Physics):
     """This class implements linear, collisionless cosmology. 
