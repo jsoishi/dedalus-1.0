@@ -24,7 +24,7 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
+from dedalus.funcs import insert_ipython
 import numpy as na
 
 def taylor_green(ux, uy):
@@ -108,14 +108,16 @@ def MIT_vortices(data):
 
     """
     
-    sh = data['ux'].data.shape
+    sh = data['u']['x', 'kspace'].shape
     x, y = na.meshgrid(na.r_[0:sh[0]]*2*na.pi/sh[0],na.r_[0:sh[1]]*2*na.pi/sh[1])
-    aux = data.__class__(['w','psi'],0.)
-    aux['w']=na.exp(-((x-na.pi)**2+(y-na.pi+na.pi/4)**2)/(0.2)) \
+    aux = data.__class__(data.time, data._field_classes['tensor'], data._field_classes['vector'], data._field_classes['scalar'])
+    aux.add_field('w','scalar')
+    aux.add_field('psi','scalar')
+    aux['w']['xspace']=na.exp(-((x-na.pi)**2+(y-na.pi+na.pi/4)**2)/(0.2)) \
         +na.exp(-((x-na.pi)**2+(y-na.pi-na.pi/4)**2)/(0.2)) \
         -0.5*na.exp(-((x-na.pi-na.pi/4)**2+(y-na.pi-na.pi/4)**2)/(0.4))
-    aux['w']._curr_space = 'xspace'
-    aux['psi'] = aux['w']['kspace']/aux['w'].k2(no_zero=True)
 
-    data['ux'] = aux['psi'].deriv('y')
-    data['uy'] = -aux['psi'].deriv('x')
+    aux['psi']['kspace'] = aux['w']['kspace']/aux['w']().k2(no_zero=True)
+    
+    data['u']['x','kspace'] = aux['psi']().deriv('y')
+    data['u']['y','kspace'] = -aux['psi']().deriv('x')

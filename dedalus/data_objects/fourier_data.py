@@ -41,6 +41,7 @@ class FourierRepresentation(Representation):
     Parallelization will go here?
 
     """
+
     def __init__(self, shape, length=None, dtype='complex128', method='fftw'):
         """
         
@@ -54,6 +55,7 @@ class FourierRepresentation(Representation):
         self.dim = len(shape)
         self.data = na.zeros(self._shape,dtype=dtype)
         names = ['z','y','x']
+        self.trans = {'x': 0, 'y': 1, 'z': 2} # for vector fields
         # hard code for now
         self.L = dict(zip(names[3-self.dim:],2.*na.pi*na.ones(self.dim)))
 

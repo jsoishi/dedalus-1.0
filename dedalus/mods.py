@@ -26,7 +26,9 @@ from dedalus.analysis.api import \
     AnalysisSet, \
     VolumeAverageSet
 
-from dedalus.data_objects.api import FourierData
+from dedalus.data_objects.api import \
+    FourierRepresentation, \
+    FourierShearRepresentation
 
 from dedalus.init_cond.api import \
     taylor_green, \

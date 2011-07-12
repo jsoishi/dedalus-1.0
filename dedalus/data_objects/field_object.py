@@ -30,13 +30,13 @@ def create_field_obj(representation, shape, name):
 
     """
     tname = "%sTensorField" % name
-    new_tensorclass = type(name, (TensorField,), {'representation': representation,
+    new_tensorclass = type(tname, (TensorField,), {'representation': representation,
                                                   'shape': shape})
     vname = "%sVectorField" % name
-    new_vectorclass = type(name, (VectorField,), {'representation': representation,
+    new_vectorclass = type(vname, (VectorField,), {'representation': representation,
                                                   'shape': shape})
     sname = "%sScalarField" % name
-    new_scalarclass = type(name, (ScalarField,), {'representation': representation,
+    new_scalarclass = type(sname, (ScalarField,), {'representation': representation,
                                                   'shape': shape})
 
     return new_tensorclass, new_vectorclass, new_scalarclass
@@ -45,22 +45,27 @@ def lookup(name, translation_table):
     """this may need to be inlined?
 
     """
-    name = translation_table.get(comp_name, None)
+    name = translation_table.get(name, None)
     if name is None:
         raise KeyError
     return name
     
 class BaseField(object):
     def __init__(self, ndim=-1):
-        self.trans = self.representation.trans # representation must
-                                               # provide a translation
-                                               # table for coordinate
-                                               # names.
         self.components = []
         if ndim == -1:
             self.ndim = len(self.shape)
-        for f in self.ndim:
+        else:
+            self.ndim = ndim
+
+        for f in range(self.ndim):
             self.components.append(self.representation(self.shape))
+
+        self.trans = self.components[-1].trans # representation must
+                                               # provide a translation
+                                               # table for coordinate
+                                               # names.
+
 
     def __getitem__(self, item):
         """item is a 2-tuple containing a component name and a space
@@ -89,7 +94,13 @@ class BaseField(object):
             sli = [slice(i) for i in f.data.shape]
             f.data[:] = data[sli]
 
-        f.__cur_space = space
+        f._curr_space = space
+
+    def __call__(self, comp_name):
+        if type(comp_name) == str:
+            comp_name = lookup(comp_name, self.trans)
+
+        return self.components[comp_name]
 
     def zero(self, item):
         if type(item) == str:
@@ -121,13 +132,16 @@ class ScalarField(BaseField):
 
     """
     def __init__(self):
-        def BaseField.__init__(self, 1)
+        BaseField.__init__(self, 1)
 
     def __getitem__(self, space):
         return self.components[0][space]
     
     def __setitem__(self, space, data):
         BaseField.__setitem__(self, (0,space), data)
+
+    def __call__(self):
+        return self.components[0]
         
     def zero(self):
         self.zero_all()
@@ -142,9 +156,12 @@ class StateData(object):
     def __init__(self, time, TensorClass, VectorClass, ScalarClass):
         self.time = time
         self.fields = {}
-        self.__field_classes = {'tensor': TensorClass,
+        self._field_classes = {'tensor': TensorClass,
                                 'vector': VectorClass, 
                                 'scalar': ScalarClass}
+
+    def __getitem__(self, item):
+        return self.fields[item]
 
     def add_field(self, field, field_type):
         """add a new field. There is a SIGNIFICANT performace penalty
@@ -153,19 +170,20 @@ class StateData(object):
 
         """
         if field not in self.fields.keys():
-            self.fields[field] = self.__field_classes[field_type]()
+            self.fields[field] = self._field_classes[field_type]()
 
     def snapshot(self, nsnap):
         """NEEDS TO BE UPDATED FOR NEW FIELD TYPES
 
         """
-        filename = "snap_%05i.cpu%04i" % (nsnap, 0)
-        outfile = h5py.File(filename, mode='w')
-        grp = outfile.create_group('/data')
-        dset = outfile.create_dataset('time',data=self.time)
-        for f in self.fields.keys():
-            dset = grp.create_dataset(f,data=self[f].data)
-            dset.attrs["space"] = self[f]._curr_space
-
-        outfile.close()
+        pass
+        #filename = "snap_%05i.cpu%04i" % (nsnap, 0)
+        #outfile = h5py.File(filename, mode='w')
+        #grp = outfile.create_group('/data')
+        #dset = outfile.create_dataset('time',data=self.time)
+        #for f in self.fields.keys():
+        #    dset = grp.create_dataset(f,data=self[f].data)
+        #    dset.attrs["space"] = self[f]._curr_space
+        #
+        #outfile.close()
 

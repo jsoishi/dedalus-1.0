@@ -63,12 +63,11 @@ def field_snap(data, it):
 
     """
     
-    # Retrieve field names
-    fields = data.fields.keys()
-    fields.sort()
-    
     # Determine imag grid size
-    nvars = len(fields)
+    nvars = 0
+    fields  = data.fields
+    for f in fields.values():
+        nvars += len(f.components)
     if nvars in [4, 9]:
         nrow = ncol = na.sqrt(nvars)
     else:
@@ -87,10 +86,11 @@ def field_snap(data, it):
                     label_mode="1",
                     cbar_location="top",
                     cbar_mode="each")
-    for i,f in enumerate(fields):
-        im = grid[i].imshow(data[f]['xspace'].real, origin='lower')
-        grid[i].text(0.05,0.95,f, transform=grid[i].transAxes, size=24,color='white')
-        grid.cbar_axes[i].colorbar(im)
+    for f in fields.values():
+        for i in range(f.ndim):
+            im = grid[i].imshow(f[i,'xspace'].real, origin='lower')
+            grid[i].text(0.05,0.95,f, transform=grid[i].transAxes, size=24,color='white')
+            grid.cbar_axes[i].colorbar(im)
     tstr = 't = %5.2f' % data.time
     grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
     if not os.path.exists('frames'):
@@ -115,16 +115,13 @@ def print_energy(data, it):
 
 @AnalysisSet.register_task
 def en_spec(data, it):
-    kk = na.zeros(data['ux'].data.shape)
-    for k in data['ux'].k.values():
-        kk += k**2
-    kk = na.sqrt(kk)
-    power = na.zeros(data['ux'].data.shape)
-    for f in data.fields:
-        power += (data[f]['kspace']*data[f]['kspace'].conj()).real
+    kk = na.sqrt(data['u']('x').k2())
+    power = na.zeros(data['u']('x').data.shape)
+    for i in range(data['u'].ndim):
+        power += (data['u'][i,'kspace']*data['u'][i,'kspace'].conj()).real
 
     power *= 0.5
-    nbins = (data['ux'].k['x'].size)/2 
+    nbins = (data['u']('x').k['x'].size)/2 
     k = na.arange(nbins)
     spec = na.zeros(nbins)
     for i in range(nbins):

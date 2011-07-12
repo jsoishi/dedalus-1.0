@@ -24,7 +24,7 @@ License:
 """
 
 import numpy as na
-from dedalus.data_objects.api import create_data, zero_nyquist, AuxEquation
+from dedalus.data_objects.api import create_field_obj, zero_nyquist, AuxEquation, StateData
 from dedalus.utils.api import friedmann
 from dedalus.funcs import insert_ipython
 
@@ -36,8 +36,8 @@ class Physics(object):
         self._shape = shape
         self._ndims = len(self._shape)
         self._representation = representation
-        dataname = "%sData" % self.__class__.__name__
-        self.__DataClass = create_data(self._representation, self._shape, dataname)
+        dataname = self.__class__.__name__
+        self.__TensorClass, self.__VectorClass, self.__ScalarClass = create_field_obj(self._representation, self._shape, dataname)
         self.parameters = {}
         self.fields = {}
         self.aux_fields = {}
@@ -51,11 +51,17 @@ class Physics(object):
               raise KeyError
          return
 
-    def create_fields(self, t, fields=None):
-         if fields == None:
-              return self.__DataClass(self.fields, t)
-         else:
-              return self.__DataClass(fields, t)
+    def create_fields(self, t, fields={}):
+        data = StateData(t, 
+                         self.__TensorClass, 
+                         self.__VectorClass, 
+                         self.__ScalarClass)
+        
+        if fields == {}:
+            fields = self.fields
+        for f,t in fields.iteritems():
+            data.add_field(f,t)
+        return data
 
     def create_dealias_field(self, t, fields=None):
         """data object to implement Orszag 3/2 rule for non-linear
@@ -75,9 +81,20 @@ class Physics(object):
         for k,v in params.iteritems():
             self.parameters[k] = v
 
-    def _setup_aux_fields(self, t, aux, aux_comp):
-         for f, c in zip(aux, aux_comp):
-              self.aux_fields[f] = self.create_fields(t, c)
+    def _setup_aux_fields(self, t, aux):
+        """
+
+        inputs
+        ------
+        aux -- a dict of names as keys and field types as values
+
+        """
+        self.aux_fields = StateData(t, 
+                                    self.__TensorClass,
+                                    self.__VectorClass,
+                                    self.__ScalarClass)
+        for f, t in aux.iteritems():
+            self.aux_fields.add_field(f, t)
 
     def _setup_aux_eqns(self, aux_eqns, RHS, ics):
         """ create auxiliary ODEs to be solved alongside the spatial gradients.
@@ -101,16 +118,16 @@ class Hydro(Physics):
         Physics.__init__(self, *args)
         
         # Setup data fields
-        self.ufields = ['ux', 'uy', 'uz'][0:self._ndims]
-        self.fields = self.ufields
-        self._aux_fields = ['pressure','gradu','ugradu']
-        aux_types = [None, range(self._ndims ** 2), None]
+        self.fields = {'u': 'vector'}
+        self._aux_fields = {'pressure': 'vector',
+                            'gradu': 'tensor',
+                            'ugradu': 'vector'}
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1.}
 
-        self.q = self.create_dealias_field(0.,['u','gu','ugu'])
-        self._setup_aux_fields(0., self._aux_fields, aux_types)
+        #self.q = self.create_dealias_field(0.,['u','gu','ugu'])
+        self._setup_aux_fields(0., self._aux_fields)
         self._setup_parameters(params)
         self._RHS = self.create_fields(0.)
 
@@ -124,7 +141,7 @@ class Hydro(Physics):
         """
         
         # Compute terms
-        self.XgradX(data, self.ufields, 'u', dealias='2/3')
+        self.XgradX(data, 'u', 'u', dealias='2/3')
         self.pressure(data)
         
         # Place references
@@ -132,33 +149,32 @@ class Hydro(Physics):
         pressure = self.aux_fields['pressure']
         
         # Construct time derivatives
-        for f in self.fields:
-            self._RHS[f] = -ugradu[f]['kspace'] - pressure[f]['kspace']
+        for f in xrange(self._ndims):
+            self._RHS['u'][f,'kspace'] = -ugradu[f, 'kspace'] - pressure[f, 'kspace']
             
         self._RHS.time = data.time        
         return self._RHS
 
-    def gradX(self, data, fieldlist, outfield):
+    def gradX(self, data, field, outfield):
         """
         Compute Jacobian: JX_ij = dX_i/dx_j
         
         Inputs:
             data        Data object
-            fieldlist   List of fields that make up the vector X
+            field       Field that makes up the vector X
             outfield    Name of the vector (output assigned to field "grad_")
 
         """
         
         # Place references
         gradx = self.aux_fields['grad' + outfield]
-        N = len(fieldlist)
+        N = self._ndims
 
         # Construct Jacobian
-        for i,f in enumerate(fieldlist):
-            for j in xrange(N):
-                gradx[N * i + j] = data[f].deriv(self._trans[j])
-                gradx[N * i + j]._curr_space = 'kspace'
-                zero_nyquist(gradx[N * i + j].data)
+        for i in xrange(self._ndims):
+            for j in xrange(self._ndims):
+                gradx[N * i + j, 'kspace'] = data[outfield](i).deriv(self._trans[j])
+                zero_nyquist(gradx(N * i + j).data)
 
     def pressure(self, data):
         """
@@ -168,33 +184,31 @@ class Hydro(Physics):
         ==> pressure term = - k (k * ugradu) / k^2
         
         """
-        
         # Place references
         ugradu = self.aux_fields['ugradu']
         pressure = self.aux_fields['pressure']
         
         # Setup temporary data container
-        sampledata = data['ux']
+        sampledata = data['u']('x')
         tmp = na.zeros_like(sampledata.data)
         k2 = sampledata.k2(no_zero=True)
         
         # Construct k * ugradu
-        for i,f in enumerate(self.ufields):
-            tmp += data[f].k[self._trans[i]] * ugradu[f]['kspace']
+        for i in xrange(self._ndims):
+            tmp += data['u'](i).k[self._trans[i]] * ugradu[i,'kspace']
 
         # Construct full term
-        for i,f in enumerate(self.ufields):            
-            pressure[f] = -data[f].k[self._trans[i]] * tmp / k2
-            pressure[f]._curr_space = 'kspace'
-            zero_nyquist(pressure[f].data)
+        for i in xrange(self._ndims):            
+            pressure[i,'kspace'] = -data['u'](i).k[self._trans[i]] * tmp / k2
+            zero_nyquist(pressure(i).data)
 
-    def XgradX(self, data, fieldlist, outfield, dealias='2/3'):
+    def XgradX(self, data, field, outfield, dealias='2/3'):
         """
         Calculate "X dot (grad X)" term for ufields, with dealiasing options.
         
         Inputs:
             data        Data object
-            fieldlist   List of fields that make up the vector X
+            field       field that makes up the vector X
             outfield    Name of the vector (output assigned to field "_grad_")
             
         Dealiasing options: 
@@ -207,8 +221,8 @@ class Hydro(Physics):
         if dealias not in [None, '2/3', '3/2']:
             raise ValueError('Dealising method not implemented.')
             
-        if len(fieldlist) != len(self.ufields):
-            raise ValueError('X and u must have same number of dimensions')
+        # if len(fieldlist) != len(self.ufields):
+        #     raise ValueError('X and u must have same number of dimensions')
 
         if dealias == '3/2':
             # Uses temporary dealias fields with 3/2 as many points 
@@ -244,13 +258,13 @@ class Hydro(Physics):
 
         else:
             # Perform gradX calculation and place references
-            self.gradX(data, fieldlist, outfield)
+            self.gradX(data, field, outfield)
             gradx = self.aux_fields['grad' + outfield]
             xgradx = self.aux_fields[outfield + 'grad' + outfield]
-            N = len(fieldlist)
+            N = self._ndims
 
             # Setup temporary data container and dealias mask
-            sampledata = data[fieldlist[0]]
+            sampledata = data[field]('x')
             tmp = na.zeros_like(sampledata.data)
             
             if dealias == '2/3': 
@@ -259,16 +273,14 @@ class Hydro(Physics):
                          (na.abs(sampledata.k['y']) > 2/3. * self._shape[1]/2.))
             
             # Construct XgradX **************** Proper dealiasing?
-            for i,f in enumerate(self.ufields):
+            for i in range(self._ndims):
                 for j in xrange(N):
-                    tmp += data[fieldlist[j]]['xspace'] * gradx[N * i + j]['xspace']
+                    tmp += data[field][j, 'xspace'] * gradx[N * i + j,'xspace']
 
-                xgradx[f] = tmp
-                xgradx[f]._curr_space = 'xspace'
-                
+                xgradx[i,'xspace'] = tmp.real
                 if dealias == '2/3':
-                    xgradx[f] = tmp.real
-                    xgradx[f]['kspace'][dmask] = 0.
+                    xgradx[i,'kspace'] # dummy call to switch spaces
+                    xgradx[i, 'kspace'][dmask] = 0.
                     
                 tmp *= 0+0j
  
