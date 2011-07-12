@@ -35,6 +35,7 @@ class Physics(object):
     def __init__(self, shape, representation):
         self._shape = shape
         self.ndim = len(self._shape)
+        self.dims = xrange(self.ndim)
         self._representation = representation
         dataname = self.__class__.__name__
         self.__TensorClass, self.__VectorClass, self.__ScalarClass = create_field_classes(self._representation, self._shape, dataname)
@@ -149,8 +150,8 @@ class Hydro(Physics):
         pressure = self.aux_fields['pressure']
         
         # Construct time derivatives
-        for f in xrange(self.ndim):
-            self._RHS['u'][f]['kspace'] = -ugradu[f]['kspace'] - pressure[f]['kspace']
+        for d in self.dims:
+            self._RHS['u'][d]['kspace'] = -ugradu[d]['kspace'] - pressure[d]['kspace']
             
         self._RHS.time = data.time        
         return self._RHS
@@ -171,8 +172,8 @@ class Hydro(Physics):
         N = self.ndim
 
         # Construct Jacobian
-        for i in xrange(self.ndim):
-            for j in xrange(self.ndim):
+        for i in self.dims:
+            for j in self.dims:
                 gradx[N * i + j]['kspace'] = data[outfield][i].deriv(self._trans[j])
                 zero_nyquist(gradx[N * i + j].data)
 
@@ -194,11 +195,11 @@ class Hydro(Physics):
         k2 = sampledata.k2(no_zero=True)
         
         # Construct k * ugradu
-        for i in xrange(self.ndim):
+        for i in self.dims:
             tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace']
 
         # Construct full term
-        for i in xrange(self.ndim):            
+        for i in self.dims:            
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             zero_nyquist(pressure[i].data)
 
@@ -237,7 +238,7 @@ class Hydro(Physics):
             trans = {0: 'ux', 1: 'uy', 2: 'uz'}
             self.q.zero_all()
             for i,f in enumerate(self.fields):
-                b = [i * self.ndim + j for j in range(self.ndim)]
+                b = [i * self.ndim + j for j in self.dims]
                 tmp = na.zeros_like(self.q['ugu'].data)
                 for ii,j, in enumerate(b):
                     self.q['u'].data[:]= 0+0j
@@ -273,7 +274,7 @@ class Hydro(Physics):
                          (na.abs(sampledata.k['y']) > 2/3. * self._shape[1]/2.))
             
             # Construct XgradX **************** Proper dealiasing?
-            for i in range(self.ndim):
+            for i in self.dims:
                 for j in xrange(N):
                     tmp += data[field][j]['xspace'] * gradx[N * i + j]['xspace']
 
