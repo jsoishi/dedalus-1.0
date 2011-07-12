@@ -21,13 +21,18 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from .data_object import \
-    BaseData, \
-    create_data
+from .field_object import \
+    BaseField, \
+    VectorField, \
+    ScalarField,\
+    create_field_obj
+
+from .state_data import \
+    StateData
 
 from .fourier_data import \
-    FourierData, \
-    FourierShearData
+    FourierRepresentation, \
+    FourierShearRepresentation
 
 from .hermitianize import \
     enforce_hermitian, \
