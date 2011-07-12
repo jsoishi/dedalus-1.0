@@ -156,26 +156,23 @@ class Hydro(Physics):
         self._RHS.time = data.time        
         return self._RHS
 
-    def gradX(self, data, field, outfield):
+    def gradX(self, X, output):
         """
-        Compute Jacobian: JX_ij = dX_i/dx_j
+        Compute Jacobian: gradX[N * i + j] = dX_i/dx_j
         
         Inputs:
-            data        Data object
-            field       Field that makes up the vector X
-            outfield    Name of the vector (output assigned to field "grad_")
+            X           Input VectorField object
+            output      Output TensorField object
 
         """
         
-        # Place references
-        gradx = self.aux_fields['grad' + outfield]
         N = self.ndim
 
         # Construct Jacobian
         for i in self.dims:
             for j in self.dims:
-                gradx[N * i + j]['kspace'] = data[outfield][i].deriv(self._trans[j])
-                zero_nyquist(gradx[N * i + j].data)
+                output[N * i + j]['kspace'] = X[i].deriv(self._trans[j]) #################################### Bad k indexing
+                zero_nyquist(output[N * i + j].data)
 
     def pressure(self, data):
         """
