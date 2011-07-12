@@ -24,7 +24,7 @@ License:
 
 import h5py
 
-def create_field_obj(representation, shape, name):
+def create_field_classes(representation, shape, name):
     """utility function to bind representation and shape to tensor,
     vector, and scalar fields.
 
@@ -66,40 +66,13 @@ class BaseField(object):
                                                # table for coordinate
                                                # names.
 
-
-    def __getitem__(self, item):
+    def __getitem__(self, comp_name):
         """item is a 2-tuple containing a component name and a space
         (x or k).
 
         """
-        comp_name, space = item
         if type(comp_name) == str:
             comp_name = lookup(comp_name, self.trans)
-        return self.components[comp_name][space]
-
-    def __setitem__(self, item, data):
-        """this needs to ensure the pointer for the field's data
-        member doesn't change for FFTW. Currently, we do that by
-        slicing the entire data array. 
-        """
-        comp_name, space = item
-        if type(comp_name) == str:
-            comp_name = lookup(comp_name, self.trans)
-
-        f = self.components[comp_name]
-        if data.size < f.data.size:
-            sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
-            f.data[sli] = data
-        else:
-            sli = [slice(i) for i in f.data.shape]
-            f.data[:] = data[sli]
-
-        f._curr_space = space
-
-    def __call__(self, comp_name):
-        if type(comp_name) == str:
-            comp_name = lookup(comp_name, self.trans)
-
         return self.components[comp_name]
 
     def zero(self, item):
@@ -134,15 +107,21 @@ class ScalarField(BaseField):
     def __init__(self):
         BaseField.__init__(self, 1)
 
-    def __getitem__(self, space):
-        return self.components[0][space]
-    
-    def __setitem__(self, space, data):
-        BaseField.__setitem__(self, (0,space), data)
+    def __getitem__(self, item):
+        return self.components[0][item]
 
-    def __call__(self):
-        return self.components[0]
-        
+    def __setitem__(self, space, data):
+        self.components[0].__setitem__(space,data)
+
+    def __getattr__(self, attr):
+        """in order to make scalar fields work as though they have no
+        internal structure, we provide this method to search the
+        attributes of the undrlying representation (stored in
+        self.components[0]). Thus, a ScalarField will act like a
+        single instance of its underlying representation.
+        """
+        return self.components[0].__getattribute__(attr)
+
     def zero(self):
         self.zero_all()
 

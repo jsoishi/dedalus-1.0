@@ -215,13 +215,13 @@ class CrankNicholsonVisc(TimeStepBase):
 
     """
     def do_advance(self, data, dt):
-        k2 = data['u']('x').k2()
+        k2 = data['u']['x'].k2()
         top = (1./dt - 0.5*self.RHS.parameters['nu']*k2)
         bottom  = (1./dt + 0.5*self.RHS.parameters['nu']*k2)
         deriv = self.RHS.RHS(data)
         for k,f in deriv.fields.iteritems():
             for i in range(f.ndim):
-                data[k][i,'kspace'] = top/bottom * data[k][i,'kspace'] + 1./bottom * deriv[k][i,'kspace']
+                data[k][i]['kspace'] = top/bottom * data[k][i]['kspace'] + 1./bottom * deriv[k][i]['kspace']
 
         data.time += dt
         self.time += dt

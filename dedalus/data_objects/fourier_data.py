@@ -88,6 +88,20 @@ class FourierRepresentation(Representation):
         
         return self.data
 
+    def __setitem__(self, space, data):
+        """this needs to ensure the pointer for the field's data
+        member doesn't change for FFTW. Currently, we do that by
+        slicing the entire data array. 
+        """
+        if data.size < self.data.size:
+            sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
+            self.data[sli] = data
+        else:
+            sli = [slice(i) for i in self.data.shape]
+            self.data[:] = data[sli]
+
+        self._curr_space = space
+
     def initialize(self, data, space):
         """should provide some way to initialize data
         """
