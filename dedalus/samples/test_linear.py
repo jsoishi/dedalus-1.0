@@ -19,7 +19,7 @@ data = RHS.create_fields(0.)
 RHS.parameters['Omega_r'] = 8.4e-5
 RHS.parameters['Omega_m'] = 0.276
 RHS.parameters['Omega_l'] = 0.724
-RHS.parameters['H0'] = 3.24077649e-18 # 100 km/s/Mpc in seconds
+RHS.parameters['H0'] = 2.27826587e-18 # 70.3 km/s/Mpc in seconds^-1
 cosmology(data, icfname, normfname)
 
 ti = RK2simple(RHS)

@@ -468,9 +468,9 @@ class LinearCollisionlessCosmology(Physics):
     """
     def __init__(self,*args):
         Physics.__init__(self, *args)
-        self.fields = ['delta','ux','uy']
-        self._aux_fields = ['gradphi']
-        aux_types = [None]
+        self.fields = [('delta', 'scalar'),('u', 'vector')]
+        self._aux_fields = [('gradphi', 'vector')]
+
         if self.ndim == 3:
              self.fields.append('uz')
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
@@ -479,7 +479,7 @@ class LinearCollisionlessCosmology(Physics):
                   'Omega_l': 0.,
                   'H0': 100.}
         self._setup_parameters(params)
-        self._setup_aux_fields(0., self._aux_fields,aux_types)
+        self._setup_aux_fields(0., self._aux_fields)
         aux_eqn_rhs = lambda a: a*friedmann(a,self.parameters['H0'],self.parameters['Omega_r'], self.parameters['Omega_m'], self.parameters['Omega_l'])
         
         self._setup_aux_eqns(['a'],[aux_eqn_rhs], [1e-4])
