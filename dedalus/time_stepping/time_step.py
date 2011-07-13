@@ -126,12 +126,13 @@ class RK2simple(TimeStepBase):
 
         # second step
         self.field_dt = self.RHS.RHS(self.tmp_fields)
+
         for k,f in self.RHS.fields.iteritems:
             for i in range(f.ndim):
                 data[k][i]['kspace'] = data[f][i]['kspace'] + dt * self.field_dt[f][i]['kspace']
 
         for a in self.RHS.aux_eqns.values():
-            a.value = a.value + dt/2. * a.RHS(a_tmp)
+            a.value = a.value + dt * a.RHS(a_tmp)
 
         data.time += dt
         self.time += dt

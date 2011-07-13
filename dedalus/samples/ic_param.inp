@@ -1,0 +1,18 @@
+omega_m			= 0.276			# Omega all matter today
+omega_b			= 0.050			# Omega baryonic matter today
+omega_L			= 0.724			# Omega cosmological constant today
+H0			= 70.3			# Hubble constant today
+Tcmb			= 2.726			# CMB temperature today (in K)
+YHe			= 0.248			# Helium fraction
+aout			= 0.00009999 		# output times (given in expansion factor a)
+kmin			= 1e-4			# minimum wavenumber to compute
+kmax			= 1e1			# maximum wavenumber 
+numk			= 200			# number of wavenumbers
+lmax			= 12			# maximum number of modes allowed 
+						# for photon anisotropy spectrum
+output_thermo		= true			# output thermal history to 'thermo.txt'
+outfile			= ic.txt		# name of the output file
+output_mode		= 1			# output type
+						# 0: CDM+baryon transfer functions for 
+						#    density and velocity
+						# 1: linger equivalent output
