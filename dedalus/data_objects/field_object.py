@@ -101,7 +101,7 @@ class TensorField(BaseField):
     """
     def __init__(self):
         ndim = len(self.shape)**2
-        BaseField.__init__(self, ndim=ndim)
+        BaseField.__init__(self, ndim)
 
 class VectorField(BaseField):
     """these should have N components with names defined at simulation initialization time.

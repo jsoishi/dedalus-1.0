@@ -63,15 +63,16 @@ def field_snap(data, it):
 
     """
     
-    # Determine imag grid size
+    # Determine image grid size
     nvars = 0
-    fields  = data.fields
-    for f in fields.values():
-        nvars += len(f.components)
-    if nvars in [4, 9]:
-        nrow = ncol = na.sqrt(nvars)
+    for f in data.fields.values():
+        nvars += f.ndim
+    if nvars == 4:
+        nrow = ncol = 2
+    elif nvars == 9:
+        nrow = ncol = 3
     else:
-        nrow = na.int(na.ceil(nvars / 3.))
+        nrow = na.ceil(nvars / 3.)
         ncol = na.min([nvars, 3])
     nrow = na.int(nrow)
     ncol = na.int(ncol)
@@ -86,11 +87,13 @@ def field_snap(data, it):
                     label_mode="1",
                     cbar_location="top",
                     cbar_mode="each")
-    for f in fields.values():
-        for i in range(f.ndim):
-            im = grid[i].imshow(f[i]['xspace'].real, origin='lower')
-            grid[i].text(0.05,0.95,f, transform=grid[i].transAxes, size=24,color='white')
-            grid.cbar_axes[i].colorbar(im)
+    I = 0
+    for k,f in data.fields.iteritems():
+        for i in xrange(f.ndim):
+            im = grid[I].imshow(f[i]['xspace'].real, origin='lower')
+            grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='white')
+            grid.cbar_axes[I].colorbar(im)
+            I += 1
     tstr = 't = %5.2f' % data.time
     grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
     if not os.path.exists('frames'):

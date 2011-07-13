@@ -64,13 +64,13 @@ class FourierRepresentation(Representation):
         self.kny = na.pi * na.array(self.shape) / na.array(self.length)
 
         # Setup wavenumbers
-        kk = []
-        for dim,S in enumerate(self.shape):
-            shape = (self.ndim - dim - 1) * (1,) + (S,) + dim * (1,)
-            k = fpack.fftfreq(S) * 2. * self.kny[dim]
-            k.resize(shape)
-            kk.append(k)
-        self.k = dict(zip(['x','y','z'][:self.ndim], kk))
+        self.k = []
+        for i,S in enumerate(self.shape):
+            kshape = (self.ndim - i - 1) * (1,) + (S,) + i * (1,)
+            ki = fpack.fftfreq(S) * 2. * self.kny[i]
+            ki.resize(kshape)
+            self.k.append(ki)
+        self.k = dict(zip(['x','y','z'][:self.ndim], self.k))
 
         self.set_fft(method)
 
