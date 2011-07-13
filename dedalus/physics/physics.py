@@ -266,20 +266,19 @@ class MHD(Hydro):
         Physics.__init__(self, *args)
         
         # Setup data fields
-        self.ufields = ['ux', 'uy', 'uz'][0:self.ndim]
-        self.Afields = ['Ax', 'Ay', 'Az']
-        self.fields = self.ufields + self.Afields
-        self._aux_fields = (['Bx', 'By', 'Bz'][0:self.ndim] + 
-                            ['Ptotal', 'gradu', 'ugradu', 'gradB', 'BgradB'])
-        aux_types = [self.Afields] * self.ndim + [self.ufields, 
-                     range(self.ndim ** 2), self.ufields, 
-                     range(self.ndim ** 2), self.ufields]
+        self.fields = [('u', 'vector'),
+                       ('B', 'vector')]
+        self._aux_fields = [('Ptotal', 'vector'),
+                            ('gradu', 'tensor'),
+                            ('ugradu', 'vector'),
+                            ('gradB', 'tensor'),
+                            ('BgradB', 'vector')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1., 'eta': 0.}
 
-        self.q = self.create_dealias_field(0.,['u','gu','ugu'])
-        self._setup_aux_fields(0., self._aux_fields, aux_types)
+        #self.q = self.create_dealias_field(0.,['u','gu','ugu'])
+        self._setup_aux_fields(0., self._aux_fields)
         self._setup_parameters(params)
         self._RHS = self.create_fields(0.)
 
@@ -297,8 +296,10 @@ class MHD(Hydro):
         """
         
         # Compute terms
-        self.XgradX(data, self.ufields, 'u', dealias='2/3')
-        self.XgradX(data, self.Bfields, 'B', dealias='2/3')
+        self.XgradY(data['u'], data['u'], self.aux_fields['gradu'],
+                    self.aux_fields['ugradu'], dealias='2/3')
+        self.XgradY(data['B'], data['B'], self.aux_fields['gradB'],
+                    self.aux_fields['BgradB'], dealias='2/3')
         self.total_pressure(data)
 
         # Place references
@@ -308,21 +309,15 @@ class MHD(Hydro):
         pr4 = 4 * na.pi * self.parameters['rho0']
         
         # Construct time derivatives
-        for f in self.ufields:
-            self._RHS[f] = (-ugradu[f]['kspace'] + BgradB[f]['kspace'] / pr4 -
-                            Ptotal[f]['kspace'])
-        for f in self.Bfields:
-            pass
-            #self._RHS[f] = ****** NEEDS INDUCTION *******
+        for i in self.dims:
+            self._RHS['u'][i]['kspace'] = (-ugradu[i]['kspace'] + 
+                                           BgradB[i]['kspace'] / pr4 -
+                                           Ptotal[i]['kspace'])
+            # ***** NEEDS INDUCTION *****                         
+            self._RHS['B'][i]['kspace'] += 0.
 
         self._RHS.time = data.time        
         return self._RHS
-        
-    def getB(self, data):
-        """Compute magnetic field from vector potential."""
-        
-        [B0, B1, B2] = self.curl(data, self.Afields)
-            
         
     def total_pressure(self, data):
         """
@@ -340,20 +335,19 @@ class MHD(Hydro):
         pr4 = 4 * na.pi * self.parameters['rho0']
 
         # Setup temporary data container
-        sampledata = data['ux']
+        sampledata = data['u']['x']
         tmp = na.zeros_like(sampledata.data)
         k2 = sampledata.k2(no_zero=True)
 
         # Construct k * ugradu - k * BgradB / (4 pi rho0)
-        for i,f in enumerate(self.ufields):
-            tmp += data[f].k[self._trans[i]] * ugradu[f]['kspace']
-            tmp -= data[f].k[self._trans[i]] * BgradB[f]['kspace'] / pr4
+        for i self.dims:
+            tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace']
+            tmp -= data['u'][i].k[self._trans[i]] * BgradB[i]['kspace'] / pr4
         
         # Construct full term
-        for i,f in enumerate(self.ufields):            
-            Ptotal[f] = -data[f].k[self._trans[i]] * tmp / k2
-            Ptotal[f]._curr_space = 'kspace'
-            zero_nyquist(Ptotal[f].data)
+        for i in self.dims:            
+            Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
+            zero_nyquist(Ptotal[i].data)
 
     def XcrossY(self, data, Xlist, Ylist, space):
         """
