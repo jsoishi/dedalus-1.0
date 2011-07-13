@@ -108,7 +108,7 @@ class Physics(object):
             for j in self.dims:
                 output[N * i + j]['kspace'] = X[i].deriv(self._trans[j]) 
                 
-    def XgradY(self, X, Y, gradY, output, dealias='2/3'):
+    def XgradY(self, X, Y, gradY, output, dealias='2/3', compute_gradY=True):
         """
         Calculate "X dot (grad X)" term, with dealiasing options.
         
@@ -122,6 +122,9 @@ class Physics(object):
             None        No dealiasing
             '2/3'       Dealias by keeping lower 2/3 modes, and zeroing others
             '3/2'       Dealias by extending to 3/2 larger temp fields
+            
+        Keywords:
+            compute_gradY   Set to False if gradY has been computed
         
         """
         
@@ -164,7 +167,8 @@ class Physics(object):
             N = self.ndim
         
             # Perform gradY calculation
-            self.gradX(Y, gradY)
+            if compute_gradY:
+                self.gradX(Y, gradY)
 
             # Setup temporary data container and dealias mask
             sampledata = X[0]
@@ -331,7 +335,9 @@ class MHD(Hydro):
                             ('gradu', 'tensor'),
                             ('ugradu', 'vector'),
                             ('gradB', 'tensor'),
-                            ('BgradB', 'vector')]
+                            ('BgradB', 'vector'),
+                            ('ugradB', 'vector'),
+                            ('Bgradu', 'vector')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1., 'eta': 0.}
@@ -348,32 +354,36 @@ class MHD(Hydro):
         
         u_t + nu k^2 u = -ugradu + BgradB / (4 pi rho0) - i k Ptot / rho0
         
-        A_t + eta k^2 A = ucrossB + eta k (k * A)
-        
-        *****NEEDS INDUCTION******
+        B_t + eta k^2 B = Bgradu - ugradB
 
         """
         
-        # Compute terms
-        self.XgradY(data['u'], data['u'], self.aux_fields['gradu'],
-                    self.aux_fields['ugradu'], dealias='2/3')
-        self.XgradY(data['B'], data['B'], self.aux_fields['gradB'],
-                    self.aux_fields['BgradB'], dealias='2/3')
-        self.total_pressure(data)
-
         # Place references
+        u = data['u']
+        B = data['B']
+        gradu = self.aux_fields['gradu']
+        gradB = self.aux_fields['gradB']
         ugradu = self.aux_fields['ugradu']
         BgradB = self.aux_fields['BgradB']
+        ugradB = self.aux_fields['ugradB']
+        Bgradu = self.aux_fields['Bgradu']
         Ptotal = self.aux_fields['Ptotal']
         pr4 = 4 * na.pi * self.parameters['rho0']
+        
+        # Compute terms
+        self.XgradY(u, u, gradu, ugradu, dealias='2/3')
+        self.XgradY(B, B, gradB, BgradB, dealias='2/3')
+        self.XgradY(u, B, gradB, ugradB, dealias='2/3', compute_gradY=False)
+        self.XgradY(B, u, gradu, Bgradu, dealias='2/3', compute_gradY=False)
+        self.total_pressure(data)
         
         # Construct time derivatives
         for i in self.dims:
             self._RHS['u'][i]['kspace'] = (-ugradu[i]['kspace'] + 
                                            BgradB[i]['kspace'] / pr4 -
                                            Ptotal[i]['kspace'])
-            # ***** NEEDS INDUCTION *****                         
-            self._RHS['B'][i]['kspace'] += 0.
+                                           
+            self._RHS['B'][i]['kspace'] = Bgradu[i]['kspace'] - ugradB[i]['kspace']
 
         self._RHS.time = data.time        
         return self._RHS
