@@ -34,7 +34,7 @@ class Physics(object):
     """
     def __init__(self, shape, representation):
         self._shape = shape
-        self._ndims = len(self._shape)
+        self.ndim = len(self._shape)
         self._representation = representation
         dataname = self.__class__.__name__
         self.__TensorClass, self.__VectorClass, self.__ScalarClass = create_field_classes(self._representation, self._shape, dataname)
@@ -149,7 +149,7 @@ class Hydro(Physics):
         pressure = self.aux_fields['pressure']
         
         # Construct time derivatives
-        for f in xrange(self._ndims):
+        for f in xrange(self.ndim):
             self._RHS['u'][f]['kspace'] = -ugradu[f]['kspace'] - pressure[f]['kspace']
             
         self._RHS.time = data.time        
@@ -168,11 +168,11 @@ class Hydro(Physics):
         
         # Place references
         gradx = self.aux_fields['grad' + outfield]
-        N = self._ndims
+        N = self.ndim
 
         # Construct Jacobian
-        for i in xrange(self._ndims):
-            for j in xrange(self._ndims):
+        for i in xrange(self.ndim):
+            for j in xrange(self.ndim):
                 gradx[N * i + j]['kspace'] = data[outfield][i].deriv(self._trans[j])
                 zero_nyquist(gradx[N * i + j].data)
 
@@ -194,11 +194,11 @@ class Hydro(Physics):
         k2 = sampledata.k2(no_zero=True)
         
         # Construct k * ugradu
-        for i in xrange(self._ndims):
+        for i in xrange(self.ndim):
             tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace']
 
         # Construct full term
-        for i in xrange(self._ndims):            
+        for i in xrange(self.ndim):            
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             zero_nyquist(pressure[i].data)
 
@@ -237,7 +237,7 @@ class Hydro(Physics):
             trans = {0: 'ux', 1: 'uy', 2: 'uz'}
             self.q.zero_all()
             for i,f in enumerate(self.fields):
-                b = [i * self._ndims + j for j in range(self._ndims)]
+                b = [i * self.ndim + j for j in range(self.ndim)]
                 tmp = na.zeros_like(self.q['ugu'].data)
                 for ii,j, in enumerate(b):
                     self.q['u'].data[:]= 0+0j
@@ -261,7 +261,7 @@ class Hydro(Physics):
             self.gradX(data, field, outfield)
             gradx = self.aux_fields['grad' + outfield]
             xgradx = self.aux_fields[outfield + 'grad' + outfield]
-            N = self._ndims
+            N = self.ndim
 
             # Setup temporary data container and dealias mask
             sampledata = data[field]['x']
@@ -273,7 +273,7 @@ class Hydro(Physics):
                          (na.abs(sampledata.k['y']) > 2/3. * self._shape[1]/2.))
             
             # Construct XgradX **************** Proper dealiasing?
-            for i in range(self._ndims):
+            for i in range(self.ndim):
                 for j in xrange(N):
                     tmp += data[field][j]['xspace'] * gradx[N * i + j]['xspace']
 
@@ -291,14 +291,14 @@ class MHD(Hydro):
         Physics.__init__(self, *args)
         
         # Setup data fields
-        self.ufields = ['ux', 'uy', 'uz'][0:self._ndims]
-        self.Bfields = ['Bx', 'By', 'Bz'][0:self._ndims]
+        self.ufields = ['ux', 'uy', 'uz'][0:self.ndim]
+        self.Bfields = ['Bx', 'By', 'Bz'][0:self.ndim]
         self.fields = self.ufields + self.Bfields
-        self._aux_fields = (['Ax', 'Ay', 'Az'][0:self._ndims] + 
+        self._aux_fields = (['Ax', 'Ay', 'Az'][0:self.ndim] + 
                             ['Ptotal', 'gradu', 'ugradu', 'gradB', 'BgradB'])
-        aux_types = [self.Bfields] * self._ndims + [self.ufields, 
-                     range(self._ndims ** 2), self.ufields, 
-                     range(self._ndims ** 2), self.ufields]
+        aux_types = [self.Bfields] * self.ndim + [self.ufields, 
+                     range(self.ndim ** 2), self.ufields, 
+                     range(self.ndim ** 2), self.ufields]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1., 'eta': 0.}
@@ -398,7 +398,7 @@ class LinearCollisionlessCosmology(Physics):
         self.fields = ['delta','ux','uy']
         self._aux_fields = ['gradphi']
         aux_types = [None]
-        if self._ndims == 3:
+        if self.ndim == 3:
              self.fields.append('uz')
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'Omega_r': 0.,
