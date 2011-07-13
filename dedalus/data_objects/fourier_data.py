@@ -66,11 +66,11 @@ class FourierRepresentation(Representation):
         # Setup wavenumbers
         kk = []
         for dim,S in enumerate(self.shape):
-            shape = dim * (1,) + (S,) + (self.ndim - dim - 1) * (1,)
+            shape = (self.ndim - dim - 1) * (1,) + (S,) + dim * (1,)
             k = fpack.fftfreq(S) * 2. * self.kny[dim]
             k.resize(shape)
             kk.append(k)
-        self.k = dict(zip(['x','y','z'][:self.ndim][::-1], kk))
+        self.k = dict(zip(['x','y','z'][:self.ndim], kk))
 
         self.set_fft(method)
 

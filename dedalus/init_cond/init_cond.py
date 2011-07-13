@@ -182,13 +182,11 @@ def create_cosmo_field(field, spec, freq, mean=0., stdev=1.):
 
 def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     """generate realization of initial conditions in CDM overdensity
-    and velocity from linger++ output.
+    and velocity from linger++ output. Assumes 3-dimensional fields.
 
     ***** NEEDS TO CONSIDER RANGE OF WAVENUMBERS *****
 
     """
-    deltac = data['delta']['kspace']
-    velc = [data['ux']['kspace'], data['uy']['kspace'], data['uz']['kspace']]
 
     ak = []
     deltacp = []
@@ -210,11 +208,11 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     deltacp = deltacp*ampl
     thetac = thetac*ampl
 
-    shape = deltac.shape
-    
+    shape = data['delta'].shape
+   
     nk = shape[0]
     freq = data['delta'].k['x']
-
+   
     kk = na.sqrt(data['delta'].k2(no_zero=True))
 
     maxkk = kk[nk/2, nk/2, nk/2]
@@ -223,7 +221,6 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
         print 'cannot interpolate: some grid wavenumbers larger than input wavenumbers; ICs for those modes are wrong'
         # any |k| larger than the max input k is replaced by max input k
         kk[:,:,:] = na.minimum(kk, maxkinput*na.ones_like(kk))
-
 
     # calculate spectra
     f_deltacp = interp1d(ak[::-1], deltacp[::-1], kind='cubic')
@@ -235,6 +232,6 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     spec_theta[0,0,0] = 0
 
     # create realizations
-    create_cosmo_field(deltac, spec_delta, freq)
+    create_cosmo_field(data['delta']['kspace'], spec_delta, freq)
     for i in xrange(3):
-        create_cosmo_field(velc[i], spec_theta, freq)
+        create_cosmo_field(data['u'][i]['kspace'], spec_theta, freq)

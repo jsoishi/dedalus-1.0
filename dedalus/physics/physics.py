@@ -41,8 +41,6 @@ class Physics(object):
         dataname = self.__class__.__name__
         self._field_classes = create_field_classes(self._representation, self.shape, dataname)
         self.parameters = {}
-        self.fields = {}
-        self.aux_fields = {}
         self.aux_eqns = {}
     
     def __getitem__(self, item):
@@ -53,14 +51,10 @@ class Physics(object):
               raise KeyError
          return
 
-    def create_fields(self, t, fields={}):
-        data = StateData(t, self._field_classes)
-        
-        if fields == {}:
-            fields = self.fields
-        for f,t in fields.iteritems():
-            data.add_field(f,t)
-        return data
+    def create_fields(self, t, field_list=None):        
+        if field_list == None:
+            field_list = self.fields
+        return StateData(t, self._field_classes, field_list)    
 
     def create_dealias_field(self, t, fields=None):
         """data object to implement Orszag 3/2 rule for non-linear
@@ -80,17 +74,8 @@ class Physics(object):
         for k,v in params.iteritems():
             self.parameters[k] = v
 
-    def _setup_aux_fields(self, t, aux):
-        """
-
-        inputs
-        ------
-        aux -- a dict of names as keys and field types as values
-
-        """
-        self.aux_fields = StateData(t, self._field_classes)
-        for f, t in aux.iteritems():
-            self.aux_fields.add_field(f, t)
+    def _setup_aux_fields(self, t, aux_field_list=None):
+        self.aux_fields = self.create_fields(t, aux_field_list)
 
     def _setup_aux_eqns(self, aux_eqns, RHS, ics):
         """ create auxiliary ODEs to be solved alongside the spatial gradients.
@@ -114,10 +99,10 @@ class Hydro(Physics):
         Physics.__init__(self, *args)
         
         # Setup data fields
-        self.fields = {'u': 'vector'}
-        self._aux_fields = {'pressure': 'vector',
-                            'gradu': 'tensor',
-                            'ugradu': 'vector'}
+        self.fields = [('u', 'vector')]
+        self._aux_fields = [('pressure', 'vector'),
+                            ('gradu', 'tensor'),
+                            ('ugradu', 'vector')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1.}
@@ -468,7 +453,8 @@ class LinearCollisionlessCosmology(Physics):
     """
     def __init__(self,*args):
         Physics.__init__(self, *args)
-        self.fields = [('delta', 'scalar'),('u', 'vector')]
+        self.fields = [('delta', 'scalar'),
+                       ('u', 'vector')]
         self._aux_fields = [('gradphi', 'vector')]
 
         if self.ndim == 3:
@@ -492,24 +478,22 @@ class LinearCollisionlessCosmology(Physics):
         self._RHS.time = data.time
         return self._RHS
 
-    def kdotv(self, data):
-        tmp = na.zeros_like(data['delta'].data)
-        for i,f in enumerate(self.fields[1:]):
-            tmp -= data[f].k[self._trans[i]] * data[f]['kspace']
-        return tmp
-
     def density_RHS(self, data):
         a = self.aux_eqns['a'].value
-        tmp = self.kdotv(data)  
-        self._RHS['delta'] = 1j * tmp / a
+        tmp = na.zeros(data['delta'].shape)
+        print tmp.shape
+        for i in self.dims:
+            tmp += data['u'][i].k[self._trans[i]] * data['u'][i]['kspace']
+
+        self._RHS['delta']['kspace'] = 1j * tmp / a
 
     def vel_RHS(self, data):
         self.grad_phi(data)
         gradphi = self.aux_fields['gradphi']
         a = self.aux_eqns['a'].value
         H = self.aux_eqns['a'].RHS(a)/a
-        for i,f in enumerate(self.fields[1:]):
-            self._RHS[f] = -gradphi[f]['kspace'] - H * data[f]['kspace']
+        for i in self.dims:
+            self._RHS['u'][i]['kspace'] = -gradphi[i]['kspace'] - H * data['u'][i]['kspace'] 
         
     def grad_phi(self, data):
         a = self.aux_eqns['a'].value
@@ -517,9 +501,8 @@ class LinearCollisionlessCosmology(Physics):
 
         gradphi = self.aux_fields['gradphi']
         tmp = -3./2. * H*H * data['delta']['kspace']/data['delta'].k2(no_zero=True)        
-        for i,f in enumerate(self.fields[1:]):
-            gradphi[f] = 1j * a * data[f].k[self._trans[i]] * tmp
-            gradphi[f]._curr_space = 'kspace'
+        for i in self.dims:
+            gradphi[i]['kspace'] = 1j * a * data['u'][i].k[self._trans[i]] * tmp
 
 class CollisionlessCosmology(LinearCollisionlessCosmology):
     """This class implements collisionless cosmology with some nonlinear terms.
@@ -534,12 +517,7 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
     """
 
     def density_RHS(self, data):
-        a = self.aux_eqns['a'].value
-        tmp = 1j* kdotv(data) / a
-
-        # ...
-
-        self._RHS['delta'] = tmp
+        pass
 
 if __name__ == "__main__":
     import pylab as P
