@@ -186,7 +186,66 @@ class Physics(object):
                     output[i]['kspace'][dmask] = 0.
                     
                 tmp *= 0+0j
+                
+    def XcrossY(self, X, Y, output, space):
+        """
+        Calculate X cross Y.  *** NOT TESTED ***
+        
+        Inputs:
+            X           Input VectorField object
+            Y           Input VectorField object
+            output      Output Vector/ScalarField object (3D/2D)
+            space       Space for cross product
+        
+        Note: 
+            2D inputs require scalar output
+            3D inputs require vector output
 
+        """            
+
+        N = X.ndim
+            
+        # Place references
+        X0 = X[0][space]
+        X1 = X[1][space]
+        if N == 3: X2 = X[2][space]
+            
+        Y0 = Y[0][space]
+        Y1 = Y[1][space]
+        if N == 3: Y2 = Y[2][space]
+
+        # Calculate cross product, scalar if N == 2
+        if N == 3:
+            output[0][space] = X1 * Y2 - X2 * Y1
+            output[1][space] = X2 * Y0 - X0 * Y2
+            output[2][space] = X0 * Y1 - X1 * Y0
+        else:
+            output[space] = X0 * Y1 - X1 * Y0
+            
+    def curlX(self, X, output):
+        """
+        Return list of components of curl X. *** NOT TESTED ***
+        
+        Inputs:
+            X           Input VectorField object
+            output      Output Vector/ScalarField object (3D/2D)
+        
+        Note: 
+            2D input requires scalar output
+            3D input requires vector output
+            
+        """
+        
+        N = X.ndim
+
+        # Calculate curl, scalar if N == 2
+        if N == 3:
+            output[0]['kspace'] = X[2].deriv(self._trans[1]) - X[1].deriv(self._trans[2])
+            output[1]['kspace'] = X[0].deriv(self._trans[2]) - X[2].deriv(self._trans[0])
+            output[2]['kspace'] = X[1].deriv(self._trans[0]) - X[0].deriv(self._trans[1])
+        else:
+            output['kspace'] = X[1].deriv(self._trans[0]) - X[0].deriv(self._trans[1])    
+        
 class Hydro(Physics):
     """Incompressible hydrodynamics."""
     
@@ -349,82 +408,6 @@ class MHD(Hydro):
             Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             zero_nyquist(Ptotal[i].data)
 
-    def XcrossY(self, data, Xlist, Ylist, space):
-        """
-        Return list of X cross Y components.
-        
-        Inputs:
-            data        Data object
-            Xlist       List of fields that make up the vector X
-            Ylist       List of fields that make up the vector Y
-            space       Space for cross product
-        
-        Note:   
-            2D and 3D inputs both result in 3D output
-
-        """            
-        
-        if len(Xlist) != len(Ylist):
-            raise ValueError('Inputs of different dimension')
-            
-        N = len(Xlist)
-        [out0, out1, out2] = [np.zeros_like(Xlist[0]), 
-                              np.zeros_like(Xlist[0]), 
-                              np.zeros_like(Xlist[0])]
-            
-        # Place references
-        X0 = data[Xlist[0]][space]
-        X1 = data[Xlist[1]][space]
-        if N == 3: X2 = data[Xlist[2]][space]
-            
-        Y0 = data[Ylist[0]][space]
-        Y1 = data[Ylist[1]][space]
-        if N == 3: Y2 = data[Ylist[2]][space]
-
-        # Calculate cross product, only have Z-component if N == 2
-        if N == 3:
-            out0 = X1 * Y2 - X2 * Y1
-            out1 = X2 * Y0 - X0 * Y2
-            
-        out2 = X0 * Y1 - X1 * Y0
-        
-        return [out0, out1, out2]
-        
-    def curlX(self, data, Xlist):
-        """
-        Return list of components of curl X.
-        
-        Inputs:
-            data        Data object
-            Xlist       List of fields that make up the vector X
-            
-        Note:
-            2D and 3D inputs both result in 3D output
-            
-        """
-        
-        N = len(Xlist)
-        [out0, out1, out2] = [np.zeros_like(Xlist[0]), 
-                              np.zeros_like(Xlist[0]), 
-                              np.zeros_like(Xlist[0])]
-            
-        # Place references
-        #data[f].deriv(self._trans[j])
-        X0 = data[Xlist[0]]
-        X1 = data[Xlist[1]]
-        if N == 3: X2 = data[Xlist[2]]
-
-        # Calculate curl, only have Z-component if N == 2
-        if N == 3:
-            out0 = X2.deriv(self._trans[1]) - X1.deriv(self._trans[2])
-            out1 = X0.deriv(self._trans[2]) - X2.deriv(self._trans[0])
-            
-        out2 = X1.deriv(self._trans[0]) - X0.deriv(self._trans[1])
-        
-        return [out0, out1, out2]
-    
-    
-    
     
             
 class LinearCollisionlessCosmology(Physics):
