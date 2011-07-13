@@ -140,7 +140,8 @@ class Hydro(Physics):
         """
         
         # Compute terms
-        self.XgradX(data, 'u', 'u', dealias='2/3')
+        self.XgradY(data['u'], data['u'], self.aux_fields['gradu'],
+                    self.aux_fields['ugradu'], dealias='2/3')
         self.pressure(data)
         
         # Place references
@@ -199,14 +200,15 @@ class Hydro(Physics):
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             zero_nyquist(pressure[i].data)
 
-    def XgradX(self, data, field, outfield, dealias='2/3'):
+    def XgradY(self, X, Y, gradY, output, dealias='2/3'):
         """
-        Calculate "X dot (grad X)" term for ufields, with dealiasing options.
+        Calculate "X dot (grad X)" term, with dealiasing options.
         
         Inputs:
-            data        Data object
-            field       field that makes up the vector X
-            outfield    Name of the vector (output assigned to field "_grad_")
+            X           Input VectorField object
+            Y           Input VectorField object
+            gradY       TensorField object to hold gradY
+            output      Output VectorField object
             
         Dealiasing options: 
             None        No dealiasing
@@ -217,9 +219,6 @@ class Hydro(Physics):
         
         if dealias not in [None, '2/3', '3/2']:
             raise ValueError('Dealising method not implemented.')
-            
-        # if len(fieldlist) != len(self.ufields):
-        #     raise ValueError('X and u must have same number of dimensions')
 
         if dealias == '3/2':
             # Uses temporary dealias fields with 3/2 as many points 
@@ -254,14 +253,13 @@ class Hydro(Physics):
                 tmp *= 0+0j
 
         else:
-            # Perform gradX calculation and place references
-            self.gradX(data, field, outfield)
-            gradx = self.aux_fields['grad' + outfield]
-            xgradx = self.aux_fields[outfield + 'grad' + outfield]
             N = self.ndim
+        
+            # Perform gradY calculation
+            self.gradX(Y, gradY)
 
             # Setup temporary data container and dealias mask
-            sampledata = data[field]['x']
+            sampledata = X[0]
             tmp = na.zeros_like(sampledata.data)
             
             if dealias == '2/3': 
@@ -272,12 +270,12 @@ class Hydro(Physics):
             # Construct XgradX **************** Proper dealiasing?
             for i in self.dims:
                 for j in xrange(N):
-                    tmp += data[field][j]['xspace'] * gradx[N * i + j]['xspace']
+                    tmp += X[j]['xspace'] * gradY[N * i + j]['xspace']
 
-                xgradx[i]['xspace'] = tmp.real
+                output[i]['xspace'] = tmp.real
                 if dealias == '2/3':
-                    xgradx[i]['kspace'] # dummy call to switch spaces
-                    xgradx[i]['kspace'][dmask] = 0.
+                    output[i]['kspace'] # dummy call to switch spaces
+                    output[i]['kspace'][dmask] = 0.
                     
                 tmp *= 0+0j
  
