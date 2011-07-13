@@ -91,52 +91,7 @@ class Physics(object):
 
     def RHS(self):
         pass
-
-class Hydro(Physics):
-    """Incompressible hydrodynamics."""
-    
-    def __init__(self, *args):
-        Physics.__init__(self, *args)
         
-        # Setup data fields
-        self.fields = [('u', 'vector')]
-        self._aux_fields = [('pressure', 'vector'),
-                            ('gradu', 'tensor'),
-                            ('ugradu', 'vector')]
-        
-        self._trans = {0: 'x', 1: 'y', 2: 'z'}
-        params = {'nu': 0., 'rho0': 1.}
-
-        #self.q = self.create_dealias_field(0.,['u','gu','ugu'])
-        self._setup_aux_fields(0., self._aux_fields)
-        self._setup_parameters(params)
-        self._RHS = self.create_fields(0.)
-
-    def RHS(self, data):
-        """
-        Compute right hand side of fluid equations, populating self._RHS with
-        the time derivatives of the fields.
-
-        u_t + nu k^2 u = -ugradu - i k p / rho0
-
-        """
-        
-        # Compute terms
-        self.XgradY(data['u'], data['u'], self.aux_fields['gradu'],
-                    self.aux_fields['ugradu'], dealias='2/3')
-        self.pressure(data)
-        
-        # Place references
-        ugradu = self.aux_fields['ugradu']
-        pressure = self.aux_fields['pressure']
-        
-        # Construct time derivatives
-        for d in self.dims:
-            self._RHS['u'][d]['kspace'] = -ugradu[d]['kspace'] - pressure[d]['kspace']
-            
-        self._RHS.time = data.time        
-        return self._RHS
-
     def gradX(self, X, output):
         """
         Compute Jacobian: gradX[N * i + j] = dX_i/dx_j
@@ -153,35 +108,8 @@ class Hydro(Physics):
         for i in self.dims:
             for j in self.dims:
                 output[N * i + j]['kspace'] = X[i].deriv(self._trans[j]) #################################### Bad k indexing
-                zero_nyquist(output[N * i + j].data)
-
-    def pressure(self, data):
-        """
-        Compute pressure term for ufields: i k p / rho0
-        
-        p / rho0 = i k * ugradu / k^2     
-        ==> pressure term = - k (k * ugradu) / k^2
-        
-        """
-        
-        # Place references
-        ugradu = self.aux_fields['ugradu']
-        pressure = self.aux_fields['pressure']
-        
-        # Setup temporary data container
-        sampledata = data['u']['x']
-        tmp = na.zeros_like(sampledata.data)
-        k2 = sampledata.k2(no_zero=True)
-        
-        # Construct k * ugradu
-        for i in self.dims:
-            tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace']
-
-        # Construct full term
-        for i in self.dims:            
-            pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            zero_nyquist(pressure[i].data)
-
+                zero_nyquist(output[N * i + j].data)  
+                
     def XgradY(self, X, Y, gradY, output, dealias='2/3'):
         """
         Calculate "X dot (grad X)" term, with dealiasing options.
@@ -260,6 +188,78 @@ class Hydro(Physics):
                     output[i]['kspace'][dmask] = 0.
                     
                 tmp *= 0+0j
+
+class Hydro(Physics):
+    """Incompressible hydrodynamics."""
+    
+    def __init__(self, *args):
+        Physics.__init__(self, *args)
+        
+        # Setup data fields
+        self.fields = [('u', 'vector')]
+        self._aux_fields = [('pressure', 'vector'),
+                            ('gradu', 'tensor'),
+                            ('ugradu', 'vector')]
+        
+        self._trans = {0: 'x', 1: 'y', 2: 'z'}
+        params = {'nu': 0., 'rho0': 1.}
+
+        #self.q = self.create_dealias_field(0.,['u','gu','ugu'])
+        self._setup_aux_fields(0., self._aux_fields)
+        self._setup_parameters(params)
+        self._RHS = self.create_fields(0.)
+
+    def RHS(self, data):
+        """
+        Compute right hand side of fluid equations, populating self._RHS with
+        the time derivatives of the fields.
+
+        u_t + nu k^2 u = -ugradu - i k p / rho0
+
+        """
+        
+        # Compute terms
+        self.XgradY(data['u'], data['u'], self.aux_fields['gradu'],
+                    self.aux_fields['ugradu'], dealias='2/3')
+        self.pressure(data)
+        
+        # Place references
+        ugradu = self.aux_fields['ugradu']
+        pressure = self.aux_fields['pressure']
+        
+        # Construct time derivatives
+        for d in self.dims:
+            self._RHS['u'][d]['kspace'] = -ugradu[d]['kspace'] - pressure[d]['kspace']
+            
+        self._RHS.time = data.time        
+        return self._RHS
+
+    def pressure(self, data):
+        """
+        Compute pressure term for ufields: i k p / rho0
+        
+        p / rho0 = i k * ugradu / k^2     
+        ==> pressure term = - k (k * ugradu) / k^2
+        
+        """
+        
+        # Place references
+        ugradu = self.aux_fields['ugradu']
+        pressure = self.aux_fields['pressure']
+        
+        # Setup temporary data container
+        sampledata = data['u']['x']
+        tmp = na.zeros_like(sampledata.data)
+        k2 = sampledata.k2(no_zero=True)
+        
+        # Construct k * ugradu
+        for i in self.dims:
+            tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace']
+
+        # Construct full term
+        for i in self.dims:            
+            pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
+            zero_nyquist(pressure[i].data)
  
 class MHD(Hydro):
     """Incompressible magnetohydrodynamics."""
