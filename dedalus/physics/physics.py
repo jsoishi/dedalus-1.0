@@ -29,7 +29,8 @@ from dedalus.utils.api import friedmann
 from dedalus.funcs import insert_ipython
 
 class Physics(object):
-    """This is a base class for a physics object. It needs to provide
+    """
+    This is a base class for a physics object. It needs to provide
     a right hand side for a time integration scheme.
     """
     
@@ -38,18 +39,16 @@ class Physics(object):
         self.ndim = len(self.shape)
         self.dims = xrange(self.ndim)
         self._representation = representation
-        dataname = self.__class__.__name__
-        self._field_classes = create_field_classes(self._representation, self.shape, dataname)
+        self._field_classes = create_field_classes(
+                self._representation, self.shape, self.__class__.__name__)
         self.parameters = {}
         self.aux_eqns = {}
     
     def __getitem__(self, item):
-         a = self.parameters.get(item, None)
-         # if a is None:
-         #      a = self.parameters.get(item, None)
-         if a is None:
+         value = self.parameters.get(item, None)
+         if value is None:
               raise KeyError
-         return
+         return value
 
     def create_fields(self, t, field_list=None):        
         if field_list == None:
@@ -107,8 +106,7 @@ class Physics(object):
         # Construct Jacobian
         for i in self.dims:
             for j in self.dims:
-                output[N * i + j]['kspace'] = X[i].deriv(self._trans[j]) #################################### Bad k indexing
-                zero_nyquist(output[N * i + j].data)  
+                output[N * i + j]['kspace'] = X[i].deriv(self._trans[j]) 
                 
     def XgradY(self, X, Y, gradY, output, dealias='2/3'):
         """
@@ -228,8 +226,8 @@ class Hydro(Physics):
         pressure = self.aux_fields['pressure']
         
         # Construct time derivatives
-        for d in self.dims:
-            self._RHS['u'][d]['kspace'] = -ugradu[d]['kspace'] - pressure[d]['kspace']
+        for i in self.dims:
+            self._RHS['u'][i]['kspace'] = -ugradu[i]['kspace'] - pressure[i]['kspace']
             
         self._RHS.time = data.time        
         return self._RHS
