@@ -222,9 +222,7 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     f_deltacp = interp1d(ak[::-1], deltacp[::-1], kind='cubic')
     spec_delta = kmag**(nspect/2.)*f_deltacp(kmag)
     spec_delta[0,0,0] = 0
-    import pylab
-    pylab.plot(ak, deltacp)
-    pylab.show()
+
     f_thetac = interp1d(ak[::-1], thetac[::-1], kind='cubic')
     spec_theta = kmag**(nspect/2. -1.)*f_thetac(kmag)
     spec_theta[0,0,0] = 0
