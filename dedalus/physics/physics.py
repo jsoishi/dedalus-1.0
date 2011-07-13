@@ -108,7 +108,7 @@ class Physics(object):
             for j in self.dims:
                 output[N * i + j]['kspace'] = X[i].deriv(self._trans[j]) 
                 
-    def XgradY(self, X, Y, gradY, output, dealias='2/3'):
+    def XgradY(self, X, Y, gradY, output, dealias='2/3', compute_gradY=True):
         """
         Calculate "X dot (grad X)" term, with dealiasing options.
         
@@ -122,6 +122,9 @@ class Physics(object):
             None        No dealiasing
             '2/3'       Dealias by keeping lower 2/3 modes, and zeroing others
             '3/2'       Dealias by extending to 3/2 larger temp fields
+            
+        Keywords:
+            compute_gradY   Set to False if gradY has been computed
         
         """
         
@@ -164,7 +167,8 @@ class Physics(object):
             N = self.ndim
         
             # Perform gradY calculation
-            self.gradX(Y, gradY)
+            if compute_gradY:
+                self.gradX(Y, gradY)
 
             # Setup temporary data container and dealias mask
             sampledata = X[0]
@@ -186,7 +190,66 @@ class Physics(object):
                     output[i]['kspace'][dmask] = 0.
                     
                 tmp *= 0+0j
+                
+    def XcrossY(self, X, Y, output, space):
+        """
+        Calculate X cross Y.  *** NOT TESTED ***
+        
+        Inputs:
+            X           Input VectorField object
+            Y           Input VectorField object
+            output      Output Vector/ScalarField object (3D/2D)
+            space       Space for cross product
+        
+        Note: 
+            2D inputs require scalar output
+            3D inputs require vector output
 
+        """            
+
+        N = X.ndim
+            
+        # Place references
+        X0 = X[0][space]
+        X1 = X[1][space]
+        if N == 3: X2 = X[2][space]
+            
+        Y0 = Y[0][space]
+        Y1 = Y[1][space]
+        if N == 3: Y2 = Y[2][space]
+
+        # Calculate cross product, scalar if N == 2
+        if N == 3:
+            output[0][space] = X1 * Y2 - X2 * Y1
+            output[1][space] = X2 * Y0 - X0 * Y2
+            output[2][space] = X0 * Y1 - X1 * Y0
+        else:
+            output[space] = X0 * Y1 - X1 * Y0
+            
+    def curlX(self, X, output):
+        """
+        Return list of components of curl X. *** NOT TESTED ***
+        
+        Inputs:
+            X           Input VectorField object
+            output      Output Vector/ScalarField object (3D/2D)
+        
+        Note: 
+            2D input requires scalar output
+            3D input requires vector output
+            
+        """
+        
+        N = X.ndim
+
+        # Calculate curl, scalar if N == 2
+        if N == 3:
+            output[0]['kspace'] = X[2].deriv(self._trans[1]) - X[1].deriv(self._trans[2])
+            output[1]['kspace'] = X[0].deriv(self._trans[2]) - X[2].deriv(self._trans[0])
+            output[2]['kspace'] = X[1].deriv(self._trans[0]) - X[0].deriv(self._trans[1])
+        else:
+            output['kspace'] = X[1].deriv(self._trans[0]) - X[0].deriv(self._trans[1])    
+        
 class Hydro(Physics):
     """Incompressible hydrodynamics."""
     
@@ -272,7 +335,9 @@ class MHD(Hydro):
                             ('gradu', 'tensor'),
                             ('ugradu', 'vector'),
                             ('gradB', 'tensor'),
-                            ('BgradB', 'vector')]
+                            ('BgradB', 'vector'),
+                            ('ugradB', 'vector'),
+                            ('Bgradu', 'vector')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1., 'eta': 0.}
@@ -289,32 +354,36 @@ class MHD(Hydro):
         
         u_t + nu k^2 u = -ugradu + BgradB / (4 pi rho0) - i k Ptot / rho0
         
-        A_t + eta k^2 A = ucrossB + eta k (k * A)
-        
-        *****NEEDS INDUCTION******
+        B_t + eta k^2 B = Bgradu - ugradB
 
         """
         
-        # Compute terms
-        self.XgradY(data['u'], data['u'], self.aux_fields['gradu'],
-                    self.aux_fields['ugradu'], dealias='2/3')
-        self.XgradY(data['B'], data['B'], self.aux_fields['gradB'],
-                    self.aux_fields['BgradB'], dealias='2/3')
-        self.total_pressure(data)
-
         # Place references
+        u = data['u']
+        B = data['B']
+        gradu = self.aux_fields['gradu']
+        gradB = self.aux_fields['gradB']
         ugradu = self.aux_fields['ugradu']
         BgradB = self.aux_fields['BgradB']
+        ugradB = self.aux_fields['ugradB']
+        Bgradu = self.aux_fields['Bgradu']
         Ptotal = self.aux_fields['Ptotal']
         pr4 = 4 * na.pi * self.parameters['rho0']
+        
+        # Compute terms
+        self.XgradY(u, u, gradu, ugradu, dealias='2/3')
+        self.XgradY(B, B, gradB, BgradB, dealias='2/3')
+        self.XgradY(u, B, gradB, ugradB, dealias='2/3', compute_gradY=False)
+        self.XgradY(B, u, gradu, Bgradu, dealias='2/3', compute_gradY=False)
+        self.total_pressure(data)
         
         # Construct time derivatives
         for i in self.dims:
             self._RHS['u'][i]['kspace'] = (-ugradu[i]['kspace'] + 
                                            BgradB[i]['kspace'] / pr4 -
                                            Ptotal[i]['kspace'])
-            # ***** NEEDS INDUCTION *****                         
-            self._RHS['B'][i]['kspace'] += 0.
+                                           
+            self._RHS['B'][i]['kspace'] = Bgradu[i]['kspace'] - ugradB[i]['kspace']
 
         self._RHS.time = data.time        
         return self._RHS
@@ -349,82 +418,6 @@ class MHD(Hydro):
             Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             zero_nyquist(Ptotal[i].data)
 
-    def XcrossY(self, data, Xlist, Ylist, space):
-        """
-        Return list of X cross Y components.
-        
-        Inputs:
-            data        Data object
-            Xlist       List of fields that make up the vector X
-            Ylist       List of fields that make up the vector Y
-            space       Space for cross product
-        
-        Note:   
-            2D and 3D inputs both result in 3D output
-
-        """            
-        
-        if len(Xlist) != len(Ylist):
-            raise ValueError('Inputs of different dimension')
-            
-        N = len(Xlist)
-        [out0, out1, out2] = [np.zeros_like(Xlist[0]), 
-                              np.zeros_like(Xlist[0]), 
-                              np.zeros_like(Xlist[0])]
-            
-        # Place references
-        X0 = data[Xlist[0]][space]
-        X1 = data[Xlist[1]][space]
-        if N == 3: X2 = data[Xlist[2]][space]
-            
-        Y0 = data[Ylist[0]][space]
-        Y1 = data[Ylist[1]][space]
-        if N == 3: Y2 = data[Ylist[2]][space]
-
-        # Calculate cross product, only have Z-component if N == 2
-        if N == 3:
-            out0 = X1 * Y2 - X2 * Y1
-            out1 = X2 * Y0 - X0 * Y2
-            
-        out2 = X0 * Y1 - X1 * Y0
-        
-        return [out0, out1, out2]
-        
-    def curlX(self, data, Xlist):
-        """
-        Return list of components of curl X.
-        
-        Inputs:
-            data        Data object
-            Xlist       List of fields that make up the vector X
-            
-        Note:
-            2D and 3D inputs both result in 3D output
-            
-        """
-        
-        N = len(Xlist)
-        [out0, out1, out2] = [np.zeros_like(Xlist[0]), 
-                              np.zeros_like(Xlist[0]), 
-                              np.zeros_like(Xlist[0])]
-            
-        # Place references
-        #data[f].deriv(self._trans[j])
-        X0 = data[Xlist[0]]
-        X1 = data[Xlist[1]]
-        if N == 3: X2 = data[Xlist[2]]
-
-        # Calculate curl, only have Z-component if N == 2
-        if N == 3:
-            out0 = X2.deriv(self._trans[1]) - X1.deriv(self._trans[2])
-            out1 = X0.deriv(self._trans[2]) - X2.deriv(self._trans[0])
-            
-        out2 = X1.deriv(self._trans[0]) - X0.deriv(self._trans[1])
-        
-        return [out0, out1, out2]
-    
-    
-    
     
             
 class LinearCollisionlessCosmology(Physics):
