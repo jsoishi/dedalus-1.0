@@ -482,30 +482,64 @@ class LinearCollisionlessCosmology(Physics):
         self._setup_aux_fields(0., self._aux_fields,aux_types)
         aux_eqn_rhs = lambda a: a*friedmann(a,self.parameters['H0'],self.parameters['Omega_r'], self.parameters['Omega_m'], self.parameters['Omega_l'])
         
-        self._setup_aux_eqns(['H'],[aux_eqn_rhs], [1e-5])
+        self._setup_aux_eqns(['a'],[aux_eqn_rhs], [1e-4])
 
         self._RHS = self.create_fields(0.)
 
     def RHS(self, data):
         self.density_RHS(data)
-        
+        self.vel_RHS(data)
+        self._RHS.time = data.time
         return self._RHS
 
+    def kdotv(self, data):
+        tmp = na.zeros_like(data['delta'].data)
+        for i,f in enumerate(self.fields[1:]):
+            tmp -= data[f].k[self._trans[i]] * data[f]['kspace']
+        return tmp
+
     def density_RHS(self, data):
-        pass
+        a = self.aux_eqns['a'].value
+        tmp = self.kdotv(data)  
+        self._RHS['delta'] = 1j * tmp / a
 
     def vel_RHS(self, data):
         self.grad_phi(data)
         gradphi = self.aux_fields['gradphi']
+        a = self.aux_eqns['a'].value
+        H = self.aux_eqns['a'].RHS(a)/a
         for i,f in enumerate(self.fields[1:]):
-            self._RHS[f] = -gradphi[f]['kspace'] - self.aux_eqns['H'] * data[f]['kspace']
+            self._RHS[f] = -gradphi[f]['kspace'] - H * data[f]['kspace']
         
     def grad_phi(self, data):
+        a = self.aux_eqns['a'].value
+        H = self.aux_eqns['a'].RHS(a) / a
+
         gradphi = self.aux_fields['gradphi']
-        tmp = -3./2. * self.parameters['H0'] * data['delta']['kspace']/data['delta'].k2(no_zero=True)
-        
+        tmp = -3./2. * H*H * data['delta']['kspace']/data['delta'].k2(no_zero=True)        
         for i,f in enumerate(self.fields[1:]):
-            gradphi[f] = data[f].k(self._trans(i)) * tmp
+            gradphi[f] = 1j * a * data[f].k[self._trans[i]] * tmp
+            gradphi[f]._curr_space = 'kspace'
+
+class CollisionlessCosmology(LinearCollisionlessCosmology):
+    """This class implements collisionless cosmology with some nonlinear terms.
+
+    **** NOT YET IMPLEMENTED ****
+
+    solves
+    ------
+    d_t d = -(1 + d) div(v_) - v dot grad(d)
+    d_t v = -grad(Phi) - H v
+    laplacian(Phi) = 3 H^2 d / 2
+    """
+
+    def density_RHS(self, data):
+        a = self.aux_eqns['a'].value
+        tmp = 1j* kdotv(data) / a
+
+        # ...
+
+        self._RHS['delta'] = tmp
 
 if __name__ == "__main__":
     import pylab as P

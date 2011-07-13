@@ -27,6 +27,11 @@ License:
 from dedalus.funcs import insert_ipython
 import numpy as na
 
+from scipy.interpolate import interp1d
+from scipy.integrate import simps
+
+from dedalus.data_objects import hermitianize
+
 def taylor_green(ux, uy):
     if ux.dim == 2:
         ux.data[1,1] = -1j/4.
@@ -118,6 +123,118 @@ def MIT_vortices(data):
         -0.5*na.exp(-((x-na.pi-na.pi/4)**2+(y-na.pi-na.pi/4)**2)/(0.4))
 
     aux['psi']['kspace'] = aux['w']['kspace']/aux['w'].k2(no_zero=True)
-    
+
     data['u']['x']['kspace'] = aux['psi'].deriv('y')
     data['u']['y']['kspace'] = -aux['psi'].deriv('x')
+
+def get_ic_data(fname, ak, deltacp, thetac):
+    """read certain values from a linger output file
+
+    """
+
+    infile = open(fname)
+    for i,line in enumerate(infile):
+        values = line.split()
+        ak.append(float(values[1]))
+        deltacp.append(float(values[6]))
+        thetac.append(float(values[11]))
+    infile.close()
+
+def get_norm_data(fname, ak_trans, Ttot0):
+    """read certain values from a transfer-mode linger++ output file
+
+    """
+    infile = open(fname)
+    for i,line in enumerate(infile):
+        values = line.split()
+        ak_trans.append(float(values[0]))
+        Ttot0.append(float(values[6]))
+    infile.close()
+
+def sig2_integrand(Ttot0, ak, nspect):
+    """calculate the integrand in the expression for the mean square of the field smoothed with a top-hat window function W at 8 Mpc.
+
+    """
+    R = 8.
+    x = ak*R
+    w = 3. * (na.sin(x) - x*na.cos(x))/(x*x*x)
+    Pk = (ak**nspect) * (Ttot0*Ttot0)
+    return (w*w) * Pk * (ak*ak)
+
+def get_normalization(Ttot0, ak, sigma_8, nspect):
+    """calculate the normalization for delta_tot using sigma_8
+
+    """
+    integrand = sig2_integrand(Ttot0, ak, nspect)
+    sig2 = 4.*na.pi*simps(integrand, ak)
+    ampl = sigma_8/na.sqrt(sig2)
+    return ampl
+
+def create_cosmo_field(field, spec, freq, mean=0., stdev=1.):
+    """fill 3-d field with values sampled from gaussians with amplitudes 
+    given by spec.
+
+    """
+    shape = spec.shape
+    field[:,:,:] = spec * (na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape)) # Use field[:,:,:] so we don't lose the pointer
+    hermitianize.enforce_hermitian(field)
+    hermitianize.zero_nyquist(field)
+
+def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
+    """generate realization of initial conditions in CDM overdensity
+    and velocity from linger++ output.
+
+    ***** NEEDS TO CONSIDER RANGE OF WAVENUMBERS *****
+
+    """
+    deltac = data['delta']['kspace']
+    velc = [data['ux']['kspace'], data['uy']['kspace'], data['uz']['kspace']]
+
+    ak = []
+    deltacp = []
+    thetac = []
+    Ttot0 = []
+    ak_trans = [] # the k-values that go with Ttot0
+
+    get_ic_data(ic_fname, ak, deltacp, thetac)
+    get_norm_data(norm_fname, ak_trans, Ttot0)
+    ak = na.array(ak)
+    deltacp = na.array(deltacp)
+    thetac = na.array(thetac)
+    ak_trans = na.array(ak_trans)
+    Ttot0 = na.array(Ttot0)
+    
+    # normalize
+    ampl = get_normalization(Ttot0, ak_trans, sigma_8, nspect)
+
+    deltacp = deltacp*ampl
+    thetac = thetac*ampl
+
+    shape = deltac.shape
+    
+    nk = shape[0]
+    freq = data['delta'].k['x']
+
+    kk = na.sqrt(data['delta'].k2(no_zero=True))
+
+    maxkk = kk[nk/2, nk/2, nk/2]
+    maxkinput = max(ak)
+    if maxkk > maxkinput:
+        print 'cannot interpolate: some grid wavenumbers larger than input wavenumbers; ICs for those modes are wrong'
+        # any |k| larger than the max input k is replaced by max input k
+        kk[:,:,:] = na.minimum(kk, maxkinput*na.ones_like(kk))
+
+
+    # calculate spectra
+    f_deltacp = interp1d(ak[::-1], deltacp[::-1], kind='cubic')
+    spec_delta = kk**(nspect/2.)*f_deltacp(kk)
+    spec_delta[0,0,0] = 0
+
+    f_thetac = interp1d(ak[::-1], thetac[::-1], kind='cubic')
+    spec_theta = kk**(nspect/2. -1.)*f_thetac(kk)
+    spec_theta[0,0,0] = 0
+
+    # create realizations
+    create_cosmo_field(deltac, spec_delta, freq)
+    for i in xrange(3):
+        create_cosmo_field(velc[i], spec_theta, freq)
