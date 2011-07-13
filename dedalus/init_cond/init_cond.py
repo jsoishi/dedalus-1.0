@@ -184,6 +184,10 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     """generate realization of initial conditions in CDM overdensity
     and velocity from linger++ output. Assumes 3-dimensional fields.
 
+    (create_cosmo_field actually creates the realizations from
+    spectra; the rest is generating the spectra from input, which
+    might reasonably belong somewhere else)
+
     ***** NEEDS TO CONSIDER RANGE OF WAVENUMBERS *****
 
     """
