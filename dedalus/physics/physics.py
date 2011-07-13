@@ -477,7 +477,7 @@ class LinearCollisionlessCosmology(Physics):
         a = self.aux_eqns['a'].value
         tmp = na.zeros(data['delta'].shape, complex)
         for i in self.dims:
-            tmp += data['u'][i].k[self._trans[i]] * data['u'][i]['kspace']
+            tmp -= data['u'][i].k[self._trans[i]] * data['u'][i]['kspace']
 
         self._RHS['delta']['kspace'] = 1j * tmp / a
 
