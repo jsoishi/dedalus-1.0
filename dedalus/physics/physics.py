@@ -340,7 +340,7 @@ class MHD(Hydro):
         k2 = sampledata.k2(no_zero=True)
 
         # Construct k * ugradu - k * BgradB / (4 pi rho0)
-        for i self.dims:
+        for i in self.dims:
             tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace']
             tmp -= data['u'][i].k[self._trans[i]] * BgradB[i]['kspace'] / pr4
         

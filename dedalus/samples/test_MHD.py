@@ -31,7 +31,7 @@ data = RHS.create_fields(0.)            # B SHOULD BE ZERO BY DEFAULT
 MIT_vortices(data)
 #ti = RK2simplevisc(RHS,CFL=0.4)
 ti = CrankNicholsonVisc(RHS)
-ti.stop_time(100.) # set stoptime
+ti.stop_time(50.) # set stoptime
 #ti.stop_iter(10) # max iterations
 ti.stop_walltime(3600.) # stop after 10 hours
 ti.set_nsnap(100) # save data every 100 timesteps
