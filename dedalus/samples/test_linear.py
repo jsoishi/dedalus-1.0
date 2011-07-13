@@ -45,7 +45,3 @@ outfile.close()
 #print delta_final/delta_init
 #Should be a single real number for all modes, assuming the decaying
 #solution is negligible in delta_init
-
-
-
-

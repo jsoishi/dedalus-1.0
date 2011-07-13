@@ -208,17 +208,25 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     nk = shape[0]
     freq = data['delta'].k['x']
 
-    #******* the /2 doesn't belong here, just temporary to make it run
-    kmag = na.sqrt(data['delta'].k2(no_zero=True)) / 2
-    #*******
+    kmag = na.sqrt(data['delta'].k2(no_zero=True))
+
+    maxkmag = kmag[nk/2, nk/2, nk/2]
+    maxkinput = max(ak)
+    if maxkmag > maxkinput:
+        print 'cannot interpolate: some grid wavenumbers larger than input wavenumbers; ICs for those modes are wrong'
+        # any |k| larger than the max input k is replaced by max input k
+        kmag[:,:,:] = na.minimum(kmag, maxkinput*na.ones_like(kmag))
+
 
     # calculate spectra
-    fdeltacp = interp1d(ak[::-1], deltacp[::-1], kind='cubic')
-    spec_delta = kmag**(nspect/2.)*fdeltacp(kmag)
+    f_deltacp = interp1d(ak[::-1], deltacp[::-1], kind='cubic')
+    spec_delta = kmag**(nspect/2.)*f_deltacp(kmag)
     spec_delta[0,0,0] = 0
-
-    fthetac = interp1d(ak[::-1], thetac[::-1], kind='cubic')
-    spec_theta = kmag**(nspect/2. -1.)*fthetac(kmag)
+    import pylab
+    pylab.plot(ak, deltacp)
+    pylab.show()
+    f_thetac = interp1d(ak[::-1], thetac[::-1], kind='cubic')
+    spec_theta = kmag**(nspect/2. -1.)*f_thetac(kmag)
     spec_theta[0,0,0] = 0
 
     # create realizations
