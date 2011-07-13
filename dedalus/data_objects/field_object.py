@@ -118,6 +118,7 @@ class ScalarField(BaseField):
         BaseField.__init__(self, 1)
 
     def __getitem__(self, item):
+        if item == 0: return self.components[0]
         return self.components[0][item]
 
     def __setitem__(self, space, data):

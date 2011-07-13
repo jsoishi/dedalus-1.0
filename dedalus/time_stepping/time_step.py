@@ -117,9 +117,9 @@ class RK2simple(TimeStepBase):
         self.field_dt.time = data.time
         # first step
         self.field_dt = self.RHS.RHS(data)
-        for k,f in self.RHS.fields.iteritems():
+        for k,f in data.fields.iteritems():
             for i in range(f.ndim):
-                self.tmp_fields[f][i]['kspace'] = data[k][i]['kspace'] + dt/2. * self.field_dt[k][i]['kspace']
+                self.tmp_fields[k][i]['kspace'] = data[k][i]['kspace'] + dt/2. * self.field_dt[k][i]['kspace']
         for a in self.RHS.aux_eqns.values():
             a_tmp = a.value + dt/2. * a.RHS(a.value)
         self.tmp_fields.time = data.time + dt/2.
@@ -127,9 +127,9 @@ class RK2simple(TimeStepBase):
         # second step
         self.field_dt = self.RHS.RHS(self.tmp_fields)
 
-        for k,f in self.RHS.fields.iteritems:
+        for k,f in data.fields.iteritems():
             for i in range(f.ndim):
-                data[k][i]['kspace'] = data[f][i]['kspace'] + dt * self.field_dt[f][i]['kspace']
+                data[k][i]['kspace'] = data[k][i]['kspace'] + dt * self.field_dt[k][i]['kspace']
 
         for a in self.RHS.aux_eqns.values():
             a.value = a.value + dt * a.RHS(a_tmp)
@@ -137,8 +137,9 @@ class RK2simple(TimeStepBase):
         data.time += dt
         self.time += dt
         self.iter += 1
-        self.tmp_fields.zero_all() 
-        self.field_dt.zero_all()
+        for k,f in data.fields.iteritems():
+            self.tmp_fields[k].zero_all() 
+            self.field_dt[k].zero_all()
 
 class RK2simplevisc(RK2simple):
     """Runga-Kutta 2 with integrating factor for viscosity. 

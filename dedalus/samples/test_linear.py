@@ -41,7 +41,7 @@ while ti.ok:
     outfile.write("%10.5e\t%10.5e\t%10.5e\n" %(ti.time, ti.RHS.aux_eqns['a'].value, delta))
 outfile.close()
 
-#delta_final = data['delta']['kspace'] 
-#print delta_final/delta_init
+delta_final = data['delta']['kspace'] 
+print delta_final/delta_init
 #Should be a single real number for all modes, assuming the decaying
 #solution is negligible in delta_init

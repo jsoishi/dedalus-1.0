@@ -475,8 +475,7 @@ class LinearCollisionlessCosmology(Physics):
 
     def density_RHS(self, data):
         a = self.aux_eqns['a'].value
-        tmp = na.zeros(data['delta'].shape)
-        print tmp.shape
+        tmp = na.zeros(data['delta'].shape, complex)
         for i in self.dims:
             tmp += data['u'][i].k[self._trans[i]] * data['u'][i]['kspace']
 
