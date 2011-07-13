@@ -22,6 +22,8 @@ License:
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from collections import OrderedDict
+
 class StateData(object):
     """the object containing all relevant data for the state of the
     system. composed of vector and scalar fields, each of which in
@@ -29,10 +31,12 @@ class StateData(object):
     according to the coordinate system in use (xyz/rthetaphi/rphiz/etc
     etc etc)...or 0,1,2
     """
-    def __init__(self, time, field_class_dict):
+    def __init__(self, time, field_class_dict, field_list=[]):
         self.time = time
-        self.fields = {}
+        self.fields = OrderedDict()
         self._field_classes = field_class_dict
+        for f,t in field_list:
+            self.add_field(f, t)
                                 
     def clone(self):
         return self.__class__(self.time, self._field_classes)

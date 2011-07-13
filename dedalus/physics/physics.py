@@ -41,8 +41,6 @@ class Physics(object):
         dataname = self.__class__.__name__
         self._field_classes = create_field_classes(self._representation, self.shape, dataname)
         self.parameters = {}
-        self.fields = {}
-        self.aux_fields = {}
         self.aux_eqns = {}
     
     def __getitem__(self, item):
@@ -53,14 +51,10 @@ class Physics(object):
               raise KeyError
          return
 
-    def create_fields(self, t, fields={}):
-        data = StateData(t, self._field_classes)
-        
-        if fields == {}:
-            fields = self.fields
-        for f,t in fields.iteritems():
-            data.add_field(f,t)
-        return data
+    def create_fields(self, t, field_list=None):        
+        if field_list == None:
+            field_list = self.fields
+        return StateData(t, self._field_classes, field_list)    
 
     def create_dealias_field(self, t, fields=None):
         """data object to implement Orszag 3/2 rule for non-linear
@@ -80,17 +74,8 @@ class Physics(object):
         for k,v in params.iteritems():
             self.parameters[k] = v
 
-    def _setup_aux_fields(self, t, aux):
-        """
-
-        inputs
-        ------
-        aux -- a dict of names as keys and field types as values
-
-        """
-        self.aux_fields = StateData(t, self._field_classes)
-        for f, t in aux.iteritems():
-            self.aux_fields.add_field(f, t)
+    def _setup_aux_fields(self, t, aux_field_list=None):
+        self.aux_fields = self.create_fields(t, aux_field_list)
 
     def _setup_aux_eqns(self, aux_eqns, RHS, ics):
         """ create auxiliary ODEs to be solved alongside the spatial gradients.
@@ -114,10 +99,10 @@ class Hydro(Physics):
         Physics.__init__(self, *args)
         
         # Setup data fields
-        self.fields = {'u': 'vector'}
-        self._aux_fields = {'pressure': 'vector',
-                            'gradu': 'tensor',
-                            'ugradu': 'vector'}
+        self.fields = [('u', 'vector')]
+        self._aux_fields = [('pressure', 'vector'),
+                            ('gradu', 'tensor'),
+                            ('ugradu', 'vector')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1.}
