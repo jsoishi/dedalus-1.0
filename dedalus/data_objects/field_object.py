@@ -39,7 +39,9 @@ def create_field_classes(representation, shape, name):
     new_scalarclass = type(sname, (ScalarField,), {'representation': representation,
                                                   'shape': shape})
 
-    return new_tensorclass, new_vectorclass, new_scalarclass
+    return {'tensor': new_tensorclass,
+            'vector': new_vectorclass,
+            'scalar': new_scalarclass}
 
 def lookup(name, translation_table):
     """this may need to be inlined?

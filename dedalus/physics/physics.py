@@ -32,13 +32,14 @@ class Physics(object):
     """This is a base class for a physics object. It needs to provide
     a right hand side for a time integration scheme.
     """
+    
     def __init__(self, shape, representation):
-        self._shape = shape
-        self.ndim = len(self._shape)
+        self.shape = shape
+        self.ndim = len(self.shape)
         self.dims = xrange(self.ndim)
         self._representation = representation
         dataname = self.__class__.__name__
-        self.__TensorClass, self.__VectorClass, self.__ScalarClass = create_field_classes(self._representation, self._shape, dataname)
+        self._field_classes = create_field_classes(self._representation, self.shape, dataname)
         self.parameters = {}
         self.fields = {}
         self.aux_fields = {}
@@ -53,9 +54,7 @@ class Physics(object):
          return
 
     def create_fields(self, t, fields={}):
-        data = StateData(t, {'tensor': self.__TensorClass,
-                             'vector': self.__VectorClass,
-                             'scalar': self.__ScalarClass})
+        data = StateData(t, self._field_classes)
         
         if fields == {}:
             fields = self.fields
@@ -69,7 +68,7 @@ class Physics(object):
 
         """
         name = "%sDealiasData" % self.__class__.__name__
-        shape = [3*d/2 for d in self._shape]
+        shape = [3*d/2 for d in self.shape]
         data_class = create_data(self._representation, shape, name)
 
         if fields == None:
@@ -89,9 +88,7 @@ class Physics(object):
         aux -- a dict of names as keys and field types as values
 
         """
-        self.aux_fields = StateData(t, {'tensor': self.__TensorClass,
-                                        'vector': self.__VectorClass,
-                                        'scalar': self.__ScalarClass})
+        self.aux_fields = StateData(t, self._field_classes)
         for f, t in aux.iteritems():
             self.aux_fields.add_field(f, t)
 
@@ -264,8 +261,8 @@ class Hydro(Physics):
             
             if dealias == '2/3': 
                 # Orszag 2/3 dealias mask (picks out coefficients to zero)    
-                dmask = ((na.abs(sampledata.k['x']) > 2/3. *self._shape[0]/2.) | 
-                         (na.abs(sampledata.k['y']) > 2/3. * self._shape[1]/2.))
+                dmask = ((na.abs(sampledata.k['x']) > 2/3. *self.shape[0]/2.) | 
+                         (na.abs(sampledata.k['y']) > 2/3. * self.shape[1]/2.))
             
             # Construct XgradX **************** Proper dealiasing?
             for i in self.dims:
