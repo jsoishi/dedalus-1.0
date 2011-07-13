@@ -29,13 +29,14 @@ class StateData(object):
     according to the coordinate system in use (xyz/rthetaphi/rphiz/etc
     etc etc)...or 0,1,2
     """
-    def __init__(self, time, TensorClass, VectorClass, ScalarClass):
+    def __init__(self, time, field_class_dict):
         self.time = time
         self.fields = {}
-        self._field_classes = {'tensor': TensorClass,
-                                'vector': VectorClass, 
-                                'scalar': ScalarClass}
-
+        self._field_classes = field_class_dict
+                                
+    def _clone(self):
+        return self.__class__(self.time, self._field_classes)
+        
     def __getitem__(self, item):
         return self.fields[item]
 

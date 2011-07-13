@@ -24,7 +24,7 @@ License:
 from dedalus.mods import *
 from dedalus.funcs import insert_ipython
 shape = (128,128) #(86, 86) 
-RHS = MHD(shape, FourierData)
+RHS = MHD(shape, FourierRepresentation)
 RHS.parameters['nu'] = 1e-3
 data = RHS.create_fields(0.)            # B SHOULD BE ZERO BY DEFAULT
 

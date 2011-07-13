@@ -23,7 +23,7 @@ License:
 from dedalus.mods import *
 from dedalus.funcs import insert_ipython
 shape = (128,128) #(86, 86) 
-RHS = Hydro(shape, FourierData)
+RHS = Hydro(shape, FourierRepresentation)
 RHS.parameters['nu'] = 1e-3
 data = RHS.create_fields(0.)
 

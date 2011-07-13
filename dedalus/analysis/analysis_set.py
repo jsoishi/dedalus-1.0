@@ -115,13 +115,13 @@ def print_energy(data, it):
 
 @AnalysisSet.register_task
 def en_spec(data, it):
-    kk = na.sqrt(data['u']('x').k2())
-    power = na.zeros(data['u']('x').data.shape)
+    kk = na.sqrt(data['u']['x'].k2())
+    power = na.zeros(data['u']['x'].data.shape)
     for i in range(data['u'].ndim):
-        power += (data['u'][i,'kspace']*data['u'][i,'kspace'].conj()).real
+        power += (data['u'][i]['kspace']*data['u'][i]['kspace'].conj()).real
 
     power *= 0.5
-    nbins = (data['u']('x').k['x'].size)/2 
+    nbins = (data['u']['x'].k['x'].size)/2 
     k = na.arange(nbins)
     spec = na.zeros(nbins)
     for i in range(nbins):

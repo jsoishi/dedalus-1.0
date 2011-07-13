@@ -53,10 +53,9 @@ class Physics(object):
          return
 
     def create_fields(self, t, fields={}):
-        data = StateData(t, 
-                         self.__TensorClass, 
-                         self.__VectorClass, 
-                         self.__ScalarClass)
+        data = StateData(t, {'tensor': self.__TensorClass,
+                             'vector': self.__VectorClass,
+                             'scalar': self.__ScalarClass})
         
         if fields == {}:
             fields = self.fields
@@ -90,10 +89,9 @@ class Physics(object):
         aux -- a dict of names as keys and field types as values
 
         """
-        self.aux_fields = StateData(t, 
-                                    self.__TensorClass,
-                                    self.__VectorClass,
-                                    self.__ScalarClass)
+        self.aux_fields = StateData(t, {'tensor': self.__TensorClass,
+                                        'vector': self.__VectorClass,
+                                        'scalar': self.__ScalarClass})
         for f, t in aux.iteritems():
             self.aux_fields.add_field(f, t)
 

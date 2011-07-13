@@ -110,7 +110,8 @@ def MIT_vortices(data):
     
     sh = data['u']['x']['kspace'].shape
     x, y = na.meshgrid(na.r_[0:sh[0]]*2*na.pi/sh[0],na.r_[0:sh[1]]*2*na.pi/sh[1])
-    aux = data.__class__(data.time, data._field_classes['tensor'], data._field_classes['vector'], data._field_classes['scalar'])
+    #aux = data.__class__(data.time, data._field_classes['tensor'], data._field_classes['vector'], data._field_classes['scalar'])
+    aux = data._clone()
     aux.add_field('w','scalar')
     aux.add_field('psi','scalar')
     aux['w']['xspace']=na.exp(-((x-na.pi)**2+(y-na.pi+na.pi/4)**2)/(0.2)) \

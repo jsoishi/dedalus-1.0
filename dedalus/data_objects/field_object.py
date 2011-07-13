@@ -77,7 +77,7 @@ class BaseField(object):
         #return self.components[comp_name]
         
         if type(comp_name) == str:
-            comp_name = self.trans.get(name, None)
+            comp_name = self.trans.get(comp_name, None)
             if comp_name is None: 
                 raise KeyError
                 
