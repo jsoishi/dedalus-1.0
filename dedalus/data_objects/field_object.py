@@ -40,6 +40,15 @@ def create_field_classes(representation, shape, name):
                                                   'shape': shape})
 
     return new_tensorclass, new_vectorclass, new_scalarclass
+
+def lookup(name, translation_table):
+    """this may need to be inlined?
+
+    """
+    name = translation_table.get(name, None)
+    if name is None:
+        raise KeyError
+    return name
     
 class BaseField(object):
     def __init__(self, ndim=-1):
@@ -62,6 +71,11 @@ class BaseField(object):
         (x or k).
 
         """
+        
+        #if type(comp_name) == str:
+        #    comp_name = lookup(comp_name, self.trans)
+        #return self.components[comp_name]
+        
         if type(comp_name) == str:
             comp_name = self.trans.get(name, None)
             if comp_name is None: 

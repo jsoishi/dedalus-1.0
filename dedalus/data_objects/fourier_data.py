@@ -44,32 +44,33 @@ class FourierRepresentation(Representation):
 
     def __init__(self, shape, length=None, dtype='complex128', method='fftw'):
         """
-        
-        Parameters
-        ----------
-        shape : tuple of ints
-            the shape of the data.
+        Inputs:
+            shape       The shape of the data, tuple of ints
+            length      The length of the data, tuple of floats (default: 2 pi)
+            
         """
+        
         self.shape = shape
+        self.ndim = len(self.shape)
+        self.data = na.zeros(self.shape, dtype=dtype)
         self._curr_space = 'kspace'
-        self.ndim = len(shape)
-        self.data = na.zeros(self.shape,dtype=dtype)
-        names = ['z','y','x']
         self.trans = {'x': 0, 'y': 1, 'z': 2} # for vector fields
-        # hard code for now
-        self.L = dict(zip(names[3-self.ndim:],2.*na.pi*na.ones(self.ndim)))
-
+        
         if not length:
-            self.kny = na.pi*na.array(self.shape)/na.array(self.L.values())
+            # Default length is 2 pi in each direction
+            self.length = (2 * na.pi,) * self.ndim
+        
+        # Get Nyquist wavenumbers
+        self.kny = na.pi * na.array(self.shape) / na.array(self.length)
 
-        # setup wavenumbers
+        # Setup wavenumbers
         kk = []
-        for i,dim in enumerate(self.data.shape):
-            sl = i*(1,)+(dim,)+(self.ndim-i-1)*(1,)
-            k = fpack.fftfreq(dim)*2.*self.kny[i]
-            k.resize(sl)
+        for dim,S in enumerate(self.shape):
+            shape = dim * (1,) + (S,) + (self.ndim - dim - 1) * (1,)
+            k = fpack.fftfreq(S) * 2. * self.kny[dim]
+            k.resize(shape)
             kk.append(k)
-        self.k = dict(zip(names[3-self.ndim:],kk))
+        self.k = dict(zip(['z','y','x']-self.ndim:],kk))
 
         self.set_fft(method)
 
