@@ -68,7 +68,7 @@ def enstrophy(data):
 
     """
     aux = data.__class__(['vortz'],data.time)
-    aux = data._clone()
+    aux = data.clone()
     aux.add_field('vortz', 'scalar')
     aux['vortz']['kspace'] = data['u']['y'].deriv('x') - data['u']['x'].deriv('y')
     

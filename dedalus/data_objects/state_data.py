@@ -34,7 +34,7 @@ class StateData(object):
         self.fields = {}
         self._field_classes = field_class_dict
                                 
-    def _clone(self):
+    def clone(self):
         return self.__class__(self.time, self._field_classes)
         
     def __getitem__(self, item):
