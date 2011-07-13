@@ -466,7 +466,10 @@ class LinearCollisionlessCosmology(Physics):
                   'H0': 100.}
         self._setup_parameters(params)
         self._setup_aux_fields(0., self._aux_fields)
-        aux_eqn_rhs = lambda a: a*friedmann(a,self.parameters['H0'],self.parameters['Omega_r'], self.parameters['Omega_m'], self.parameters['Omega_l'])
+        aux_eqn_rhs = lambda a: a*friedmann(a, self.parameters['H0'],
+                                            self.parameters['Omega_r'],
+                                            self.parameters['Omega_m'], 
+                                            self.parameters['Omega_l'])
         
         self._setup_aux_eqns(['a'],[aux_eqn_rhs], [1e-4])
 
@@ -493,14 +496,16 @@ class LinearCollisionlessCosmology(Physics):
         a = self.aux_eqns['a'].value
         H = self.aux_eqns['a'].RHS(a)/a
         for i in self.dims:
-            self._RHS['u'][i]['kspace'] = -gradphi[i]['kspace'] - H * data['u'][i]['kspace'] 
+            self._RHS['u'][i]['kspace'] = (-gradphi[i]['kspace'] - 
+                                            H * data['u'][i]['kspace'])
         
     def grad_phi(self, data):
         a = self.aux_eqns['a'].value
         H = self.aux_eqns['a'].RHS(a) / a
 
         gradphi = self.aux_fields['gradphi']
-        tmp = -3./2. * H*H * data['delta']['kspace']/data['delta'].k2(no_zero=True)        
+        tmp = (-3./2. * H*H * 
+                data['delta']['kspace']/data['delta'].k2(no_zero=True))
         for i in self.dims:
             gradphi[i]['kspace'] = 1j * a * data['u'][i].k[self._trans[i]] * tmp
 
