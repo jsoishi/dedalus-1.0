@@ -54,7 +54,7 @@ class VolumeAverageSet(object):
 
 @VolumeAverageSet.register_task
 def ekin(data):
-    en = na.zeros(data['u']['x']['kspace'].shape)
+    en = na.zeros(data['u']['x'].data.shape)
     for i in range(data['u'].ndim):
         en += 0.5*(data['u'][i]['kspace']*data['u'][i]['kspace'].conj()).real
 
@@ -81,7 +81,7 @@ def vort_cenk(data):
 
     """
     k2 = data['u']['x'].k2()
-    en = na.zeros(data['u']['x']['kspace'].shape)
+    en = na.zeros(data['u']['x'].data.shape)
     for i in xrange(data['u'].ndim):
         en += 0.5*(data['u'][i]['kspace']*data['u'][i]['kspace'].conj()).real
     
