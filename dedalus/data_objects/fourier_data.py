@@ -50,26 +50,26 @@ class FourierRepresentation(Representation):
         shape : tuple of ints
             the shape of the data.
         """
-        self._shape = shape
+        self.shape = shape
         self._curr_space = 'kspace'
-        self.dim = len(shape)
-        self.data = na.zeros(self._shape,dtype=dtype)
+        self.ndim = len(shape)
+        self.data = na.zeros(self.shape,dtype=dtype)
         names = ['z','y','x']
         self.trans = {'x': 0, 'y': 1, 'z': 2} # for vector fields
         # hard code for now
-        self.L = dict(zip(names[3-self.dim:],2.*na.pi*na.ones(self.dim)))
+        self.L = dict(zip(names[3-self.ndim:],2.*na.pi*na.ones(self.ndim)))
 
         if not length:
-            self.kny = na.pi*na.array(self._shape)/na.array(self.L.values())
+            self.kny = na.pi*na.array(self.shape)/na.array(self.L.values())
 
         # setup wavenumbers
         kk = []
         for i,dim in enumerate(self.data.shape):
-            sl = i*(1,)+(dim,)+(self.dim-i-1)*(1,)
+            sl = i*(1,)+(dim,)+(self.ndim-i-1)*(1,)
             k = fpack.fftfreq(dim)*2.*self.kny[i]
             k.resize(sl)
             kk.append(k)
-        self.k = dict(zip(names[3-self.dim:],kk))
+        self.k = dict(zip(names[3-self.ndim:],kk))
 
         self.set_fft(method)
 
@@ -200,24 +200,24 @@ class FourierShearRepresentation(FourierRepresentation):
     def forward(self,time):
         deltay = self.shear_rate*time 
         print deltay
-        x = na.linspace(-na.pi,na.pi,self._shape[-1],endpoint=False)
-        #x = na.linspace(0.,2*na.pi,self._shape[-1],endpoint=False)
+        x = na.linspace(-na.pi,na.pi,self.shape[-1],endpoint=False)
+        #x = na.linspace(0.,2*na.pi,self.shape[-1],endpoint=False)
         
         self.data = self.fft(self.data,axis=1)
         self.data *= na.exp(1j*self.k['y']*x*deltay)
-        if self.dim == 3:
+        if self.ndim == 3:
             self.data = self.fft(self.data,axis=2)
         self.data = self.fft(self.data,axis=0)
         self._curr_space = 'xspace'
 
     def backward(self,time):
         deltay = self.shear_rate*time 
-        x = na.linspace(-na.pi,na.pi,self._shape[-1],endpoint=False)
+        x = na.linspace(-na.pi,na.pi,self.shape[-1],endpoint=False)
         z_,y_,x_ = N.ogrid[0:self.data.shape[0],
                            0:self.data.shape[1],
                            0:self.data.shape[2]]
 
-        if self.dim == 3:
+        if self.ndim == 3:
             self.data = self.ifft(self.data,axis=2)
         self.data = self.ifft(self.data,axis=0)
 

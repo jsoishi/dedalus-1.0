@@ -182,6 +182,7 @@ class Hydro(Physics):
         ==> pressure term = - k (k * ugradu) / k^2
         
         """
+        
         # Place references
         ugradu = self.aux_fields['ugradu']
         pressure = self.aux_fields['pressure']
