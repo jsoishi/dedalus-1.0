@@ -54,9 +54,9 @@ class VolumeAverageSet(object):
 
 @VolumeAverageSet.register_task
 def ekin(data):
-    en = na.zeros(data['u']('x')['kspace'].shape)
-    for i in range(data['u'].ndims):
-        en += 0.5*(data['u'][i,'kspace']*data['u'][i,'kspace'].conj()).real
+    en = na.zeros(data['u']['x'].data.shape)
+    for i in range(data['u'].ndim):
+        en += 0.5*(data['u'][i]['kspace']*data['u'][i]['kspace'].conj()).real
 
     return en.sum()
 
@@ -67,8 +67,9 @@ def enstrophy(data):
     HARDCODED FOR 2D CARTESIAN ONLY!
 
     """
-    aux = data.__class__(['vortz'],data.time)
-    aux['vortz'] = data['uy'].deriv('x') - data['ux'].deriv('y')
+    aux = data.__class__(data.time, data._field_classes['tensor'], data._field_classes['vector'], data._field_classes['scalar'])
+    aux.add_field('vortz','scalar')
+    aux['vortz']['kspace'] = data['u']['y'].deriv('x') - data['u']['x'].deriv('y')
     
     enstrophy = (aux['vortz']['xspace']**2).real
     return enstrophy.mean()
@@ -78,25 +79,25 @@ def vort_cenk(data):
     """Centroid wavenumber from McWilliams 1990.
 
     """
-    k2 = data['ux'].k2()
-    en = na.zeros(data['ux']['kspace'].shape)
-    for f in data.fields:
-        en += 0.5*(data[f]['kspace']*data[f]['kspace'].conj()).real
+    k2 = data['u']['x'].k2()
+    en = na.zeros(data['u']['x'].data.shape)
+    for i in range(data['u'].ndim):
+        en += 0.5*(data['u'][i]['kspace']*data['u'][i]['kspace'].conj()).real
     
     return (k2[1:,1:]**1.5*en[1:,1:]).sum()/(k2[1:,1:]*en[1:,1:]).sum()
 
 @VolumeAverageSet.register_task
 def ux_imag(data):
-    return data['ux']['xspace'].imag.mean()
+    return data['u']['x']['xspace'].imag.mean()
 
 @VolumeAverageSet.register_task
 def uy_imag(data):
-    return data['uy']['xspace'].imag.mean()
+    return data['u']['y']['xspace'].imag.mean()
 
 @VolumeAverageSet.register_task
 def ux_imag_max(data):
-    return data['ux']['xspace'].imag.max()
+    return data['u']['x']['xspace'].imag.max()
 
 @VolumeAverageSet.register_task
 def uy_imag_max(data):
-    return data['uy']['xspace'].imag.max()
+    return data['u']['y']['xspace'].imag.max()
