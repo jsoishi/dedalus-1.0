@@ -69,8 +69,7 @@ class BaseField(object):
                                                # names.
 
     def __getitem__(self, comp_name):
-        """item is a 2-tuple containing a component name and a space
-        (x or k).
+        """
 
         """
         
