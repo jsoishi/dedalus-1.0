@@ -23,7 +23,6 @@ License:
 import numpy as na
 import numpy.fft as fpack
 import fftw3
-from .hermitianize import zero_nyquist
 
 class Representation(object):
     """a representation of a field. it stores data and provides
@@ -135,8 +134,8 @@ class FourierRepresentation(Representation):
 
     def forward(self):
         self.fft()
-        zero_nyquist(self.data)
         self._curr_space = 'kspace'
+        self.zero_nyquist()
 
     def backward(self):
         self.ifft()
@@ -159,6 +158,19 @@ class FourierRepresentation(Representation):
         if no_zero:
             k2[k2 == 0] = 1.
         return k2
+        
+    def zero_nyquist(self):
+        """Zero out the Nyquist space in each dimension."""
+        
+        self['kspace']  # Dummy call to ensure in kspace
+        print self._curr_space
+        nyspace = [slice(None)] * self.ndim 
+        
+        # Pick out Nyquist space for each dimension and set to zero
+        for i in xrange(self.ndim):
+            nyspace[i] = self.shape[i] / 2
+            self.data[nyspace] = 0.
+            nyspace[i] = slice(None)
 
 class FourierShearRepresentation(FourierRepresentation):
     """

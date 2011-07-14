@@ -24,7 +24,7 @@ License:
 """
 
 import numpy as na
-from dedalus.data_objects.api import create_field_classes, zero_nyquist, AuxEquation, StateData
+from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
 from dedalus.utils.api import friedmann
 from dedalus.funcs import insert_ipython
 
@@ -151,7 +151,8 @@ class Physics(object):
                     self.q['u']._curr_space = 'kspace'
                     self.q['gu'].data[:] = 0+0j
                     self.q['gu']._curr_space = 'kspace'
-                    zero_nyquist(data[trans[ii]]['kspace'])
+                    #zero_nyquist(data[trans[ii]]['kspace'])
+                    data[trans[ii]].zero_nyquist()
                     self.q['u'] = na.fft.fftshift(data[trans[ii]]['kspace'])
                     self.q['u'] = na.fft.fftshift(self.q['u']['kspace'])
                     self.q['gu'] = na.fft.fftshift(gradu[j]['kspace'])
@@ -323,7 +324,8 @@ class Hydro(Physics):
         # Construct full term
         for i in self.dims:            
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            zero_nyquist(pressure[i].data)
+            #zero_nyquist(pressure[i].data)
+            pressure[i].zero_nyquist()
  
 class MHD(Hydro):
     """Incompressible magnetohydrodynamics."""
@@ -423,8 +425,8 @@ class MHD(Hydro):
         # Construct full term
         for i in self.dims:            
             Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            zero_nyquist(Ptotal[i].data)
-
+            #zero_nyquist(Ptotal[i].data)
+            Ptotal[i].zero_nyquist()
     
             
 class LinearCollisionlessCosmology(Physics):
