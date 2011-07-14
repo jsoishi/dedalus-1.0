@@ -127,6 +127,17 @@ def MIT_vortices(data):
     data['u']['x']['kspace'] = aux['psi'].deriv('y')
     data['u']['y']['kspace'] = -aux['psi'].deriv('x')
 
+def zeldovich(data, ampl=0.001):
+    """velocity wave IC, for testing nonlinear collisionless cosmology
+    against the Zeldovich approximation
+
+    """
+    #data['u'][2]['kspace'][0,0,1] = ampl * 1j / 2
+    #data['u'][2]['kspace'][0,0,-1] = -data['u'][2]['kspace'][0,0,1]
+
+    data['delta']['kspace'][0,0,1] = ampl * 1j / 2
+    data['delta']['kspace'][0,0,-1] = -data['delta']['kspace'][0,0,1]
+
 def get_ic_data(fname, ak, deltacp, thetac):
     """read certain values from a linger output file
 
@@ -152,7 +163,9 @@ def get_norm_data(fname, ak_trans, Ttot0):
     infile.close()
 
 def sig2_integrand(Ttot0, ak, nspect):
-    """calculate the integrand in the expression for the mean square of the field smoothed with a top-hat window function W at 8 Mpc.
+    """calculate the integrand in the expression for the mean square
+    of the overdensity field, smoothed with a top-hat window function W
+    at 8 Mpc.
 
     """
     R = 8.

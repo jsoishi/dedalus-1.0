@@ -491,13 +491,12 @@ class LinearCollisionlessCosmology(Physics):
         gradphi = self.aux_fields['gradphi']
         tmp = (-3./2. * H*H * 
                 data['delta']['kspace']/data['delta'].k2(no_zero=True))
+        
         for i in self.dims:
             gradphi[i]['kspace'] = 1j * a*a * data['u'][i].k[self._trans[i]] * tmp
 
 class CollisionlessCosmology(LinearCollisionlessCosmology):
     """This class implements collisionless cosmology with nonlinear terms.
-
-    **** NOT YET IMPLEMENTED ****
 
     solves
     ------
@@ -508,20 +507,24 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
 
     def __init__(self, *args):
         LinearCollisionlessCosmology.__init__(self, *args)
-        self.aux_fields.append(('graddelta', 'vector'))
-        self.aux_fields.append(('ugraddelta', 'scalar'))
-        self.aux_fields.append(('divu', 'scalar'))
-        self.aux_fields.append(('deltadivu', 'scalar'))
-        self.aux_fields.append(('gradu', 'tensor'))
-        self.aux_fields.append(('ugradu', 'vector'))
-        self.setup_aux_fields(self.aux_fields[-4:])        
+        self._aux_fields.append(('graddelta', 'vector'))
+        self._aux_fields.append(('ugraddelta', 'scalar'))
+        self._aux_fields.append(('divu', 'scalar'))
+        self._aux_fields.append(('deltadivu', 'scalar'))
+        self._aux_fields.append(('gradu', 'tensor'))
+        self._aux_fields.append(('ugradu', 'vector'))
+        self._setup_aux_fields(0., self._aux_fields) # re-creates gradphi
 
     def grad_delta(self, data):
+        graddelta = self.aux_fields['graddelta']
         for i in self.dims:
-            grad_delta[i]['kspace'] = data['delta'].deriv(self._trans[i])
+            graddelta[i]['kspace'] = data['delta'].deriv(self._trans[i])
 
     def div_u(self, data):
+        # should really calculate gradu first, then get divu from that
         divu = self.aux_fields['divu']
+
+        divu['kspace']
         for i in self.dims:
             divu['kspace'] += data['u'][i].deriv(self._trans[i])
     
@@ -531,9 +534,10 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         self.grad_delta(data)
         graddelta = self.aux_fields['graddelta']
 
+        ugraddelta['xspace']
         for i in self.dims:
-            ugraddelta += (data['u'][i]['xspace'] * 
-                           graddelta['xspace'])
+            ugraddelta['xspace'] += (data['u'][i]['xspace'] * 
+                           graddelta[i]['xspace'])
 
     def delta_div_u(self, data, compute_divu=False):
         if compute_divu:
@@ -547,6 +551,7 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         self.density_RHS(data)
         self.vel_RHS(data)
         self._RHS.time = data.time
+        return self._RHS
 
     def density_RHS(self, data):
         a = self.aux_eqns['a'].value
@@ -559,20 +564,23 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         
         self._RHS['delta']['kspace'] = (-divu['kspace'] - 
                                          deltadivu['kspace'] - 
-                                         ugraddelta['kspace']) / a
+                                         ugraddelta['kspace']) #/ a
 
     def vel_RHS(self, data):
         self.grad_phi(data)
-        gradphi = self.aux_fields('gradphi')
+        gradphi = self.aux_fields['gradphi']
+
         a = self.aux_eqns['a'].value
         adot = self.aux_eqns['a'].RHS(a)
+
         self.XgradY(data['u'], data['u'], self.aux_fields['gradu'], 
-                    self.aux_fields['ugradu'], None)
+                    self.aux_fields['ugradu'])
+        ugradu = self.aux_fields['ugradu']
+        
         for i in self.dims:
             self._RHS['u'][i]['kspace'] = (-gradphi[i]['kspace'] - 
                                             adot * data['u'][i]['kspace'] - 
-                                            ugradu[i]['kspace']) / a
-
+                                            ugradu[i]['kspace']) #/ a
 if __name__ == "__main__":
     import pylab as P
     from fourier_data import FourierData

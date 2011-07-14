@@ -27,7 +27,8 @@ from .init_cond import \
     sin_y, \
     turb, \
     MIT_vortices, \
-    cosmology
+    cosmology, \
+    zeldovich
 
 from .turb_spectra import \
     mcwilliams_spec
