@@ -42,6 +42,6 @@ while ti.ok:
 outfile.close()
 
 delta_final = data['delta']['kspace'] 
-print delta_final/delta_init
+#print delta_final/delta_init
 #Should be a single real number for all modes, assuming the decaying
 #solution is negligible in delta_init
