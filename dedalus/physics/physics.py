@@ -193,7 +193,7 @@ class Physics(object):
                 
     def XcrossY(self, X, Y, output, space):
         """
-        Calculate X cross Y.  *** NOT TESTED ***
+        Calculate X cross Y.
         
         Inputs:
             X           Input VectorField object
@@ -228,7 +228,7 @@ class Physics(object):
             
     def curlX(self, X, output):
         """
-        Return list of components of curl X. *** NOT TESTED ***
+        Return list of components of curl X.
         
         Inputs:
             X           Input VectorField object
