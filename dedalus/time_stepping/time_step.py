@@ -225,7 +225,7 @@ class CrankNicholsonVisc(TimeStepBase):
         for k,f in deriv.fields.iteritems():
             top = 1. / dt - 0.5 * f.integrating_factor
             bottom = 1. / dt + 0.5 * f.integrating_factor
-            for i in range(f.ndim):
+            for i in xrange(f.ndim):
                 data[k][i]['kspace'] = (top / bottom * data[k][i]['kspace'] + 
                                         1. / bottom * deriv[k][i]['kspace'])
 

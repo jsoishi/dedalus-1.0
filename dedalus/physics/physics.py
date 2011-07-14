@@ -53,7 +53,7 @@ class Physics(object):
     def create_fields(self, t, field_list=None):        
         if field_list == None:
             field_list = self.fields
-        return StateData(t, self._field_classes, field_list)    
+        return StateData(t, self._field_classes, field_list, self.parameters)    
 
     def create_dealias_field(self, t, fields=None):
         """data object to implement Orszag 3/2 rule for non-linear
