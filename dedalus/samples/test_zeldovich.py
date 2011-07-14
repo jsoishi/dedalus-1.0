@@ -3,7 +3,9 @@ import numpy as na
 
 import pylab as pl
 
-shape = (16,16,16)
+from scipy.integrate import odeint
+
+shape = (32,32,32)
 RHS = CollisionlessCosmology(shape, FourierRepresentation)
 data = RHS.create_fields(0.)
 RHS.parameters['Omega_r'] = 0#8.4e-5
@@ -17,16 +19,37 @@ ti.stop_time(3.15e7*1e9)
 ti.set_nsnap(1000)
 ti.set_dtsnap(1e17)
 dt=3.15e7*1e6
-
 i = 0
+
+ddelta = []
+uu = []
+
 while ti.ok:
     print i
     ti.advance(data, dt)
+    
+    if i % 50 == 0:
+        tmp = na.zeros_like(data['u'][2]['xspace'][:,0,0].real)
+        tmp[:] = data['u'][2]['xspace'][:,0,0].real
 
-    if i % 200 == 0: 
-        pass
-        #print data['u'][2]['kspace']
-        pl.figure()
-        pl.plot(data['u'][2]['xspace'][0,0,:].real)
-        pl.show()
+        tmp2 = na.zeros_like(data['delta']['xspace'][:,0,0].real)
+        tmp2[:] = data['delta']['xspace'][:,0,0].real
+
+        uu.append(tmp)
+        ddelta.append(tmp2)
     i += 1
+
+def reorder(arr):
+    di = len(arr)/2
+    tmp = [arr[i-di] for i in xrange(len(arr))]
+    for i in xrange(len(arr)):
+        arr[i] = tmp[i]
+    return arr
+
+for i in xrange(len(ddelta)):
+    pl.plot(reorder(ddelta[i]),hold=True)
+
+pl.figure()
+for i in xrange(len(uu)):
+    pl.plot(reorder(uu[i]),hold=True)
+pl.show()
