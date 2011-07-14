@@ -34,7 +34,6 @@ delta_init = na.zeros_like(data['delta']['kspace'])
 ti.advance(data, dt) 
 # May need to advance more for the decaying mode to vanish completely
 delta_init[:] = data['delta']['kspace']
-
 while ti.ok:
     ti.advance(data, dt)
     delta = data['delta']['kspace'][1,1,1].real
