@@ -24,12 +24,11 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 from dedalus.funcs import insert_ipython
 import numpy as na
-
 from scipy.interpolate import interp1d
 from scipy.integrate import simps
-
 from dedalus.data_objects import hermitianize
 
 def taylor_green(ux, uy):
@@ -54,7 +53,35 @@ def sin_y(f,ampl=1.):
 
 def sin_k(f, kindex, ampl=1.):
     f.data[tuple(kindex)] = ampl*1j
-    f.data[tuple(-1*na.array(kindex))] = -f.data[tuple(kindex)]
+    f.data[tuple(-1*na.array(kindex))] = f.data[tuple(kindex)].conjugate()
+
+def alfven(data):
+    """
+    Generate conditions for simulating Alfven waves in MHD.
+    For 2d, must have k and B0 in same direction
+    """
+    
+    B0 = na.array([1., 0.])
+    k = na.array([1., 0.])
+    u1 = na.array([0., 1.]) * 0.001
+    
+    B0mag = na.linalg.norm(B0)
+    kmag = na.linalg.norm(k)
+    u1mag = na.linalg.norm(u1)
+    
+    cA = na.sqrt(B0mag ** 2 / (4 * na.pi * data.parameters['rho0']))
+    
+    # u and B perturbations
+    sin_k(data['u']['y'], k[::-1], ampl=u1mag)
+    sin_k(data['B']['y'], k[::-1], ampl=-u1mag * B0mag / cA)
+    
+    data['u']['y']._curr_space = 'kspace'
+    data['B']['y']._curr_space = 'kspace'
+    
+    
+    # Background magnetic field
+    for i in xrange(data['B'].ndim):
+        data['B'][i]['xspace'] += B0[i]
 
 
 def turb(ux, uy, spec, tot_en=0.5, **kwargs):
