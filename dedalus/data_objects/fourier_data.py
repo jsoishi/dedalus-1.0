@@ -163,7 +163,6 @@ class FourierRepresentation(Representation):
         """Zero out the Nyquist space in each dimension."""
         
         self['kspace']  # Dummy call to ensure in kspace
-        print self._curr_space
         nyspace = [slice(None)] * self.ndim 
         
         # Pick out Nyquist space for each dimension and set to zero
