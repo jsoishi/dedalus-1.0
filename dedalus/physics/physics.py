@@ -390,7 +390,7 @@ class MHD(Hydro):
 
         # Set integrating factors
         self._RHS['u'].integrating_factor = self.parameters['nu'] * self._RHS['u']['x'].k2()
-        self._RHS['B'].integrating_factor = self.parameters['eta'] * self._RHS['u']['x'].k2()
+        self._RHS['B'].integrating_factor = self.parameters['eta'] * self._RHS['B']['x'].k2()
 
         self._RHS.time = data.time        
         return self._RHS
