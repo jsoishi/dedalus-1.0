@@ -67,6 +67,8 @@ class BaseField(object):
                                                # provide a translation
                                                # table for coordinate
                                                # names.
+                                               
+        self.integrating_factor = 0.
 
     def __getitem__(self, comp_name):
         """item is a 2-tuple containing a component name and a space

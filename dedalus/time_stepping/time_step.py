@@ -212,18 +212,20 @@ class RK2simplehypervisc4(RK2simple):
         #self.field_dt.zero_all()
 
 class CrankNicholsonVisc(TimeStepBase):
-    """Crank-Nicholson timestepping, copied from MIT script,
+    """
+    Crank-Nicholson timestepping, copied from MIT script,
     mit18336_spectral_ns2d.m
 
     """
+    
     def do_advance(self, data, dt):
-        k2 = data['u']['x'].k2()
-        top = (1./dt - 0.5*self.RHS.parameters['nu']*k2)
-        bottom  = (1./dt + 0.5*self.RHS.parameters['nu']*k2)
         deriv = self.RHS.RHS(data)
         for k,f in deriv.fields.iteritems():
+            top = 1. / dt - 0.5 * f.integrating_factor
+            bottom = 1. / dt + 0.5 * f.integrating_factor
             for i in range(f.ndim):
-                data[k][i]['kspace'] = top/bottom * data[k][i]['kspace'] + 1./bottom * deriv[k][i]['kspace']
+                data[k][i]['kspace'] = (top / bottom * data[k][i]['kspace'] + 
+                                        1. / bottom * deriv[k][i]['kspace'])
 
         data.time += dt
         self.time += dt

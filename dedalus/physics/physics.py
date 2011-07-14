@@ -292,6 +292,9 @@ class Hydro(Physics):
         for i in self.dims:
             self._RHS['u'][i]['kspace'] = -ugradu[i]['kspace'] - pressure[i]['kspace']
             
+        # Set integrating factors
+        self._RHS['u'].integrating_factor = self.parameters['nu'] * self._RHS['u']['x'].k2()
+            
         self._RHS.time = data.time        
         return self._RHS
 
@@ -384,6 +387,10 @@ class MHD(Hydro):
                                            Ptotal[i]['kspace'])
                                            
             self._RHS['B'][i]['kspace'] = Bgradu[i]['kspace'] - ugradB[i]['kspace']
+
+        # Set integrating factors
+        self._RHS['u'].integrating_factor = self.parameters['nu'] * self._RHS['u']['x'].k2()
+        self._RHS['B'].integrating_factor = self.parameters['eta'] * self._RHS['u']['x'].k2()
 
         self._RHS.time = data.time        
         return self._RHS
