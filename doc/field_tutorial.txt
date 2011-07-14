@@ -1,0 +1,30 @@
+
+Vector/Tensors
+--------------
+
+data = StateData()
+
+data['u'] --> HydroVectorField, LinearCollisionlesCosmldsfaosdjfVectorField
+
+data['u']['x'] --> FourierRepresentation
+
+data['u']['x'].k2() --> square wavenumbers
+data['u']['x'].deriv('y') --> d u_x/ dy
+
+a = data['u']['x']['kspace'] --> numpy array with data
+data['u']['x']['kspace'] = [0,1l2,3,3] ---> __setitem__ on FourierRepresnetation
+
+data['u']['x']['xspace']
+data['u']['x']['xspace'] = data['u']['x']['xspace'] * [0,1l2,3,3] ---> NB: DOES NOT TAKE FOURIER TRANSFORM
+
+Scalars
+-------
+
+data['density'] --> will LOOK like a FourierRepresentation but IS a HydroScalarField
+
+__getitem__ on a scalar takes a "space" argument
+data['density']['kspace']
+
+data['density'].k2() --> this will work
+data['density'].deriv('x') --> this will also work
+
