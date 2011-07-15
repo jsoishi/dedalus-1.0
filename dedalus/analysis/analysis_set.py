@@ -77,9 +77,9 @@ def field_snap(data, it):
     nrow = na.int(nrow)
     ncol = na.int(ncol)
     
-    # Plot
-    fig = P.figure(1,figsize=(24.*ncol/3.,24.*nrow/3.))
-    grid = AxesGrid(fig,111,
+    # Figure setup
+    fig = P.figure(1, figsize=(24. * ncol / 3., 24. * nrow / 3.))
+    grid = AxesGrid(fig, 111,
                     nrows_ncols = (nrow, ncol),
                     axes_pad=0.3,
                     cbar_pad=0.,
@@ -87,10 +87,16 @@ def field_snap(data, it):
                     label_mode="1",
                     cbar_location="top",
                     cbar_mode="each")
+                    
+    # Plot field components
     I = 0
     for k,f in data.fields.iteritems():
         for i in xrange(f.ndim):
-            im = grid[I].imshow(f[i]['xspace'].real, origin='lower')
+            if f[i].ndim == 3:
+                plot_array = f[i]['xspace'][0,:,:].real
+            else:
+                plot_array = f[i]['xspace'].real
+            im = grid[I].imshow(plot_array, origin='lower')
             grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='white')
             grid.cbar_axes[I].colorbar(im)
             I += 1

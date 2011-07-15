@@ -24,7 +24,7 @@ License:
 """
 
 import numpy as na
-from dedalus.data_objects.api import create_field_classes, zero_nyquist, AuxEquation, StateData
+from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
 from dedalus.utils.api import friedmann
 from dedalus.funcs import insert_ipython
 
@@ -53,7 +53,7 @@ class Physics(object):
     def create_fields(self, t, field_list=None):        
         if field_list == None:
             field_list = self.fields
-        return StateData(t, self._field_classes, field_list)    
+        return StateData(t, self._field_classes, field_list, self.parameters)    
 
     def create_dealias_field(self, t, fields=None):
         """data object to implement Orszag 3/2 rule for non-linear
@@ -151,7 +151,8 @@ class Physics(object):
                     self.q['u']._curr_space = 'kspace'
                     self.q['gu'].data[:] = 0+0j
                     self.q['gu']._curr_space = 'kspace'
-                    zero_nyquist(data[trans[ii]]['kspace'])
+                    #zero_nyquist(data[trans[ii]]['kspace'])
+                    data[trans[ii]].zero_nyquist()
                     self.q['u'] = na.fft.fftshift(data[trans[ii]]['kspace'])
                     self.q['u'] = na.fft.fftshift(self.q['u']['kspace'])
                     self.q['gu'] = na.fft.fftshift(gradu[j]['kspace'])
@@ -193,7 +194,7 @@ class Physics(object):
                 
     def XcrossY(self, X, Y, output, space):
         """
-        Calculate X cross Y.  *** NOT TESTED ***
+        Calculate X cross Y.
         
         Inputs:
             X           Input VectorField object
@@ -226,9 +227,27 @@ class Physics(object):
         else:
             output[space] = X0 * Y1 - X1 * Y0
             
+    def XdotY(self, X, Y, output, space):
+        """
+        Calculate X dot Y.
+        
+        Inputs:
+            X           Input VectorField object
+            Y           Input VectorField object
+            output      Output ScalarField object
+            space       Space for dot product
+
+        """            
+
+        if X.ncomp != Y.ncomp: raise ValueError('Vectors not the same size')
+
+        output.zero()  
+        for i in xrange(X.ncomp):
+            output[space] += X[i][space] * Y[i][space]
+            
     def curlX(self, X, output):
         """
-        Return list of components of curl X. *** NOT TESTED ***
+        Return list of components of curl X.
         
         Inputs:
             X           Input VectorField object
@@ -292,6 +311,9 @@ class Hydro(Physics):
         for i in self.dims:
             self._RHS['u'][i]['kspace'] = -ugradu[i]['kspace'] - pressure[i]['kspace']
             
+        # Set integrating factors
+        self._RHS['u'].integrating_factor = self.parameters['nu'] * self._RHS['u']['x'].k2()
+            
         self._RHS.time = data.time        
         return self._RHS
 
@@ -320,7 +342,8 @@ class Hydro(Physics):
         # Construct full term
         for i in self.dims:            
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            zero_nyquist(pressure[i].data)
+            #zero_nyquist(pressure[i].data)
+            pressure[i].zero_nyquist()
  
 class MHD(Hydro):
     """Incompressible magnetohydrodynamics."""
@@ -385,6 +408,10 @@ class MHD(Hydro):
                                            
             self._RHS['B'][i]['kspace'] = Bgradu[i]['kspace'] - ugradB[i]['kspace']
 
+        # Set integrating factors
+        self._RHS['u'].integrating_factor = self.parameters['nu'] * self._RHS['u']['x'].k2()
+        self._RHS['B'].integrating_factor = self.parameters['eta'] * self._RHS['B']['x'].k2()
+
         self._RHS.time = data.time        
         return self._RHS
         
@@ -416,8 +443,8 @@ class MHD(Hydro):
         # Construct full term
         for i in self.dims:            
             Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            zero_nyquist(Ptotal[i].data)
-
+            #zero_nyquist(Ptotal[i].data)
+            Ptotal[i].zero_nyquist()
     
             
 class LinearCollisionlessCosmology(Physics):
