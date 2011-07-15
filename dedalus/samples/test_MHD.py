@@ -32,14 +32,14 @@ alfven(data)
 
 #ti = RK2simplevisc(RHS,CFL=0.4)
 ti = CrankNicholsonVisc(RHS)
-ti.stop_time(30.) # set stoptime
+ti.stop_time(25.) # set stoptime
 ti.stop_walltime(3600.) # stop after 1 hour
 
 an = AnalysisSet(data, ti)
-an.add("field_snap", 15)
+an.add("field_snap", 10)
 
 # Main loop
-dt = 0.05
+dt = 0.1
 an.run()
 while ti.ok:
     print "step: %i" %ti.iter

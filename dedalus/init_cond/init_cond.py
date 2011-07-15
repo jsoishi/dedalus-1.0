@@ -65,7 +65,7 @@ def alfven(data):
     B0 = na.array([1., 0., 0.])
     B0mag = na.linalg.norm(B0)
     
-    k = na.array([2., 0., 0.])
+    k = na.array([-2., 0., 0.])
     kmag = na.linalg.norm(k)
         
     # Alfven speed and wave frequency
