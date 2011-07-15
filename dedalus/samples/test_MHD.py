@@ -24,12 +24,13 @@ License:
 from dedalus.mods import *
 from dedalus.funcs import insert_ipython
 
-shape = (128,128)
+shape = (32,32,32)
 RHS = MHD(shape, FourierRepresentation)
 data = RHS.create_fields(0.)
 
 alfven(data)
 
+#ti = RK2simplevisc(RHS,CFL=0.4)
 ti = CrankNicholsonVisc(RHS)
 ti.stop_time(30.) # set stoptime
 ti.stop_walltime(3600.) # stop after 1 hour

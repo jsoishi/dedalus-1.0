@@ -61,9 +61,9 @@ def alfven(data):
     For 2d, must have k and B0 in same direction
     """
     
-    B0 = na.array([1., 0.])
-    k = na.array([1., 0.])
-    u1 = na.array([0., 1.]) * 0.001
+    B0 = na.array([1., 0., 0.])
+    k = na.array([2., 0., 0.])
+    u1 = na.array([0., 0., 1.]) * 1e-6
     
     B0mag = na.linalg.norm(B0)
     kmag = na.linalg.norm(k)
@@ -72,12 +72,12 @@ def alfven(data):
     cA = na.sqrt(B0mag ** 2 / (4 * na.pi * data.parameters['rho0']))
     
     # u and B perturbations
-    sin_k(data['u']['y'], k[::-1], ampl=u1mag)
-    sin_k(data['B']['y'], k[::-1], ampl=-u1mag * B0mag / cA)
+    for i in xrange(data['u'].ndim):
+        sin_k(data['u'][i], k[::-1], ampl=u1[i])
+        sin_k(data['B'][i], k[::-1], ampl=-u1[i] * B0mag / cA)
     
     data['u']['y']._curr_space = 'kspace'
     data['B']['y']._curr_space = 'kspace'
-    
     
     # Background magnetic field
     for i in xrange(data['B'].ndim):
