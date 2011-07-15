@@ -92,7 +92,7 @@ class TensorField(BaseField):
     """Tensor class. Currently used mostly for the velocity gradient tensor."""
     
     def __init__(self):
-        ncomp = self.ndim ** 2
+        ncomp = len(self.shape) ** 2
         BaseField.__init__(self, ncomp)
 
 class VectorField(BaseField):
