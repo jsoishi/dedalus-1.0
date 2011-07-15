@@ -23,36 +23,26 @@ License:
 """
 from dedalus.mods import *
 from dedalus.funcs import insert_ipython
-shape = (128,128) #(86, 86) 
-RHS = MHD(shape, FourierRepresentation)
-RHS.parameters['nu'] = 1e-3
-data = RHS.create_fields(0.)            # B SHOULD BE ZERO BY DEFAULT
 
-MIT_vortices(data)
+shape = (32,32,32)
+RHS = MHD(shape, FourierRepresentation)
+data = RHS.create_fields(0.)
+
+alfven(data)
+
 #ti = RK2simplevisc(RHS,CFL=0.4)
 ti = CrankNicholsonVisc(RHS)
-ti.stop_time(50.) # set stoptime
-#ti.stop_iter(10) # max iterations
-ti.stop_walltime(3600.) # stop after 10 hours
-ti.set_nsnap(100) # save data every 100 timesteps
-ti.set_dtsnap(100.)
-
-vs = VolumeAverageSet(data)
-vs.add("ekin","%10.5e")
-vs.add("enstrophy","%10.5e")
-vs.add("vort_cenk","%10.5e")
+ti.stop_time(30.) # set stoptime
+ti.stop_walltime(3600.) # stop after 1 hour
 
 an = AnalysisSet(data, ti)
-an.add("field_snap", 25)
-an.add("en_spec",100)
-an.add("volume_average",10,{'va_obj': vs})
+an.add("field_snap", 15)
 
-
-#main loop
-dt = 1e-1
+# Main loop
+dt = 0.05
 an.run()
 while ti.ok:
-    print "step: %i" % ti.iter
+    print "step: %i" %ti.iter
     ti.advance(data, dt)
     an.run()
 

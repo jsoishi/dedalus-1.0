@@ -24,12 +24,11 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 from dedalus.funcs import insert_ipython
 import numpy as na
-
 from scipy.interpolate import interp1d
 from scipy.integrate import simps
-
 from dedalus.data_objects import hermitianize
 
 def taylor_green(ux, uy):
@@ -54,7 +53,42 @@ def sin_y(f,ampl=1.):
 
 def sin_k(f, kindex, ampl=1.):
     f.data[tuple(kindex)] = ampl*1j
-    f.data[tuple(-1*na.array(kindex))] = -f.data[tuple(kindex)]
+    f.data[tuple(-1*na.array(kindex))] = f.data[tuple(kindex)].conjugate()
+
+def alfven(data):
+    """
+    Generate conditions for simulating Alfven waves in MHD.
+    For 2d, must have k and B0 in same direction
+    """
+    
+    # Field setup and calculation
+    B0 = na.array([1., 0., 0.])
+    B0mag = na.linalg.norm(B0)
+    
+    k = na.array([2., 0., 0.])
+    kmag = na.linalg.norm(k)
+        
+    # Alfven speed and wave frequency
+    cA = B0mag / na.sqrt(4 * na.pi * data.parameters['rho0'])
+    omega = cA * na.dot(k, B0) / B0mag
+    
+    # u and B perturbations
+    u1 = na.array([0., 0., 1.]) * 1e-6
+    u1mag = na.linalg.norm(u1)
+    
+    B1 = (na.dot(k, u1) * B0 - na.dot(k, B0) * u1) / omega
+    B1mag = na.linalg.norm(B1)
+    
+    for i in xrange(data['u'].ndim):
+        sin_k(data['u'][i], k[::-1], ampl=u1[i])
+        sin_k(data['B'][i], k[::-1], ampl=B1[i])
+    
+        data['u'][i]._curr_space = 'kspace'
+        data['B'][i]._curr_space = 'kspace'
+    
+    # Background magnetic field
+    for i in xrange(data['B'].ndim):
+        data['B'][i]['xspace'] += B0[i]
 
 
 def turb(ux, uy, spec, tot_en=0.5, **kwargs):
