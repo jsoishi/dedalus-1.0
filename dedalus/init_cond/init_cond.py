@@ -69,14 +69,14 @@ def alfven(data):
     kmag = na.linalg.norm(k)
         
     # Alfven speed and wave frequency
-    cA = B0mag * na.sqrt((4 * na.pi * data.parameters['rho0']))
+    cA = B0mag / na.sqrt(4 * na.pi * data.parameters['rho0'])
     omega = cA * na.dot(k, B0) / B0mag
     
     # u and B perturbations
     u1 = na.array([0., 0., 1.]) * 1e-6
     u1mag = na.linalg.norm(u1)
     
-    B1 = na.dot(k, u1) * B0 - na.dot(k, B0) * u1 / omega
+    B1 = (na.dot(k, u1) * B0 - na.dot(k, B0) * u1) / omega
     B1mag = na.linalg.norm(B1)
     
     for i in xrange(data['u'].ndim):
