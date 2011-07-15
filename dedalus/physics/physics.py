@@ -227,6 +227,24 @@ class Physics(object):
         else:
             output[space] = X0 * Y1 - X1 * Y0
             
+    def XdotY(self, X, Y, output, space):
+        """
+        Calculate X dot Y.
+        
+        Inputs:
+            X           Input VectorField object
+            Y           Input VectorField object
+            output      Output ScalarField object
+            space       Space for dot product
+
+        """            
+
+        if X.ncomp != Y.ncomp: raise ValueError('Vectors not the same size')
+
+        output.zero()  
+        for i in xrange(X.ncomp):
+            output[space] += X[i][space] * Y[i][space]
+            
     def curlX(self, X, output):
         """
         Return list of components of curl X.

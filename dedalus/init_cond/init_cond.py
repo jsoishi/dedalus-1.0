@@ -61,23 +61,30 @@ def alfven(data):
     For 2d, must have k and B0 in same direction
     """
     
+    # Field setup and calculation
     B0 = na.array([1., 0., 0.])
-    k = na.array([2., 0., 0.])
-    u1 = na.array([0., 0., 1.]) * 1e-6
-    
     B0mag = na.linalg.norm(B0)
-    kmag = na.linalg.norm(k)
-    u1mag = na.linalg.norm(u1)
     
-    cA = na.sqrt(B0mag ** 2 / (4 * na.pi * data.parameters['rho0']))
+    k = na.array([2., 0., 0.])
+    kmag = na.linalg.norm(k)
+        
+    # Alfven speed and wave frequency
+    cA = B0mag * na.sqrt((4 * na.pi * data.parameters['rho0']))
+    omega = cA * na.dot(k, B0) / B0mag
     
     # u and B perturbations
+    u1 = na.array([0., 0., 1.]) * 1e-6
+    u1mag = na.linalg.norm(u1)
+    
+    B1 = na.dot(k, u1) * B0 - na.dot(k, B0) * u1 / omega
+    B1mag = na.linalg.norm(B1)
+    
     for i in xrange(data['u'].ndim):
         sin_k(data['u'][i], k[::-1], ampl=u1[i])
-        sin_k(data['B'][i], k[::-1], ampl=-u1[i] * B0mag / cA)
+        sin_k(data['B'][i], k[::-1], ampl=B1[i])
     
-    data['u']['y']._curr_space = 'kspace'
-    data['B']['y']._curr_space = 'kspace'
+        data['u'][i]._curr_space = 'kspace'
+        data['B'][i]._curr_space = 'kspace'
     
     # Background magnetic field
     for i in xrange(data['B'].ndim):
