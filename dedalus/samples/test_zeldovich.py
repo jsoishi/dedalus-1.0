@@ -5,7 +5,7 @@ import pylab as pl
 
 from scipy.integrate import odeint
 
-shape = (32,32,32)
+shape = (16,16,16)
 RHS = CollisionlessCosmology(shape, FourierRepresentation)
 data = RHS.create_fields(0.)
 RHS.parameters['Omega_r'] = 0#8.4e-5

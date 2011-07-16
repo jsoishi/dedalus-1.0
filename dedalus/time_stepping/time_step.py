@@ -118,7 +118,7 @@ class RK2simple(TimeStepBase):
         # first step
         self.field_dt = self.RHS.RHS(data)
         for k,f in data.fields.iteritems():
-            for i in range(f.ndim):
+            for i in range(f.ncomp):
                 self.tmp_fields[k][i]['kspace'] = data[k][i]['kspace'] + dt/2. * self.field_dt[k][i]['kspace']
         for a in self.RHS.aux_eqns.values():
             a_tmp = a.value + dt/2. * a.RHS(a.value)
@@ -128,7 +128,7 @@ class RK2simple(TimeStepBase):
         self.field_dt = self.RHS.RHS(self.tmp_fields)
 
         for k,f in data.fields.iteritems():
-            for i in range(f.ndim):
+            for i in range(f.ncomp):
                 data[k][i]['kspace'] = data[k][i]['kspace'] + dt * self.field_dt[k][i]['kspace']
 
         for a in self.RHS.aux_eqns.values():
