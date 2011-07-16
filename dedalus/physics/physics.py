@@ -90,6 +90,8 @@ class Physics(object):
 
     def RHS(self):
         pass
+
+        
         
     def gradX(self, X, output):
         """
@@ -99,7 +101,17 @@ class Physics(object):
             X           Input VectorField object
             output      Output TensorField object
 
+           (For scalar X: Compute gradient: gradX[i] = dX/dx_i
+            Inputs:
+                X           Input ScalarField object
+                output      Output VectorField object)
+
         """
+
+        if X.ncomp == 1:
+            for i in self.dims:
+                output[i]['kspace'] = X.deriv(self._trans[i])
+            return
         
         N = self.ndim
 
@@ -108,15 +120,15 @@ class Physics(object):
             for j in self.dims:
                 output[N * i + j]['kspace'] = X[i].deriv(self._trans[j]) 
                 
-    def XgradY(self, X, Y, gradY, output, dealias='2/3', compute_gradY=True):
+    def XgradY(self, X, Y, gradY, output, dealias='2/3', compute_gradY=True, X_masked=None, gradY_masked=None):
         """
         Calculate "X dot (grad X)" term, with dealiasing options.
         
         Inputs:
             X           Input VectorField object
-            Y           Input VectorField object
-            gradY       TensorField object to hold gradY
-            output      Output VectorField object
+            Y           Input VectorField object --or ScalarField--
+            gradY       TensorField object to hold gradY --or VectorField--
+            output      Output VectorField object --or ScalarField--
             
         Dealiasing options: 
             None        No dealiasing
@@ -125,7 +137,13 @@ class Physics(object):
             
         Keywords:
             compute_gradY   Set to False if gradY has been computed
-        
+
+        Optional input: 
+            X_masked        Vector field to hold masked copy of X, if necessary 
+            gradY_masked    Vector field to hold masked copy of gradY
+
+        Warning for scalar Y: fields are currently assumed to be 3d
+
         """
         
         if dealias not in [None, '2/3', '3/2']:
@@ -136,7 +154,7 @@ class Physics(object):
             # as the shape of the data object.
             
             # ****** THIS HAS NOT BEEN UPDATED TO WORK WITH NEW HANDLING ******
-
+            # ****** or with scalar Y
             d = data['ux']
             self.gradu(data)
             gradu = self.aux_fields['gradu']
@@ -179,18 +197,57 @@ class Physics(object):
                 # Orszag 2/3 dealias mask (picks out coefficients to zero)    
                 dmask = ((na.abs(sampledata.k['x']) > 2/3. *self.shape[0]/2.) | 
                          (na.abs(sampledata.k['y']) > 2/3. * self.shape[1]/2.))
-            
-            # Construct XgradX **************** Proper dealiasing?
-            for i in self.dims:
-                for j in xrange(N):
-                    tmp += X[j]['xspace'] * gradY[N * i + j]['xspace']
+                
+                if self.ndim == 3:
+                    dmask = (dmask[0] | 
+                             (na.abs(sampledata.k['z']) >
+                              2/3. * self.shape[2]/2.))
 
-                output[i]['xspace'] = tmp.real
+
+            # Use temporary fields for masking, if applicable
+            if X_masked is None:
+                X_masked = X
+            else:
+                for i in self.dims:
+                    X_masked[i]['kspace'] = X[i]['kspace']
+            if gradY_masked is None:
+                gradY_masked = gradY
+            else:
+                if Y.ncomp == 1:
+                    for i in self.dims:
+                        gradY_masked[i]['kspace'] = gradY[i]['kspace']
+                else:
+                    for i in self.dims:
+                        for j in self.dims:
+                            gradY_masked[N*i+j]['kspace'] = gradY[N*i+j]['kspace']
+            #####
+            # If Y is a scalar:
+            if Y.ncomp == 1:
                 if dealias == '2/3':
-                    output[i]['kspace'] # dummy call to switch spaces
-                    output[i]['kspace'][dmask] = 0.
+                    for i in self.dims:
+                        X_masked[i]['kspace'][dmask] = 0. 
+                        gradY_masked[i]['kspace'][dmask] = 0.
+                self.XdotY(X_masked, gradY_masked, output, 'xspace') 
+                
+                return
+            #####
+            else:
+                # mask first
+                if dealias == '2/3':
+                    for i in self.dims:
+                        for j in xrange(N):
+                            gradY_masked[N * i + j]['kspace'][dmask] = 0.
+                        X_masked[i]['kspace'][dmask] = 0.
+
+                # Construct XgradY
+                for i in self.dims:
+                    for j in xrange(N):
+                        tmp += (X_masked[j]['xspace'] * 
+                                gradY_masked[N * i + j]['xspace'])
+                        
+                    output[i]['xspace'] = tmp.real
                     
-                tmp *= 0+0j
+                    tmp *= 0+0j
                 
     def XcrossY(self, X, Y, output, space):
         """
@@ -537,12 +594,10 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         self._aux_fields.append(('deltadivu', 'scalar'))
         self._aux_fields.append(('gradu', 'tensor'))
         self._aux_fields.append(('ugradu', 'vector'))
+        self._aux_fields.append(('u_tmp', 'vector'))
+        self._aux_fields.append(('d_tmp', 'scalar'))
+        self._aux_fields.append(('divu_tmp', 'scalar'))
         self._setup_aux_fields(0., self._aux_fields) # re-creates gradphi
-
-    def grad_delta(self, data):
-        graddelta = self.aux_fields['graddelta']
-        for i in self.dims:
-            graddelta[i]['kspace'] = data['delta'].deriv(self._trans[i])
 
     def div_u(self, data):
         # should really calculate gradu first, then get divu from that
@@ -552,24 +607,29 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         for i in self.dims:
             divu['kspace'] += data['u'][i].deriv(self._trans[i])
     
-    def u_grad_delta(self, data):
-        ugraddelta = self.aux_fields['ugraddelta']
-        
-        self.grad_delta(data)
-        graddelta = self.aux_fields['graddelta']
-
-        ugraddelta['xspace'] = na.zeros_like(ugraddelta['xspace'])
-        for i in self.dims:
-            ugraddelta['xspace'] += (data['u'][i]['xspace'] * 
-                                     graddelta[i]['xspace'])
-
     def delta_div_u(self, data, compute_divu=False):
+        """calculate delta*div(v) in x-space, using 2/3 de-aliasing 
+
+        """
+
         if compute_divu:
             self.div_u(data)
         divu = self.aux_fields['divu']
         deltadivu = self.aux_fields['deltadivu']
+        divu_tmp = self.aux_fields['divu_tmp']
+        d_tmp = self.aux_fields['d_tmp']
+
+        divu_tmp['kspace'] = divu['kspace']
+        d_tmp['kspace'] = data['delta']['kspace']
+
+        dmask = ((na.abs(data['delta'].k['x']) > 2/3. * self.shape[0]/2.) | 
+                 (na.abs(data['delta'].k['y']) > 2/3. * self.shape[1]/2.) | 
+                 (na.abs(data['delta'].k['z']) > 2/3. * self.shape[2]/2.))
+                
+        divu_tmp['kspace'][dmask] = 0.
+        d_tmp['kspace'][dmask] = 0.
         
-        deltadivu['xspace'] = divu['xspace'] * data['delta']['xspace']
+        deltadivu['xspace'] = divu_tmp['xspace'] * d_tmp['xspace']
 
     def RHS(self, data):
         self.density_RHS(data)
@@ -580,7 +640,8 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
     def density_RHS(self, data):
         a = self.aux_eqns['a'].value
         self.div_u(data)
-        self.u_grad_delta(data)
+        self.XgradY(data['u'], data['delta'], self.aux_fields['graddelta'], 
+               self.aux_fields['ugraddelta'], X_masked=self.aux_fields['u_tmp'])
         self.delta_div_u(data)
         divu = self.aux_fields['divu']
         ugraddelta = self.aux_fields['ugraddelta']
@@ -598,9 +659,10 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         adot = self.aux_eqns['a'].RHS(a)
 
         self.XgradY(data['u'], data['u'], self.aux_fields['gradu'], 
-                    self.aux_fields['ugradu'])
+                    self.aux_fields['ugradu']) 
+                    
         ugradu = self.aux_fields['ugradu'] 
-
+        
         for i in self.dims:
             self._RHS['u'][i]['kspace'] = -(gradphi[i]['kspace'] +
                                             adot * data['u'][i]['kspace'] +
