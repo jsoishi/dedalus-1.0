@@ -184,7 +184,7 @@ class Physics(object):
 
         else:
             N = self.ndim
-        
+
             # Perform gradY calculation
             if compute_gradY:
                 self.gradX(Y, gradY)
@@ -193,16 +193,12 @@ class Physics(object):
             sampledata = X[0]
             tmp = na.zeros_like(sampledata.data)
             
+            kk = na.sqrt(sampledata.k2())
+            
             if dealias == '2/3': 
                 # Orszag 2/3 dealias mask (picks out coefficients to zero)    
-                dmask = ((na.abs(sampledata.k['x']) > 2/3. *self.shape[0]/2.) | 
-                         (na.abs(sampledata.k['y']) > 2/3. * self.shape[1]/2.))
+                dmask = (kk > 2/3. * self.shape[0]/2.)
                 
-                if self.ndim == 3:
-                    dmask = (dmask[0] | 
-                             (na.abs(sampledata.k['z']) >
-                              2/3. * self.shape[2]/2.))
-
             # Use temporary fields for masking, if applicable
             if X_masked is None:
                 X_masked = X
@@ -620,9 +616,8 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         divu_tmp['kspace'] = divu['kspace']
         d_tmp['kspace'] = data['delta']['kspace']
 
-        dmask = ((na.abs(data['delta'].k['x']) > 2/3. * self.shape[0]/2.) | 
-                 (na.abs(data['delta'].k['y']) > 2/3. * self.shape[1]/2.) | 
-                 (na.abs(data['delta'].k['z']) > 2/3. * self.shape[2]/2.))
+        kk = na.sqrt(data['delta'].k2())
+        dmask = (kk > 2/3. * self.shape[0]/2.)
                 
         divu_tmp['kspace'][dmask] = 0.
         d_tmp['kspace'][dmask] = 0.
