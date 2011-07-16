@@ -203,7 +203,6 @@ class Physics(object):
                              (na.abs(sampledata.k['z']) >
                               2/3. * self.shape[2]/2.))
 
-
             # Use temporary fields for masking, if applicable
             if X_masked is None:
                 X_masked = X
@@ -228,7 +227,6 @@ class Physics(object):
                         X_masked[i]['kspace'][dmask] = 0. 
                         gradY_masked[i]['kspace'][dmask] = 0.
                 self.XdotY(X_masked, gradY_masked, output, 'xspace') 
-                
                 return
             #####
             else:
@@ -659,8 +657,9 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         adot = self.aux_eqns['a'].RHS(a)
 
         self.XgradY(data['u'], data['u'], self.aux_fields['gradu'], 
-                    self.aux_fields['ugradu']) 
-                    
+                    self.aux_fields['ugradu'],
+                    X_masked=self.aux_fields['u_tmp']) 
+        
         ugradu = self.aux_fields['ugradu'] 
         
         for i in self.dims:
