@@ -161,7 +161,7 @@ def MIT_vortices(data):
     data['u']['x']['kspace'] = aux['psi'].deriv('y')
     data['u']['y']['kspace'] = -aux['psi'].deriv('x')
 
-def zeldovich(data, ampl=1e-22):
+def zeldovich(data, ampl=5e-23):
     """velocity wave IC, for testing nonlinear collisionless cosmology
     against the Zeldovich approximation
 
