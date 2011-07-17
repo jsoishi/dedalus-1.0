@@ -194,7 +194,6 @@ class Physics(object):
             tmp = na.zeros_like(sampledata.data)
             
             kk = na.sqrt(sampledata.k2())
-            
             if dealias == '2/3': 
                 # Orszag 2/3 dealias mask (picks out coefficients to zero)    
                 dmask = (kk > 2/3. * self.shape[0]/2.)
@@ -223,6 +222,9 @@ class Physics(object):
                         X_masked[i]['kspace'][dmask] = 0. 
                         gradY_masked[i]['kspace'][dmask] = 0.
                 self.XdotY(X_masked, gradY_masked, output, 'xspace') 
+                if dealias == '2/3':
+                    output['kspace']
+                    output['kspace'][dmask] = 0.
                 return
             #####
             else:
@@ -240,7 +242,9 @@ class Physics(object):
                                 gradY_masked[N * i + j]['xspace'])
                         
                     output[i]['xspace'] = tmp.real
-                    
+                    if dealias == '2/3':
+                        output[i]['kspace']
+                        output[i]['kspace'][dmask] = 0.
                     tmp *= 0+0j
                 
     def XcrossY(self, X, Y, output, space):
@@ -564,8 +568,8 @@ class LinearCollisionlessCosmology(Physics):
         H = self.aux_eqns['a'].RHS(a) / a
 
         gradphi = self.aux_fields['gradphi']
-        tmp = (-3./2. * H*H * 
-                data['delta']['kspace']/data['delta'].k2(no_zero=True))
+        tmp = (-3./2. * H*H * data['delta']['kspace'] /
+                data['delta'].k2(no_zero=True))
         
         for i in self.dims:            
             gradphi[i]['kspace'] = 1j * a*a * data['u'][i].k[self._trans[i]] * tmp
@@ -623,6 +627,8 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         d_tmp['kspace'][dmask] = 0.
         
         deltadivu['xspace'] = divu_tmp['xspace'] * d_tmp['xspace']
+        deltadivu['kspace']
+        deltadivu['kspace'][dmask] = 0.
 
     def RHS(self, data):
         self.density_RHS(data)
@@ -634,7 +640,7 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         a = self.aux_eqns['a'].value
         self.div_u(data)
         self.XgradY(data['u'], data['delta'], self.aux_fields['graddelta'], 
-               self.aux_fields['ugraddelta'], X_masked=self.aux_fields['u_tmp'])
+               self.aux_fields['ugraddelta'], X_masked=self.aux_fields['u_tmp'],dealias='2/3')
         self.delta_div_u(data)
         divu = self.aux_fields['divu']
         ugraddelta = self.aux_fields['ugraddelta']
@@ -643,7 +649,7 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         self._RHS['delta']['kspace'] = -(divu['kspace'] + 
                                          deltadivu['kspace'] + 
                                          ugraddelta['kspace']) / a
-
+   
     def vel_RHS(self, data):
         self.grad_phi(data)
         gradphi = self.aux_fields['gradphi']
@@ -653,7 +659,7 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
 
         self.XgradY(data['u'], data['u'], self.aux_fields['gradu'], 
                     self.aux_fields['ugradu'],
-                    X_masked=self.aux_fields['u_tmp']) 
+                    X_masked=self.aux_fields['u_tmp'],dealias='2/3') 
         
         ugradu = self.aux_fields['ugradu'] 
         
