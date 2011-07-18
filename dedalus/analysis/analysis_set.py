@@ -57,7 +57,7 @@ def volume_average(data, it, va_obj=None):
     va_obj.run()
 
 @AnalysisSet.register_task
-def field_snap(data, it):
+def field_snap(data, it, use_extent=False, **kwargs):
     """take a snapshot of all fields defined. currently only works in
     2D; it will need a slice index for 3D.
 
@@ -76,6 +76,11 @@ def field_snap(data, it):
         ncol = na.min([nvars, 3])
     nrow = na.int(nrow)
     ncol = na.int(ncol)
+
+    if use_extent:
+        extent = [0.,data.length[1], 0., data.length[0]]
+    else:
+        extent = None
     
     # Figure setup
     fig = P.figure(1, figsize=(24. * ncol / 3., 24. * nrow / 3.))
@@ -96,7 +101,7 @@ def field_snap(data, it):
                 plot_array = f[i]['xspace'][0,:,:].real
             else:
                 plot_array = f[i]['xspace'].real
-            im = grid[I].imshow(plot_array, origin='lower')
+            im = grid[I].imshow(plot_array, extent=extent, origin='lower', **kwargs)
             grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='white')
             grid.cbar_axes[I].colorbar(im)
             I += 1

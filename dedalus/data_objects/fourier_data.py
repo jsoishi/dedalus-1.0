@@ -59,6 +59,8 @@ class FourierRepresentation(Representation):
         if not length:
             # Default length is 2 pi in each direction
             self.length = (2 * na.pi,) * self.ndim
+        else:
+            self.length = length
         
         # Get Nyquist wavenumbers
         self.kny = na.pi * na.array(self.shape) / na.array(self.length)
