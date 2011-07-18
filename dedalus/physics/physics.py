@@ -34,9 +34,13 @@ class Physics(object):
     a right hand side for a time integration scheme.
     """
     
-    def __init__(self, shape, representation):
+    def __init__(self, shape, representation, length=None):
         self.shape = shape
         self.ndim = len(self.shape)
+        if length:
+            self.length = length
+        else:
+            self.length = (2*na.pi,) * self.ndim
         self.dims = xrange(self.ndim)
         self._representation = representation
         self._field_classes = create_field_classes(
@@ -53,7 +57,7 @@ class Physics(object):
     def create_fields(self, t, field_list=None):        
         if field_list == None:
             field_list = self.fields
-        return StateData(t, self._field_classes, field_list, self.parameters)    
+        return StateData(t, self._field_classes, field_list=field_list, params=self.parameters, length=self.length)    
 
     def create_dealias_field(self, t, fields=None):
         """data object to implement Orszag 3/2 rule for non-linear
@@ -272,8 +276,8 @@ class Physics(object):
 class Hydro(Physics):
     """Incompressible hydrodynamics."""
     
-    def __init__(self, *args):
-        Physics.__init__(self, *args)
+    def __init__(self, *args, **kwargs):
+        Physics.__init__(self, *args, **kwargs)
         
         # Setup data fields
         self.fields = [('u', 'vector')]
@@ -348,8 +352,8 @@ class Hydro(Physics):
 class MHD(Hydro):
     """Incompressible magnetohydrodynamics."""
     
-    def __init__(self, *args):
-        Physics.__init__(self, *args)
+    def __init__(self, *args, **kwargs):
+        Physics.__init__(self, *args, **kwargs)
         
         # Setup data fields
         self.fields = [('u', 'vector'),
@@ -463,8 +467,8 @@ class LinearCollisionlessCosmology(Physics):
     laplacian(Phi) = 3 H^2 d / 2
 
     """
-    def __init__(self,*args):
-        Physics.__init__(self, *args)
+    def __init__(self, *args, **kwargs):
+        Physics.__init__(self, *args, **kwargs)
         self.fields = [('delta', 'scalar'),
                        ('u', 'vector')]
         self._aux_fields = [('gradphi', 'vector')]
@@ -529,8 +533,8 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
     laplacian(Phi) = 3 H^2 d / 2
     """
 
-    def __init__(self, *args):
-        LinearCollisionlessCosmology.__init__(self, *args)
+    def __init__(self, *args, **kwargs):
+        LinearCollisionlessCosmology.__init__(self, *args, **kwargs)
         self._aux_fields.append(('graddelta', 'vector'))
         self._aux_fields.append(('ugraddelta', 'scalar'))
         self._aux_fields.append(('divu', 'scalar'))

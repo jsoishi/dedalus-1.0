@@ -52,10 +52,11 @@ def lookup(name, translation_table):
     return name
     
 class BaseField(object):
-    def __init__(self, ncomp=-1):
+    def __init__(self, ncomp=-1, length=None):
         # self.representation provided in call to create_field_classes
         # self.shape provided in call to create_field_classes
         self.ndim = len(self.shape)
+        self.length = length
 
         # Construct components
         self.components = []
@@ -65,7 +66,7 @@ class BaseField(object):
             self.ncomp = ncomp
 
         for f in range(self.ncomp):
-            self.components.append(self.representation(self.shape))
+            self.components.append(self.representation(self.shape, length=self.length))
 
         # Take translation table for coordinate names from representation
         self.trans = self.components[-1].trans
@@ -91,9 +92,9 @@ class BaseField(object):
 class TensorField(BaseField):
     """Tensor class. Currently used mostly for the velocity gradient tensor."""
     
-    def __init__(self):
+    def __init__(self, **kwargs):
         ncomp = len(self.shape) ** 2
-        BaseField.__init__(self, ncomp)
+        BaseField.__init__(self, ncomp, **kwargs)
 
 class VectorField(BaseField):
     """these should have N components with names defined at simulation initialization time.
@@ -105,8 +106,8 @@ class VectorField(BaseField):
 class ScalarField(BaseField):
     """Scalar class; always has one component."""
     
-    def __init__(self):
-        BaseField.__init__(self, 1)
+    def __init__(self, **kwargs):
+        BaseField.__init__(self, 1, **kwargs)
 
     def __getitem__(self, item):
         """
