@@ -99,9 +99,8 @@ class TimeStepBase(object):
 
 class RK2simple(TimeStepBase):
     def __init__(self, *arg, **kwargs):
-        """a very simple Runga-Kutta 2 integrator
-
-        """
+        """Basic second-order (midpoint) Runga-Kutta integrator."""
+        
         TimeStepBase.__init__(self, *arg, **kwargs)
         self.tmp_fields = self.RHS.create_fields(0.)
         self.field_dt = self.RHS.create_fields(0.)
@@ -113,22 +112,27 @@ class RK2simple(TimeStepBase):
           k2 = h * RHS(x_n + 1/2*h, y_n + 1/2*k1)
           y_n+1 = y_n + k2 +O(h**3)
         """
+        
         self.tmp_fields.time = data.time
         self.field_dt.time = data.time
-        # first step
+        
+        # First step
         self.field_dt = self.RHS.RHS(data)
+        
         for k,f in data.fields.iteritems():
-            for i in range(f.ndim):
-                self.tmp_fields[k][i]['kspace'] = data[k][i]['kspace'] + dt/2. * self.field_dt[k][i]['kspace']
+            for i in xrange(f.ncomp):
+                self.tmp_fields[k][i]['kspace'] = data[k][i]['kspace'] + dt / 2. * self.field_dt[k][i]['kspace']
+        
         for a in self.RHS.aux_eqns.values():
-            a_tmp = a.value + dt/2. * a.RHS(a.value)
-        self.tmp_fields.time = data.time + dt/2.
+            a_tmp = a.value + dt / 2. * a.RHS(a.value)
+        
+        self.tmp_fields.time = data.time + dt / 2.
 
-        # second step
+        # Second step
         self.field_dt = self.RHS.RHS(self.tmp_fields)
 
         for k,f in data.fields.iteritems():
-            for i in range(f.ndim):
+            for i in xrange(f.ncomp):
                 data[k][i]['kspace'] = data[k][i]['kspace'] + dt * self.field_dt[k][i]['kspace']
 
         for a in self.RHS.aux_eqns.values():
