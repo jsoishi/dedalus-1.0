@@ -108,7 +108,7 @@ class Physics(object):
             for j in self.dims:
                 output[N * i + j]['kspace'] = X[i].deriv(self._trans[j]) 
                 
-    def XgradY(self, X, Y, gradY, output, dealias='2/3', compute_gradY=True):
+    def XgradY(self, X, Y, gradY, output, compute_gradY=True):
         """
         Calculate "X dot (grad X)" term, with dealiasing options.
         
@@ -127,70 +127,57 @@ class Physics(object):
             compute_gradY   Set to False if gradY has been computed
         
         """
+
+#         if dealias == '3/2':
+#             # Uses temporary dealias fields with 3/2 as many points 
+#             # as the shape of the data object.
+#             
+#             # ****** THIS HAS NOT BEEN UPDATED TO WORK WITH NEW HANDLING ******
+# 
+#             d = data['ux']
+#             self.gradu(data)
+#             gradu = self.aux_fields['gradu']
+#             ugradu = self.aux_fields['ugradu']
+#             trans = {0: 'ux', 1: 'uy', 2: 'uz'}
+#             self.q.zero_all()
+#             for i,f in enumerate(self.fields):
+#                 b = [i * self.ndim + j for j in self.dims]
+#                 tmp = na.zeros_like(self.q['ugu'].data)
+#                 for ii,j, in enumerate(b):
+#                     self.q['u'].data[:]= 0+0j
+#                     self.q['u']._curr_space = 'kspace'
+#                     self.q['gu'].data[:] = 0+0j
+#                     self.q['gu']._curr_space = 'kspace'
+#                     #zero_nyquist(data[trans[ii]]['kspace'])
+#                     data[trans[ii]].zero_nyquist()
+#                     self.q['u'] = na.fft.fftshift(data[trans[ii]]['kspace'])
+#                     self.q['u'] = na.fft.fftshift(self.q['u']['kspace'])
+#                     self.q['gu'] = na.fft.fftshift(gradu[j]['kspace'])
+#                     self.q['gu'] = na.fft.fftshift(self.q['gu']['kspace'])
+#                     tmp += self.q['u']['xspace'] * self.q['gu']['xspace']
+#                 tmp.imag = 0.
+#                 self.q['ugu'] = tmp
+#                 self.q['ugu']._curr_space = 'xspace'
+#                 ugradu[f] = self.q['ugu']['kspace']
+#                 tmp *= 0+0j
+
+        N = self.ndim
+    
+        # Perform gradY calculation
+        if compute_gradY:
+            self.gradX(Y, gradY)
+
+        # Setup temporary data container
+        sampledata = X[0]
+        tmp = na.zeros_like(sampledata.data)
         
-        if dealias not in [None, '2/3', '3/2']:
-            raise ValueError('Dealising method not implemented.')
+        # Construct XgradY
+        for i in self.dims:
+            for j in xrange(N):
+                tmp += X[j]['xspace'] * gradY[N * i + j]['xspace']
 
-        if dealias == '3/2':
-            # Uses temporary dealias fields with 3/2 as many points 
-            # as the shape of the data object.
-            
-            # ****** THIS HAS NOT BEEN UPDATED TO WORK WITH NEW HANDLING ******
-
-            d = data['ux']
-            self.gradu(data)
-            gradu = self.aux_fields['gradu']
-            ugradu = self.aux_fields['ugradu']
-            trans = {0: 'ux', 1: 'uy', 2: 'uz'}
-            self.q.zero_all()
-            for i,f in enumerate(self.fields):
-                b = [i * self.ndim + j for j in self.dims]
-                tmp = na.zeros_like(self.q['ugu'].data)
-                for ii,j, in enumerate(b):
-                    self.q['u'].data[:]= 0+0j
-                    self.q['u']._curr_space = 'kspace'
-                    self.q['gu'].data[:] = 0+0j
-                    self.q['gu']._curr_space = 'kspace'
-                    #zero_nyquist(data[trans[ii]]['kspace'])
-                    data[trans[ii]].zero_nyquist()
-                    self.q['u'] = na.fft.fftshift(data[trans[ii]]['kspace'])
-                    self.q['u'] = na.fft.fftshift(self.q['u']['kspace'])
-                    self.q['gu'] = na.fft.fftshift(gradu[j]['kspace'])
-                    self.q['gu'] = na.fft.fftshift(self.q['gu']['kspace'])
-                    tmp += self.q['u']['xspace'] * self.q['gu']['xspace']
-                tmp.imag = 0.
-                self.q['ugu'] = tmp
-                self.q['ugu']._curr_space = 'xspace'
-                ugradu[f] = self.q['ugu']['kspace']
-                tmp *= 0+0j
-
-        else:
-            N = self.ndim
-        
-            # Perform gradY calculation
-            if compute_gradY:
-                self.gradX(Y, gradY)
-
-            # Setup temporary data container and dealias mask
-            sampledata = X[0]
-            tmp = na.zeros_like(sampledata.data)
-            
-            if dealias == '2/3': 
-                # Orszag 2/3 dealias mask (picks out coefficients to zero)    
-                dmask = ((na.abs(sampledata.k['x']) > 2/3. *self.shape[0]/2.) | 
-                         (na.abs(sampledata.k['y']) > 2/3. * self.shape[1]/2.))
-            
-            # Construct XgradX **************** Proper dealiasing?
-            for i in self.dims:
-                for j in xrange(N):
-                    tmp += X[j]['xspace'] * gradY[N * i + j]['xspace']
-
-                output[i]['xspace'] = tmp.real
-                if dealias == '2/3':
-                    output[i]['kspace'] # dummy call to switch spaces
-                    output[i]['kspace'][dmask] = 0.
-                    
-                tmp *= 0+0j
+            output[i]['xspace'] = tmp.real                    
+            tmp *= 0+0j
                 
     def XcrossY(self, X, Y, output, space):
         """
@@ -300,7 +287,7 @@ class Hydro(Physics):
         
         # Compute terms
         self.XgradY(data['u'], data['u'], self.aux_fields['gradu'],
-                    self.aux_fields['ugradu'], dealias='2/3')
+                    self.aux_fields['ugradu'])
         self.pressure(data)
         
         # Place references
@@ -394,10 +381,10 @@ class MHD(Hydro):
         pr4 = 4 * na.pi * self.parameters['rho0']
         
         # Compute terms
-        self.XgradY(u, u, gradu, ugradu, dealias='2/3')
-        self.XgradY(B, B, gradB, BgradB, dealias='2/3')
-        self.XgradY(u, B, gradB, ugradB, dealias='2/3', compute_gradY=False)
-        self.XgradY(B, u, gradu, Bgradu, dealias='2/3', compute_gradY=False)
+        self.XgradY(u, u, gradu, ugradu)
+        self.XgradY(B, B, gradB, BgradB)
+        self.XgradY(u, B, gradB, ugradB, compute_gradY=False)
+        self.XgradY(B, u, gradu, Bgradu, compute_gradY=False)
         self.total_pressure(data)
         
         # Construct time derivatives
