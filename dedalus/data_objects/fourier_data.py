@@ -41,7 +41,8 @@ class FourierRepresentation(Representation):
 
     """
 
-    def __init__(self, shape, length=None, dtype='complex128', method='fftw'):
+    def __init__(self, shape, length=None, dtype='complex128', method='fftw',
+                 dealiasing='2/3'):
         """
         Inputs:
             shape       The shape of the data, tuple of ints
@@ -65,13 +66,14 @@ class FourierRepresentation(Representation):
         # Setup wavenumbers
         self.k = []
         for i,S in enumerate(self.shape):
-            kshape = (self.ndim - i - 1) * (1,) + (S,) + i * (1,)
+            kshape = i * (1,) + (S,) + (self.ndim - i - 1) * (1,)
             ki = fpack.fftfreq(S) * 2. * self.kny[i]
             ki.resize(kshape)
             self.k.append(ki)
-        self.k = dict(zip(['x','y','z'][:self.ndim], self.k))
+        self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
 
         self.set_fft(method)
+        self.set_dealiasing(dealiasing)
 
     def __getitem__(self,space):
         """returns data in either xspace or kspace, transforming as necessary.
@@ -101,6 +103,7 @@ class FourierRepresentation(Representation):
             self.data[:] = data[sli]
 
         self._curr_space = space
+        if self.dealias: self.dealias()
 
     def initialize(self, data, space):
         """should provide some way to initialize data
@@ -116,6 +119,12 @@ class FourierRepresentation(Representation):
         if method == 'numpy':
             self.fft = self.fwd_np
             self.ifft = self.rev_np
+            
+    def set_dealiasing(self, dealiasing):
+        if dealiasing == '2/3':
+            self.dealias = self.dealias_23
+        else:
+            self.dealias = None
 
     def fwd_fftw(self):
         self.fplan()
@@ -135,12 +144,28 @@ class FourierRepresentation(Representation):
     def forward(self):
         self.fft()
         self._curr_space = 'kspace'
+        if self.dealias: self.dealias()
         self.zero_nyquist()
 
     def backward(self):
+        if self.dealias: self.dealias()
         self.ifft()
         self._curr_space = 'xspace'
 
+    def dealias_23(self):
+        """Orszag 2/3 dealias rule"""
+        
+        # Zeroing mask   
+        dmask = ((na.abs(self.k['x']) > 2/3. * self.kny[-1]) | 
+                 (na.abs(self.k['y']) > 2/3. * self.kny[-2]))
+        
+        if self.ndim == 3:
+            dmask = dmask | (na.abs(self.k['z']) > 2/3. * self.kny[-3])
+
+        self['kspace'] # dummy call to switch spaces
+        self.data[dmask] = 0.
+
+        
     def deriv(self,dim):
         """take a derivative along dim"""
         if self._curr_space == 'xspace':
