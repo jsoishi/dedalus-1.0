@@ -101,7 +101,7 @@ def field_snap(data, it, use_extent=False, **kwargs):
                 plot_array = f[i]['xspace'][0,:,:].real
             else:
                 plot_array = f[i]['xspace'].real
-            im = grid[I].imshow(plot_array, extent=extent, origin='lower',**kwargs)
+            im = grid[I].imshow(plot_array, extent=extent, origin='lower', **kwargs)
             grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='white')
             grid.cbar_axes[I].colorbar(im)
             I += 1
