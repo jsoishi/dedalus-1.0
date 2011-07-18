@@ -66,7 +66,7 @@ class FourierRepresentation(Representation):
         # Setup wavenumbers
         self.k = []
         for i,S in enumerate(self.shape):
-            kshape = (self.ndim - i - 1) * (1,) + (S,) + i * (1,)
+            kshape = i * (1,) + (S,) + (self.ndim - i - 1) * (1,)
             ki = fpack.fftfreq(S) * 2. * self.kny[i]
             ki.resize(kshape)
             self.k.append(ki)
