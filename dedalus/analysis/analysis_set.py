@@ -24,7 +24,7 @@ License:
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import pylab as P
+import matplotlib.pyplot as P
 from mpl_toolkits.axes_grid1 import AxesGrid
 import numpy as na
 import os
@@ -58,15 +58,15 @@ def volume_average(data, it, va_obj=None):
 
 @AnalysisSet.register_task
 def field_snap(data, it):
-    """take a snapshot of all fields defined. currently only works in
-    2D; it will need a slice index for 3D.
-
+    """
+    Take a snapshot of all fields defined. Currently takes z[0] slice for 3D.
+    
     """
     
     # Determine image grid size
     nvars = 0
     for f in data.fields.values():
-        nvars += f.ndim
+        nvars += f.ncomp
     if nvars == 4:
         nrow = ncol = 2
     elif nvars == 9:
@@ -91,7 +91,7 @@ def field_snap(data, it):
     # Plot field components
     I = 0
     for k,f in data.fields.iteritems():
-        for i in xrange(f.ndim):
+        for i in xrange(f.ncomp):
             if f[i].ndim == 3:
                 plot_array = f[i]['xspace'][0,:,:].real
             else:
@@ -153,4 +153,87 @@ def en_spec(data, it):
     outfile = "frames/enspec_%04i.png" % it
     P.savefig(outfile)
     P.clf()
+    
+@AnalysisSet.register_task
+def phase_amp(data, it, fclist=[], klist=[]):
+    """Make plots of phase velocity and mode amplification."""
+    
+    if it == 0:
+        data._save_modes = {}
+        for f,c in fclist:
+            for k in klist:
+                data._save_modes[(f,c,k)] = [data[f][c]['kspace'][k[::-1]]]
+        data._save_modes['time'] = [data.time]
+        return
+        
+    # Save components
+    for f,c in fclist:
+        for k in klist:
+            data._save_modes[(f,c,k)].append(data[f][c]['kspace'][k[::-1]])
+    data._save_modes['time'].append(data.time)
+    
+    # Plotting setup
+    nvars = len(fclist)
+    fig, axs = P.subplots(2, nvars, num=2, figsize=(8 * nvars, 6 * 2)) 
+
+    # Plot field components
+    time = na.array(data._save_modes['time'])
+    
+    I = 0
+    for f,c in fclist:
+        for k in klist:
+            plot_array = na.array(data._save_modes[(f,c,k)])
+            amp_growth = na.abs(plot_array) / na.abs(plot_array[0]) - 1
+            phase_velocity = na.diff(na.angle(plot_array)) / na.diff(time)
+
+            axs[0, I].plot(time, amp_growth, '.-', label=str(k))
+            axs[1, I].plot(time[1:], phase_velocity, '.-', label=str(k))
+
+        # Pad and label axes
+        axs[0, I].axis(padrange(axs[0, I].axis(), 0.05))
+        axs[1, I].axis(padrange(axs[1, I].axis(), 0.05))
+                        
+        if I == 0:
+            axs[0, I].set_ylabel('normalized amplitude growth')
+            axs[1, I].set_ylabel('phase velocity')
+            axs[1, I].set_xlabel('time')
+        
+        axs[0, I].legend()
+        axs[1, I].legend()
+        axs[0, I].set_title(f + c)
+
+        I += 1
+
+    if not os.path.exists('frames'):
+        os.mkdir('frames')
+    outfile = "frames/phase_amp.png"
+    fig.savefig(outfile)
+    fig.clf()
+    
+def padrange(range, pad=0.05):
+    xmin, xmax, ymin, ymax = range
+    outrange = [xmin - pad * (xmax - xmin),
+                xmax + pad * (xmax - xmin),
+                ymin - pad * (ymax - ymin),
+                ymax + pad * (ymax - ymin)]
+                
+    return outrange
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 
