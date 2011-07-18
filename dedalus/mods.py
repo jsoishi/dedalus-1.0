@@ -37,6 +37,7 @@ from dedalus.init_cond.api import \
     turb,  \
     mcwilliams_spec, \
     MIT_vortices, \
+    shearing_wave, \
     cosmology
 
 from dedalus.physics.api import \
