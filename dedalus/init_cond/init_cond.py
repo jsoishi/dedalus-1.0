@@ -56,7 +56,7 @@ def sin_y(f,ampl=1.):
 
 def sin_k(f, kindex, ampl=1.):
     f[tuple(kindex)] = ampl*1j
-    f[tuple(-1*na.array(kindex))] = -[tuple(kindex)].conjugae()
+    f[tuple(-1*na.array(kindex))] = f[tuple(kindex)].conjugate()
 
 def alfven(data):
     """
@@ -92,8 +92,6 @@ def alfven(data):
     # Background magnetic field
     for i in xrange(data['B'].ndim):
         data['B'][i]['xspace'] += B0[i]
->>>>>>> other
-
 
 def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     """generate noise with a random phase and a spectrum given by
