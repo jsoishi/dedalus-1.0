@@ -69,7 +69,7 @@ class FourierRepresentation(Representation):
             ki = fpack.fftfreq(S) * 2. * self.kny[i]
             ki.resize(kshape)
             self.k.append(ki)
-        self.k = dict(zip(['x','y','z'][:self.ndim], self.k))
+        self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
 
         self.set_fft(method)
 
