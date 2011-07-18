@@ -38,12 +38,15 @@ from dedalus.init_cond.api import \
     mcwilliams_spec, \
     MIT_vortices, \
     shearing_wave, \
-    cosmology
+    cosmology, \
+    alfven, \
+    zeldovich
 
 from dedalus.physics.api import \
     Hydro, \
     MHD, \
-    LinearCollisionlessCosmology
+    LinearCollisionlessCosmology,\
+    CollisionlessCosmology
 
 
 from dedalus.time_stepping.api import \

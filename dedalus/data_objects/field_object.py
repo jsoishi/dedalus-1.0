@@ -44,63 +44,56 @@ def create_field_classes(representation, shape, name):
             'scalar': new_scalarclass}
 
 def lookup(name, translation_table):
-    """this may need to be inlined?
-
-    """
+    """this may need to be inlined?"""
+    
     name = translation_table.get(name, None)
     if name is None:
         raise KeyError
     return name
     
 class BaseField(object):
-    def __init__(self, ndim=-1):
-        self.components = []
-        if ndim == -1:
-            self.ndim = len(self.shape)
-        else:
-            self.ndim = ndim
+    def __init__(self, ncomp=-1):
+        # self.representation provided in call to create_field_classes
+        # self.shape provided in call to create_field_classes
+        self.ndim = len(self.shape)
 
-        for f in range(self.ndim):
+        # Construct components
+        self.components = []
+        if ncomp == -1:
+            self.ncomp = self.ndim
+        else:
+            self.ncomp = ncomp
+
+        for f in range(self.ncomp):
             self.components.append(self.representation(self.shape))
 
-        self.trans = self.components[-1].trans # representation must
-                                               # provide a translation
-                                               # table for coordinate
-                                               # names.
+        # Take translation table for coordinate names from representation
+        self.trans = self.components[-1].trans
+                                               
+        self.integrating_factor = 0.
 
     def __getitem__(self, comp_name):
-        """
-
-        """
-        
-        #if type(comp_name) == str:
-        #    comp_name = lookup(comp_name, self.trans)
-        #return self.components[comp_name]
+        """If item is not a component number, lookup in translation table."""
         
         if type(comp_name) == str:
-            comp_name = self.trans.get(comp_name, None)
-            if comp_name is None: 
-                raise KeyError
-                
+            comp_name = lookup(comp_name, self.trans)
         return self.components[comp_name]
 
-    def zero(self, item):
-        if type(item) == str:
-            item = lookup(item, self.trans)
-
-        self.components[item].data[:] = 0.
+    def zero(self, comp_name):
+        if type(comp_name) == str:
+            comp_name = lookup(comp_name, self.trans)
+        self.components[comp_name].data[:] = 0.
 
     def zero_all(self):
         for f in self.components:
             f.data[:] = 0.
 
 class TensorField(BaseField):
-    """used mostly for the velocity gradient tensor
-
-    """
+    """Tensor class. Currently used mostly for the velocity gradient tensor."""
+    
     def __init__(self):
-        ndim = len(self.shape)**2
-        BaseField.__init__(self, ndim)
+        ncomp = len(self.shape) ** 2
+        BaseField.__init__(self, ncomp)
 
 class VectorField(BaseField):
     """these should have N components with names defined at simulation initialization time.
@@ -110,26 +103,34 @@ class VectorField(BaseField):
     pass
 
 class ScalarField(BaseField):
-    """always has one component
-
-    """
+    """Scalar class; always has one component."""
+    
     def __init__(self):
         BaseField.__init__(self, 1)
 
     def __getitem__(self, item):
+        """
+        0 call returns the scalar representation object. 
+        Other calls passed to the representation object.
+        """
+        
         if item == 0: return self.components[0]
         return self.components[0][item]
 
-    def __setitem__(self, space, data):
-        self.components[0].__setitem__(space,data)
+    def __setitem__(self, item, data):
+        """Set calls passed to the scalar representation object."""
+        
+        self.components[0].__setitem__(item, data)
 
     def __getattr__(self, attr):
-        """in order to make scalar fields work as though they have no
+        """
+        In order to make scalar fields work as though they have no
         internal structure, we provide this method to search the
-        attributes of the undrlying representation (stored in
+        attributes of the underlying representation (stored in
         self.components[0]). Thus, a ScalarField will act like a
         single instance of its underlying representation.
         """
+        
         return self.components[0].__getattribute__(attr)
 
     def zero(self):

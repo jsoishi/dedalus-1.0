@@ -35,8 +35,7 @@ from .fourier_data import \
     FourierShearRepresentation
 
 from .hermitianize import \
-    enforce_hermitian, \
-    zero_nyquist
+    enforce_hermitian
     
 from .aux_equation import \
     AuxEquation

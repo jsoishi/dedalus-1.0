@@ -31,12 +31,13 @@ class StateData(object):
     according to the coordinate system in use (xyz/rthetaphi/rphiz/etc
     etc etc)...or 0,1,2
     """
-    def __init__(self, time, field_class_dict, field_list=[]):
+    def __init__(self, time, field_class_dict, field_list=[], params={}):
         self.time = time
         self.fields = OrderedDict()
         self._field_classes = field_class_dict
         for f,t in field_list:
             self.add_field(f, t)
+        self.parameters = params
                                 
     def clone(self):
         return self.__class__(self.time, self._field_classes)
