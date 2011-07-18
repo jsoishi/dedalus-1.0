@@ -180,7 +180,7 @@ class Physics(object):
                 dmask = ((na.abs(sampledata.k['x']) > 2/3. *self.shape[0]/2.) | 
                          (na.abs(sampledata.k['y']) > 2/3. * self.shape[1]/2.))
             
-            # Construct XgradX **************** Proper dealiasing?
+            # Construct XgradY **************** Proper dealiasing?
             for i in self.dims:
                 for j in xrange(N):
                     tmp += X[j]['xspace'] * gradY[N * i + j]['xspace']

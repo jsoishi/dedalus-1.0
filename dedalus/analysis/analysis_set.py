@@ -31,7 +31,10 @@ import os
 from functools import wraps
 
 class AnalysisSet(object):
+
+    # Dictionary of registered analysis tasks
     known_analysis = {}
+    
     def __init__(self, data, ti):
         self.data = data
         self.ti = ti
@@ -48,6 +51,7 @@ class AnalysisSet(object):
             else:
                 f(self.data, self.ti.iter, **kwargs)
 
+    # Task registration
     @classmethod
     def register_task(cls, func):
         cls.known_analysis[func.func_name] = func
@@ -156,17 +160,33 @@ def en_spec(data, it):
     
 @AnalysisSet.register_task
 def phase_amp(data, it, fclist=[], klist=[]):
-    """Make plots of phase velocity and mode amplification."""
+    """
+    Plot phase velocity and amplification of specified modes.
+    
+    Inputs:
+        data        Data object
+        it          Iteration number
+        fclist      List of field/component tuples to track: [('u', 'x'), ('phi', 0), ...]
+        klist       List of wavevectors given as tuples: [(1,0,0), (1,1,1), ...]
+    
+    """
     
     if it == 0:
+        # Construct container on first pass
         data._save_modes = {}
+        data._init_power = {}
+        
+        for f,c in fclist:
+            data._init_power[f] = 0
+        
         for f,c in fclist:
             for k in klist:
                 data._save_modes[(f,c,k)] = [data[f][c]['kspace'][k[::-1]]]
+                data._init_power[f] += na.abs(data._save_modes[(f,c,k)]) ** 2.
         data._save_modes['time'] = [data.time]
         return
         
-    # Save components
+    # Save components and time
     for f,c in fclist:
         for k in klist:
             data._save_modes[(f,c,k)].append(data[f][c]['kspace'][k[::-1]])
@@ -183,11 +203,17 @@ def phase_amp(data, it, fclist=[], klist=[]):
     for f,c in fclist:
         for k in klist:
             plot_array = na.array(data._save_modes[(f,c,k)])
-            amp_growth = na.abs(plot_array) / na.abs(plot_array[0]) - 1
-            phase_velocity = na.diff(na.angle(plot_array)) / na.diff(time)
+            
+            # Calculate amplitude growth, normalized to initial power
+            amp_growth = na.abs(plot_array) / na.sqrt(data._init_power[f]) - 1
+            
+            # Calculate phase velocity
+            omega = na.diff(na.angle(plot_array)) / na.diff(time)
+            phase_velocity = omega / na.linalg.norm(k)
 
             axs[0, I].plot(time, amp_growth, '.-', label=str(k))
             axs[1, I].plot(time[1:], phase_velocity, '.-', label=str(k))
+            axs[1, I].plot(time, na.angle(plot_array), '.-', label='angle')
 
         # Pad and label axes
         axs[0, I].axis(padrange(axs[0, I].axis(), 0.05))
@@ -219,21 +245,5 @@ def padrange(range, pad=0.05):
                 
     return outrange
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+     
 

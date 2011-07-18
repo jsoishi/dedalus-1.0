@@ -29,7 +29,7 @@ shape = (32,32,32)
 RHS = MHD(shape, FourierRepresentation)
 data = RHS.create_fields(0.)
 
-k = (1, 1, 0)
+k = (3, 1, 0)
 alfven(data, k=k)
 
 ti = RK2simple(RHS,CFL=0.4)
