@@ -27,6 +27,7 @@ from .init_cond import \
     sin_y, \
     turb, \
     MIT_vortices, \
+    shearing_wave, \
     cosmology
 
 from .turb_spectra import \
