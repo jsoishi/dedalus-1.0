@@ -99,9 +99,8 @@ class TimeStepBase(object):
 
 class RK2simple(TimeStepBase):
     def __init__(self, *arg, **kwargs):
-        """a very simple Runga-Kutta 2 integrator
-
-        """
+        """Basic second-order (midpoint) Runga-Kutta integrator."""
+        
         TimeStepBase.__init__(self, *arg, **kwargs)
         self.tmp_fields = self.RHS.create_fields(0.)
         self.field_dt = self.RHS.create_fields(0.)

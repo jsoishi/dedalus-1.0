@@ -21,6 +21,7 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 from dedalus.mods import *
 from dedalus.funcs import insert_ipython
 
@@ -28,15 +29,16 @@ shape = (32,32,32)
 RHS = MHD(shape, FourierRepresentation)
 data = RHS.create_fields(0.)
 
-alfven(data)
+k = (1, 1, 0)
+alfven(data, k=k)
 
 ti = RK2simple(RHS,CFL=0.4)
-#ti = CrankNicholsonVisc(RHS)
 ti.stop_time(25.) # set stoptime
 ti.stop_walltime(3600.) # stop after 1 hour
 
 an = AnalysisSet(data, ti)
 an.add("field_snap", 10)
+an.add("phase_amp", 10, {'fclist': [('u', 'z'), ('B', 'z')], 'klist': [k]})
 
 # Main loop
 dt = 0.1

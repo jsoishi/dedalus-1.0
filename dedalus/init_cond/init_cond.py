@@ -55,7 +55,7 @@ def sin_k(f, kindex, ampl=1.):
     f.data[tuple(kindex)] = ampl*1j
     f.data[tuple(-1*na.array(kindex))] = f.data[tuple(kindex)].conjugate()
 
-def alfven(data):
+def alfven(data, k=(1, 0, 0)):
     """
     Generate conditions for simulating Alfven waves in MHD.
     For 2d, must have k and B0 in same direction
@@ -65,7 +65,6 @@ def alfven(data):
     B0 = na.array([1., 0., 0.])
     B0mag = na.linalg.norm(B0)
     
-    k = na.array([1., 1., 0.])
     kmag = na.linalg.norm(k)
         
     # Alfven speed and wave frequency
