@@ -28,7 +28,9 @@ from .init_cond import \
     turb, \
     MIT_vortices, \
     shearing_wave, \
-    cosmology
+    cosmology, \
+    alfven, \
+    zeldovich
 
 from .turb_spectra import \
     mcwilliams_spec
