@@ -30,8 +30,8 @@ data = RHS.create_fields(0.)
 
 alfven(data)
 
-#ti = RK2simplevisc(RHS,CFL=0.4)
-ti = CrankNicholsonVisc(RHS)
+ti = RK2simple(RHS,CFL=0.4)
+#ti = CrankNicholsonVisc(RHS)
 ti.stop_time(25.) # set stoptime
 ti.stop_walltime(3600.) # stop after 1 hour
 
