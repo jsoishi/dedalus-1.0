@@ -42,7 +42,6 @@ class StateData(object):
         for f,t in field_list:
             self.add_field(f, t)
         self.parameters = params
-
                                 
     def clone(self):
         return self.__class__(self.time, self._field_classes, length=self.length)
