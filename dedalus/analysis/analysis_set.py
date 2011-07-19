@@ -134,30 +134,42 @@ def print_energy(data, it):
 
 @AnalysisSet.register_task
 def en_spec(data, it):
-    kk = na.sqrt(data['u']['x'].k2())
-    power = na.zeros(data['u']['x'].data.shape)
-    for i in xrange((data['u'].ndim):
-        power += (data['u'][i]['kspace']*data['u'][i]['kspace'].conj()).real
-
+    """Record power spectrum of velocity field."""
+    
+    ux = data['u']['x']
+    
+    # Calculate power in each mode
+    power = na.zeros(ux.data.shape)
+    for i in xrange(data['u'].ncomp):
+        power += na.abs(data['u'][i]['kspace'] ** 2)
     power *= 0.5
-    nbins = (data['u']['x'].k['x'].size)/2 
+    
+    # Construct bins by wavevector magnitude
+    kmag = na.sqrt(ux.k2())
+    
+    nbins = (ux.k['x'].size)/2 
     k = na.arange(nbins)
     spec = na.zeros(nbins)
     for i in xrange(nbins):
-        #spec[i] = (4*na.pi*i**2*power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
-        spec[i] = (power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
+        #spec[i] = (4*na.pi*i**2*power[(kmag >= (i-1/2.)) & (kmag <= (i+1/2.))]).sum()
+        spec[i] = (power[(kmag >= (i-1/2.)) & (kmag <= (i+1/2.))]).sum()
 
     P.loglog(k[1:],spec[1:])
-    from dedalus.init_cond.api import mcwilliams_spec
-    mspec = mcwilliams_spec(k,30.)
-    mspec *= 0.5/mspec.sum()
-    print "E tot spec 1D = %10.5e" % mspec.sum()
+    
+    #from dedalus.init_cond.api import mcwilliams_spec
+    #mspec = mcwilliams_spec(k,30.)
+    #mspec *= 0.5/mspec.sum()
+    #print "E tot spec 1D = %10.5e" % mspec.sum()
     print "E tot spec 2D = %10.5e" % spec.sum()
     print "E0 2D = %10.5e" % spec[0]
-    P.loglog(k[1:], mspec[1:])
+    #P.loglog(k[1:], mspec[1:])
     P.xlabel(r"$k$")
     P.ylabel(r"$E(k)$")
-
+    
+    # Add timestamp
+    tstr = 't = %5.2f' % data.time
+    P.text(-0.3,1.,tstr, transform=P.gca().transAxes,size=24,color='black')
+   
     if not os.path.exists('frames'):
         os.mkdir('frames')
     outfile = "frames/enspec_%04i.png" % it
