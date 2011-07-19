@@ -207,13 +207,19 @@ def phase_amp(data, it, fclist=[], klist=[]):
             # Calculate amplitude growth, normalized to initial power
             amp_growth = na.abs(plot_array) / na.sqrt(data._init_power[f]) - 1
             
+            # Phase evolution at fixed point is propto exp(-omega * t)
+            dtheta = -na.diff(na.angle(plot_array))
+            
+            # Correct for pi boundary crossing
+            dtheta[dtheta > na.pi] -= 2 * na.pi
+            dtheta[dtheta < -na.pi] += 2 * na.pi
+            
             # Calculate phase velocity
-            omega = na.diff(na.angle(plot_array)) / na.diff(time)
+            omega = dtheta / na.diff(time)
             phase_velocity = omega / na.linalg.norm(k)
 
             axs[0, I].plot(time, amp_growth, '.-', label=str(k))
             axs[1, I].plot(time[1:], phase_velocity, '.-', label=str(k))
-            axs[1, I].plot(time, na.angle(plot_array), '.-', label='angle')
 
         # Pad and label axes
         axs[0, I].axis(padrange(axs[0, I].axis(), 0.05))

@@ -65,7 +65,7 @@ def alfven(data, k=(1, 0, 0)):
     """
     
     # Field setup and calculation
-    B0 = na.array([1., 0., 0.])
+    B0 = na.array([1., 0., 0.]) * 5.0
     B0mag = na.linalg.norm(B0)
     
     kmag = na.linalg.norm(k)
@@ -73,7 +73,11 @@ def alfven(data, k=(1, 0, 0)):
     # Alfven speed and wave frequency
     cA = B0mag / na.sqrt(4 * na.pi * data.parameters['rho0'])
     omega = na.abs(cA * na.dot(k, B0) / B0mag)
+    print '-' * 20
+    print 'cA = ', cA
     print 'cA * cos(theta) = ', cA * na.dot(k, B0) / B0mag / kmag
+    print 'Max dt (CFL=1) = ', na.min(na.array(data['u']['x'].length) / 
+                                      na.array(data['u']['x'].shape)) / cA
     
     # u and B perturbations
     u1 = na.array([0., 0., 1.]) * 1e-6
