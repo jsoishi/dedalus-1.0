@@ -136,7 +136,7 @@ def print_energy(data, it):
 def en_spec(data, it):
     kk = na.sqrt(data['u']['x'].k2())
     power = na.zeros(data['u']['x'].data.shape)
-    for i in xrange((data['u'].ndim):
+    for i in xrange(data['u'].ndim):
         power += (data['u'][i]['kspace']*data['u'][i]['kspace'].conj()).real
 
     power *= 0.5
