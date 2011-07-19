@@ -146,15 +146,20 @@ def en_spec(data, it):
     
     # Construct bins by wavevector magnitude
     kmag = na.sqrt(ux.k2())
+    k = ux.k['x'].flatten()
+    k = na.abs(k[0:(k.size / 2 + 1)])
+    kbottom = k - k[1] / 2.
+    ktop = k + k[1] / 2.
+    spec = na.zeros_like(k)
     
-    nbins = (ux.k['x'].size)/2 
-    k = na.arange(nbins)
-    spec = na.zeros(nbins)
-    for i in xrange(nbins):
+    for i in xrange(k.size):
         #spec[i] = (4*na.pi*i**2*power[(kmag >= (i-1/2.)) & (kmag <= (i+1/2.))]).sum()
-        spec[i] = (power[(kmag >= (i-1/2.)) & (kmag <= (i+1/2.))]).sum()
+        spec[i] = (power[(kmag >= kbottom[i]) & (kmag < ktop[i])]).sum()
 
-    P.loglog(k[1:],spec[1:])
+    # Plotting
+    fig = P.figure(1, figsize=(8, 6))
+    P.semilogy(k[1:], spec[1:], 'o-')
+    print spec[0], spec[1], spec[2]
     
     #from dedalus.init_cond.api import mcwilliams_spec
     #mspec = mcwilliams_spec(k,30.)
@@ -212,7 +217,7 @@ def phase_amp(data, it, fclist=[], klist=[]):
     
     # Plotting setup
     nvars = len(fclist)
-    fig, axs = P.subplots(2, nvars, num=2, figsize=(8 * nvars, 6 * 2)) 
+    fig, axs = P.subplots(2, nvars, num=1, figsize=(8 * nvars, 6 * 2)) 
 
     # Plot field components
     time = na.array(data._save_modes['time'])
