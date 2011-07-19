@@ -21,7 +21,7 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
+import numpy as na
 from collections import OrderedDict
 
 class StateData(object):
@@ -31,16 +31,21 @@ class StateData(object):
     according to the coordinate system in use (xyz/rthetaphi/rphiz/etc
     etc etc)...or 0,1,2
     """
-    def __init__(self, time, field_class_dict, field_list=[], params={}):
+    def __init__(self, time, field_class_dict, field_list=[], params={}, length=None):
         self.time = time
         self.fields = OrderedDict()
         self._field_classes = field_class_dict
+        if not length:
+            length = (2*na.pi,) * len(self._field_classes.values()[0].shape)
+        self.length = length
+
         for f,t in field_list:
             self.add_field(f, t)
         self.parameters = params
+
                                 
     def clone(self):
-        return self.__class__(self.time, self._field_classes)
+        return self.__class__(self.time, self._field_classes, length=self.length)
         
     def __getitem__(self, item):
         return self.fields[item]
@@ -52,7 +57,7 @@ class StateData(object):
 
         """
         if field not in self.fields.keys():
-            self.fields[field] = self._field_classes[field_type]()
+            self.fields[field] = self._field_classes[field_type](length=self.length)
 
     def snapshot(self, nsnap):
         """NEEDS TO BE UPDATED FOR NEW FIELD TYPES
