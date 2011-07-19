@@ -102,25 +102,15 @@ class Physics(object):
         Compute Jacobian: gradX[N * i + j] = dX_i/dx_j
         
         Inputs:
-            X           Input VectorField object
-            output      Output TensorField object
-
-           (For scalar X: Compute gradient: gradX[i] = dX/dx_i
-            Inputs:
-                X           Input ScalarField object
-                output      Output VectorField object)
+            X           Input Scalar/VectorField object
+            output      Output Vector/TensorField object
 
         """
 
-        if X.ncomp == 1:
-            for i in self.dims:
-                output[i]['kspace'] = X.deriv(self._trans[i])
-            return
-        
         N = self.ndim
 
         # Construct Jacobian
-        for i in self.dims:
+        for i in xrange(X.ncomp):
             for j in self.dims:
                 output[N * i + j]['kspace'] = X[i].deriv(self._trans[j]) 
                 
