@@ -29,19 +29,20 @@ shape = (32,32,32)
 RHS = MHD(shape, FourierRepresentation)
 data = RHS.create_fields(0.)
 
-k = (3, 1, 0)
+k = (1, -1, 0)
 alfven(data, k=k)
 
-ti = RK2simple(RHS,CFL=0.4)
-ti.stop_time(25.) # set stoptime
+ti = RK2simple(RHS, CFL=0.4)
+ti.stop_time(50.) # set stoptime
 ti.stop_walltime(3600.) # stop after 1 hour
 
 an = AnalysisSet(data, ti)
 an.add("field_snap", 10)
 an.add("phase_amp", 10, {'fclist': [('u', 'z'), ('B', 'z')], 'klist': [k]})
+an.add("en_spec", 10)
 
 # Main loop
-dt = 0.1
+dt = 0.05
 an.run()
 while ti.ok:
     print "step: %i" %ti.iter
