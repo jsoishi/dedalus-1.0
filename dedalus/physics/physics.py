@@ -130,19 +130,8 @@ class Physics(object):
             gradY       TensorField object to hold gradY --or VectorField--
             output      Output VectorField object --or ScalarField--
             
-        Dealiasing options: 
-            None        No dealiasing
-            '2/3'       Dealias by keeping lower 2/3 modes, and zeroing others
-            '3/2'       Dealias by extending to 3/2 larger temp fields
-            
         Keywords:
             compute_gradY   Set to False if gradY has been computed
-
-        Optional input: 
-            X_masked        Vector field to hold masked copy of X, if necessary 
-            gradY_masked    Vector field to hold masked copy of gradY
-
-        Warning for scalar Y: fields are currently assumed to be 3d
 
         """
 
@@ -189,7 +178,7 @@ class Physics(object):
         sampledata = X[0]
         tmp = na.zeros_like(sampledata.data)
         
-        # Scalar case
+        # Construct XgradY -- Scalar case
         if Y.ncomp == 1:
             for i in self.dims:
                 tmp += X[i]['xspace'] * gradY[i]['xspace']
@@ -492,7 +481,7 @@ class LinearCollisionlessCosmology(Physics):
                                             self.parameters['Omega_m'], 
                                             self.parameters['Omega_l'])
         
-        self._setup_aux_eqns(['a'],[aux_eqn_rhs], [1e-4])
+        self._setup_aux_eqns(['a'],[aux_eqn_rhs], [0.002])
 
         self._RHS = self.create_fields(0.)
 
