@@ -136,14 +136,14 @@ def print_energy(data, it):
 def en_spec(data, it):
     kk = na.sqrt(data['u']['x'].k2())
     power = na.zeros(data['u']['x'].data.shape)
-    for i in range(data['u'].ndim):
+    for i in xrange((data['u'].ndim):
         power += (data['u'][i]['kspace']*data['u'][i]['kspace'].conj()).real
 
     power *= 0.5
     nbins = (data['u']['x'].k['x'].size)/2 
     k = na.arange(nbins)
     spec = na.zeros(nbins)
-    for i in range(nbins):
+    for i in xrange(nbins):
         #spec[i] = (4*na.pi*i**2*power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
         spec[i] = (power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
 
