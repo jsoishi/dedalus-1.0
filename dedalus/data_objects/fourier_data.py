@@ -215,10 +215,8 @@ class FourierShearRepresentation(FourierRepresentation):
         self.shear_rate = S
         FourierRepresentation.__init__(self, shape, **kwargs)
 
-
         # for now, only numpy's fft is supported
-        self.fft = fpack.fft
-        self.ifft = fpack.ifft
+        self.set_fft('numpy')
 
     def __getitem__(self,inputs):
         """returns data in either xspace or kspace, transforming as necessary.
@@ -236,22 +234,25 @@ class FourierShearRepresentation(FourierRepresentation):
         
         return self.data
 
-    def forward(self,time):
+    def backward(self, time):
         deltay = self.shear_rate*time 
         print deltay
-        x = na.linspace(-na.pi,na.pi,self.shape[-1],endpoint=False)
-        #x = na.linspace(0.,2*na.pi,self.shape[-1],endpoint=False)
+        #x = na.linspace(-na.pi,na.pi,self.shape[-1],endpoint=False)
+        x = na.linspace(0.,2*na.pi,self.shape[-1],endpoint=False)
         
         self.data = self.fft(self.data,axis=1)
         self.data *= na.exp(1j*self.k['y']*x*deltay)
         if self.ndim == 3:
             self.data = self.fft(self.data,axis=2)
+
+        if self.dealias: self.dealias()
         self.data = self.fft(self.data,axis=0)
         self._curr_space = 'xspace'
 
-    def backward(self,time):
+    def forward(self, time):
         deltay = self.shear_rate*time 
-        x = na.linspace(-na.pi,na.pi,self.shape[-1],endpoint=False)
+        #x = na.linspace(-na.pi,na.pi,self.shape[-1],endpoint=False)
+        x = na.linspace(0.,2*na.pi,self.shape[-1],endpoint=False)
         z_,y_,x_ = N.ogrid[0:self.data.shape[0],
                            0:self.data.shape[1],
                            0:self.data.shape[2]]
