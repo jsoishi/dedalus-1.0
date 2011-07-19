@@ -13,9 +13,9 @@ RHS.parameters['H0'] = 2.27826587e-18 # 70.3 km/s/Mpc in seconds^-1
 zeldovich(data, 1e-17)
 
 ti = RK2simple(RHS)
-ti.stop_time(3.15e7*1e9)
+ti.stop_time(3.15e7*2e9)
 ti.set_nsnap(1000)
-ti.set_dtsnap(1e17)
+ti.set_dtsnap(1e19)
 dt=3.15e7*1e6
 i = 0
 
@@ -46,7 +46,7 @@ while ti.ok:
         tmp4 = na.zeros_like(data['delta']['kspace'][:,0,0])
         tmp4[:] = na.abs(data['delta']['kspace'][:,0,0])
 
-        if i % 2000 == 0:
+        if i % 2000 == 1999:
             pl.figure()
             pl.plot(reorder(tmp))
             pl.show()
