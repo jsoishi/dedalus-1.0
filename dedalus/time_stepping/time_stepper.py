@@ -47,7 +47,7 @@ class TimeStepper:
             print "not implemented, stupid."
         
     def rk2n(self,t,f,dt):
-        for itsub in range(self.itorder):
+        for itsub in xrange(self.itorder):
             llast = (itsub == self.itorder)
 
             if itsub == 0:

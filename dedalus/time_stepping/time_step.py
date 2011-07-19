@@ -164,14 +164,14 @@ class RK2simplevisc(RK2simple):
         viscosity = na.exp(-k2*dt/2.*self.RHS.parameters['nu'])
         self.field_dt = self.RHS.RHS(data)
         for k,f in self.RHS.fields.iteritems():
-            for i in range(f.ndim):
+            for i in xrange(f.ndim):
                 self.tmp_fields[f][i]['kspace'] = (data[k][i]['kspace'] + dt/2. * self.field_dt[k][i]['kspace'])*viscosity
         self.tmp_fields.time = data.time + dt/2.
 
         # second step
         self.field_dt = self.RHS.RHS(self.tmp_fields)
         for k,f in self.RHS.fields.iteritems:
-            for i in range(f.ndim):
+            for i in xrange(f.ndim):
                 data[k][i]['kspace'] = (data[f][i]['kspace']*viscosity + dt * self.field_dt[f][i]['kspace'])*viscosity
 
         data.time += dt
@@ -203,13 +203,13 @@ class RK2simplehypervisc4(RK2simple):
         viscosity = na.exp(-k4*dt/2.*self.RHS.parameters['nu'])
         self.field_dt = self.RHS.RHS(data)
         for k,f in data.fields.iteritems():
-            for i in range(f.ndim):
+            for i in xrange(f.ndim):
                 self.tmp_fields[k][i]['kspace'] = (data[k][i]['kspace'] + dt/2. * self.field_dt[k][i]['kspace'])*viscosity
         self.tmp_fields.time = data.time + dt/2.
         # second step
         self.field_dt = self.RHS.RHS(self.tmp_fields)
         for k,f in data.fields.iteritems():
-            for i in range(f.ndim):
+            for i in xrange(f.ndim):
                 data[k][i]['kspace'] = (data[k][i]['kspace']*viscosity + dt * self.field_dt[k][i]['kspace'])*viscosity
         data.time += dt
         self.time += dt
