@@ -94,6 +94,8 @@ class Physics(object):
 
     def RHS(self):
         pass
+
+        
         
     def gradX(self, X, output):
         """
@@ -103,7 +105,17 @@ class Physics(object):
             X           Input VectorField object
             output      Output TensorField object
 
+           (For scalar X: Compute gradient: gradX[i] = dX/dx_i
+            Inputs:
+                X           Input ScalarField object
+                output      Output VectorField object)
+
         """
+
+        if X.ncomp == 1:
+            for i in self.dims:
+                output[i]['kspace'] = X.deriv(self._trans[i])
+            return
         
         N = self.ndim
 
@@ -118,18 +130,13 @@ class Physics(object):
         
         Inputs:
             X           Input VectorField object
-            Y           Input VectorField object
-            gradY       TensorField object to hold gradY
-            output      Output VectorField object
-            
-        Dealiasing options: 
-            None        No dealiasing
-            '2/3'       Dealias by keeping lower 2/3 modes, and zeroing others
-            '3/2'       Dealias by extending to 3/2 larger temp fields
+            Y           Input VectorField object --or ScalarField--
+            gradY       TensorField object to hold gradY --or VectorField--
+            output      Output VectorField object --or ScalarField--
             
         Keywords:
             compute_gradY   Set to False if gradY has been computed
-        
+
         """
 
 #         if dealias == '3/2':
@@ -175,11 +182,17 @@ class Physics(object):
         sampledata = X[0]
         tmp = na.zeros_like(sampledata.data)
         
+        # Construct XgradY -- Scalar case
+        if Y.ncomp == 1:
+            for i in self.dims:
+                tmp += X[i]['xspace'] * gradY[i]['xspace']
+            output['xspace'] = tmp.real
+            return
+        
         # Construct XgradY
         for i in self.dims:
             for j in xrange(N):
                 tmp += X[j]['xspace'] * gradY[N * i + j]['xspace']
-
             output[i]['xspace'] = tmp.real                    
             tmp *= 0+0j
                 
@@ -472,7 +485,7 @@ class LinearCollisionlessCosmology(Physics):
                                             self.parameters['Omega_m'], 
                                             self.parameters['Omega_l'])
         
-        self._setup_aux_eqns(['a'],[aux_eqn_rhs], [1e-4])
+        self._setup_aux_eqns(['a'],[aux_eqn_rhs], [0.002])
 
         self._RHS = self.create_fields(0.)
 
@@ -504,8 +517,8 @@ class LinearCollisionlessCosmology(Physics):
         H = self.aux_eqns['a'].RHS(a) / a
 
         gradphi = self.aux_fields['gradphi']
-        tmp = (-3./2. * H*H * 
-                data['delta']['kspace']/data['delta'].k2(no_zero=True))
+        tmp = (-3./2. * H*H * data['delta']['kspace'] /
+                data['delta'].k2(no_zero=True))
         
         for i in self.dims:            
             gradphi[i]['kspace'] = 1j * a*a * data['u'][i].k[self._trans[i]] * tmp
@@ -530,11 +543,6 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         self._aux_fields.append(('ugradu', 'vector'))
         self._setup_aux_fields(0., self._aux_fields) # re-creates gradphi
 
-    def grad_delta(self, data):
-        graddelta = self.aux_fields['graddelta']
-        for i in self.dims:
-            graddelta[i]['kspace'] = data['delta'].deriv(self._trans[i])
-
     def div_u(self, data):
         # should really calculate gradu first, then get divu from that
         divu = self.aux_fields['divu']
@@ -543,18 +551,11 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         for i in self.dims:
             divu['kspace'] += data['u'][i].deriv(self._trans[i])
     
-    def u_grad_delta(self, data):
-        ugraddelta = self.aux_fields['ugraddelta']
-        
-        self.grad_delta(data)
-        graddelta = self.aux_fields['graddelta']
-
-        ugraddelta['xspace'] = na.zeros_like(ugraddelta['xspace'])
-        for i in self.dims:
-            ugraddelta['xspace'] += (data['u'][i]['xspace'] * 
-                                     graddelta[i]['xspace'])
-
     def delta_div_u(self, data, compute_divu=False):
+        """calculate delta*div(v) in x-space, using 2/3 de-aliasing 
+
+        """
+
         if compute_divu:
             self.div_u(data)
         divu = self.aux_fields['divu']
@@ -571,7 +572,8 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
     def density_RHS(self, data):
         a = self.aux_eqns['a'].value
         self.div_u(data)
-        self.u_grad_delta(data)
+        self.XgradY(data['u'], data['delta'], self.aux_fields['graddelta'], 
+               self.aux_fields['ugraddelta'])
         self.delta_div_u(data)
         divu = self.aux_fields['divu']
         ugraddelta = self.aux_fields['ugraddelta']
@@ -580,7 +582,7 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         self._RHS['delta']['kspace'] = -(divu['kspace'] + 
                                          deltadivu['kspace'] + 
                                          ugraddelta['kspace']) / a
-
+   
     def vel_RHS(self, data):
         self.grad_phi(data)
         gradphi = self.aux_fields['gradphi']
@@ -589,9 +591,10 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         adot = self.aux_eqns['a'].RHS(a)
 
         self.XgradY(data['u'], data['u'], self.aux_fields['gradu'], 
-                    self.aux_fields['ugradu'])
+                    self.aux_fields['ugradu']) 
+        
         ugradu = self.aux_fields['ugradu'] 
-
+        
         for i in self.dims:
             self._RHS['u'][i]['kspace'] = -(gradphi[i]['kspace'] +
                                             adot * data['u'][i]['kspace'] +
