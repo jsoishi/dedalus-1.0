@@ -38,14 +38,12 @@ class StateData(object):
         if not length:
             length = (2*na.pi,) * len(self._field_classes.values()[0].shape)
         self.length = length
-
+        self.parameters = params
         for f,t in field_list:
             self.add_field(f, t)
-        self.parameters = params
-
                                 
     def clone(self):
-        return self.__class__(self.time, self._field_classes, length=self.length)
+        return self.__class__(self.time, self._field_classes, length=self.length, params=self.parameters)
         
     def __getitem__(self, item):
         return self.fields[item]
@@ -57,7 +55,7 @@ class StateData(object):
 
         """
         if field not in self.fields.keys():
-            self.fields[field] = self._field_classes[field_type](length=self.length)
+            self.fields[field] = self._field_classes[field_type](self, length=self.length)
 
     def snapshot(self, nsnap):
         """NEEDS TO BE UPDATED FOR NEW FIELD TYPES

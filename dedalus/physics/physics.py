@@ -102,25 +102,15 @@ class Physics(object):
         Compute Jacobian: gradX[N * i + j] = dX_i/dx_j
         
         Inputs:
-            X           Input VectorField object
-            output      Output TensorField object
-
-           (For scalar X: Compute gradient: gradX[i] = dX/dx_i
-            Inputs:
-                X           Input ScalarField object
-                output      Output VectorField object)
+            X           Input Scalar/VectorField object
+            output      Output Vector/TensorField object
 
         """
 
-        if X.ncomp == 1:
-            for i in self.dims:
-                output[i]['kspace'] = X.deriv(self._trans[i])
-            return
-        
         N = self.ndim
 
         # Construct Jacobian
-        for i in self.dims:
+        for i in xrange(X.ncomp):
             for j in self.dims:
                 output[N * i + j]['kspace'] = X[i].deriv(self._trans[j]) 
                 
@@ -280,11 +270,14 @@ class Hydro(Physics):
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1.}
-
-        #self.q = self.create_dealias_field(0.,['u','gu','ugu'])
-        self._setup_aux_fields(0., self._aux_fields)
         self._setup_parameters(params)
+        #self.q = self.create_dealias_field(0.,['u','gu','ugu'])
+        self.__finalized = False
+
+    def _finalize_init(self):
+        self._setup_aux_fields(0., self._aux_fields)
         self._RHS = self.create_fields(0.)
+        self.__finalized = True
 
     def RHS(self, data):
         """
@@ -294,7 +287,8 @@ class Hydro(Physics):
         u_t + nu k^2 u = -ugradu - i k p / rho0
 
         """
-        
+        if not self.__finalized:
+            self._finalize_init()
         # Compute terms
         self.XgradY(data['u'], data['u'], self.aux_fields['gradu'],
                     self.aux_fields['ugradu'])
@@ -312,6 +306,7 @@ class Hydro(Physics):
         self._RHS['u'].integrating_factor = self.parameters['nu'] * self._RHS['u']['x'].k2()
             
         self._RHS.time = data.time        
+        self.aux_fields.time = data.time
         return self._RHS
 
     def pressure(self, data):
