@@ -1,6 +1,5 @@
 from dedalus.mods import *
 import numpy as na
-
 import pylab as pl
 
 shape = (16,16,16)
@@ -10,13 +9,13 @@ RHS.parameters['Omega_r'] = 0#8.4e-5
 RHS.parameters['Omega_m'] = 1#0.276
 RHS.parameters['Omega_l'] = 0#0.724
 RHS.parameters['H0'] = 2.27826587e-18 # 70.3 km/s/Mpc in seconds^-1
-zeldovich(data, 1e-17)
+zeldovich(data, 1e-19)
 
 ti = RK2simple(RHS)
-ti.stop_time(3.15e7*2e9)
+ti.stop_time(3.15e7*3e9)
 ti.set_nsnap(1000)
 ti.set_dtsnap(1e19)
-dt=3.15e7*1e6
+dt=3.15e7*1e7
 i = 0
 
 ddelta = []
@@ -33,7 +32,7 @@ while ti.ok:
     print i
     ti.advance(data, dt)
     
-    if i % 50 == 0:
+    if i % 50 == 40:
         tmp = na.zeros_like(data['u'][2]['xspace'][:,0,0].real)
         tmp[:] = data['u'][2]['xspace'][:,0,0].real
 

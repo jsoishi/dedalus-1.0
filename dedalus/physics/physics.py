@@ -182,15 +182,8 @@ class Physics(object):
         sampledata = X[0]
         tmp = na.zeros_like(sampledata.data)
         
-        # Construct XgradY -- Scalar case
-        if Y.ncomp == 1:
-            for i in self.dims:
-                tmp += X[i]['xspace'] * gradY[i]['xspace']
-            output['xspace'] = tmp.real
-            return
-        
         # Construct XgradY
-        for i in self.dims:
+        for i in xrange(Y.ncomp):
             for j in xrange(N):
                 tmp += X[j]['xspace'] * gradY[N * i + j]['xspace']
             output[i]['xspace'] = tmp.real                    
@@ -582,7 +575,7 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         self._RHS['delta']['kspace'] = -(divu['kspace'] + 
                                          deltadivu['kspace'] + 
                                          ugraddelta['kspace']) / a
-   
+        
     def vel_RHS(self, data):
         self.grad_phi(data)
         gradphi = self.aux_fields['gradphi']
