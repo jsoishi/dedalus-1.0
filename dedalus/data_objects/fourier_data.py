@@ -41,7 +41,7 @@ class FourierRepresentation(Representation):
 
     """
 
-    def __init__(self, shape, length=None, dtype='complex128', method='fftw',
+    def __init__(self, sd, shape, length=None, dtype='complex128', method='fftw',
                  dealiasing='2/3'):
         """
         Inputs:
@@ -49,7 +49,7 @@ class FourierRepresentation(Representation):
             length      The length of the data, tuple of floats (default: 2 pi)
             
         """
-        
+        self.sd = sd
         self.shape = shape
         self.ndim = len(self.shape)
         self.data = na.zeros(self.shape, dtype=dtype)
@@ -202,7 +202,7 @@ class FourierShearRepresentation(FourierRepresentation):
     """
 
     """
-    def __init__(self, shape, S, **kwargs):    
+    def __init__(self, sd, shape, **kwargs):    
         """Shearing box implementation.
 
 
@@ -212,59 +212,45 @@ class FourierShearRepresentation(FourierRepresentation):
             the *dimensional* shear rate in 1/t units
 
         """
-        self.shear_rate = S
-        FourierRepresentation.__init__(self, shape, **kwargs)
+        FourierRepresentation.__init__(self, sd, shape, **kwargs)
+        self.shear_rate = self.sd.parameters['S']
 
         # for now, only numpy's fft is supported
-        self.set_fft('numpy')
+        self.fft = fpack.fft
+        self.ifft = fpack.ifft
 
-    def __getitem__(self,inputs):
-        """returns data in either xspace or kspace, transforming as necessary.
-
-        """
-        space, time = inputs
-        if space == self._curr_space:
-            pass
-        elif space == 'xspace':
-            self.forward(time)
-        elif space == 'kspace':
-            self.reverse(time)
-        else:
-            raise KeyError("space must be either xspace or kspace")
-        
-        return self.data
-
-    def backward(self, time):
-        deltay = self.shear_rate*time 
-        print deltay
-        #x = na.linspace(-na.pi,na.pi,self.shape[-1],endpoint=False)
+    def backward(self):
+        deltay = self.shear_rate*self.sd.time 
         x = na.linspace(0.,2*na.pi,self.shape[-1],endpoint=False)
-        
+        if self.dealias: self.dealias()        
         self.data = self.fft(self.data,axis=1)
         self.data *= na.exp(1j*self.k['y']*x*deltay)
         if self.ndim == 3:
             self.data = self.fft(self.data,axis=2)
 
-        if self.dealias: self.dealias()
         self.data = self.fft(self.data,axis=0)
         self._curr_space = 'xspace'
 
-    def forward(self, time):
-        deltay = self.shear_rate*time 
-        #x = na.linspace(-na.pi,na.pi,self.shape[-1],endpoint=False)
+    def forward(self):
+        deltay = self.shear_rate*self.sd.time 
         x = na.linspace(0.,2*na.pi,self.shape[-1],endpoint=False)
-        z_,y_,x_ = N.ogrid[0:self.data.shape[0],
-                           0:self.data.shape[1],
-                           0:self.data.shape[2]]
-
         if self.ndim == 3:
             self.data = self.ifft(self.data,axis=2)
+            z_,y_,x_ = na.ogrid[0:self.data.shape[0],
+                                0:self.data.shape[1],
+                                0:self.data.shape[2]]
+        elif self.ndim == 2:
+            z_ = 0.
+            y_,x_ = na.ogrid[0:self.data.shape[0],
+                             0:self.data.shape[1]]
+
         self.data = self.ifft(self.data,axis=0)
 
         self.data *= na.exp(-1j*self.k['y']*(0.*z_ +0.*y_+x)*deltay)
         self.data = self.ifft(self.data,axis=1)
         self._curr_space = 'kspace'
-
+        if self.dealias: self.dealias()
+        self.zero_nyquist()
     
 class SphericalHarmonicRepresentation(FourierRepresentation):
     """Dedalus should eventually support spherical and cylindrical geometries.
