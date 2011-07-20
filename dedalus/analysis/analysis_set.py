@@ -134,30 +134,47 @@ def print_energy(data, it):
 
 @AnalysisSet.register_task
 def en_spec(data, it):
-    kk = na.sqrt(data['u']['x'].k2())
-    power = na.zeros(data['u']['x'].data.shape)
-    for i in xrange(data['u'].ndim):
-        power += (data['u'][i]['kspace']*data['u'][i]['kspace'].conj()).real
-
+    """Record power spectrum of velocity field."""
+    
+    ux = data['u']['x']
+    
+    # Calculate power in each mode
+    power = na.zeros(ux.data.shape)
+    for i in xrange(data['u'].ncomp):
+        power += na.abs(data['u'][i]['kspace'] ** 2)
     power *= 0.5
-    nbins = (data['u']['x'].k['x'].size)/2 
-    k = na.arange(nbins)
-    spec = na.zeros(nbins)
-    for i in xrange(nbins):
-        #spec[i] = (4*na.pi*i**2*power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
-        spec[i] = (power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
+    
+    # Construct bins by wavevector magnitude
+    kmag = na.sqrt(ux.k2())
+    k = ux.k['x'].flatten()
+    k = na.abs(k[0:(k.size / 2 + 1)])
+    kbottom = k - k[1] / 2.
+    ktop = k + k[1] / 2.
+    spec = na.zeros_like(k)
+    
+    for i in xrange(k.size):
+        #spec[i] = (4*na.pi*i**2*power[(kmag >= (i-1/2.)) & (kmag <= (i+1/2.))]).sum()
+        spec[i] = (power[(kmag >= kbottom[i]) & (kmag < ktop[i])]).sum()
 
-    P.loglog(k[1:],spec[1:])
-    from dedalus.init_cond.api import mcwilliams_spec
-    mspec = mcwilliams_spec(k,30.)
-    mspec *= 0.5/mspec.sum()
-    print "E tot spec 1D = %10.5e" % mspec.sum()
+    # Plotting
+    fig = P.figure(1, figsize=(8, 6))
+    P.semilogy(k[1:], spec[1:], 'o-')
+    print spec[0], spec[1], spec[2]
+    
+    #from dedalus.init_cond.api import mcwilliams_spec
+    #mspec = mcwilliams_spec(k,30.)
+    #mspec *= 0.5/mspec.sum()
+    #print "E tot spec 1D = %10.5e" % mspec.sum()
     print "E tot spec 2D = %10.5e" % spec.sum()
     print "E0 2D = %10.5e" % spec[0]
-    P.loglog(k[1:], mspec[1:])
+    #P.loglog(k[1:], mspec[1:])
     P.xlabel(r"$k$")
     P.ylabel(r"$E(k)$")
-
+    
+    # Add timestamp
+    tstr = 't = %5.2f' % data.time
+    P.text(-0.3,1.,tstr, transform=P.gca().transAxes,size=24,color='black')
+   
     if not os.path.exists('frames'):
         os.mkdir('frames')
     outfile = "frames/enspec_%04i.png" % it
@@ -200,7 +217,7 @@ def phase_amp(data, it, fclist=[], klist=[]):
     
     # Plotting setup
     nvars = len(fclist)
-    fig, axs = P.subplots(2, nvars, num=2, figsize=(8 * nvars, 6 * 2)) 
+    fig, axs = P.subplots(2, nvars, num=1, figsize=(8 * nvars, 6 * 2)) 
 
     # Plot field components
     time = na.array(data._save_modes['time'])
