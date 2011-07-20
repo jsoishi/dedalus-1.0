@@ -189,8 +189,8 @@ def zeldovich(data, ampl=1e-22):
     """velocity wave IC, for testing nonlinear collisionless cosmology
     against the Zeldovich approximation
     """
-    data['u'][2]['kspace'][1,0,0] = ampl * 1j / 2
-    data['u'][2]['kspace'][-1,0,0] = -data['u'][2]['kspace'][1,0,0]
+    data['u'][0]['kspace'][0,0,1] = ampl * 1j / 2
+    data['u'][0]['kspace'][0,0,-1] = -data['u'][0]['kspace'][0,0,1]
 
 def get_ic_data(fname, ak, deltacp, thetac):
     """read certain values from a linger output file

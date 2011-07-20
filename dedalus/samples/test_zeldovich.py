@@ -11,50 +11,40 @@ RHS.parameters['Omega_l'] = 0#0.724
 RHS.parameters['H0'] = 2.27826587e-18 # 70.3 km/s/Mpc in seconds^-1
 zeldovich(data, 1e-19)
 
+Myr = 3.15e13 # 10^6 years in seconds
+tstop = Myr*4e3
+
 ti = RK2simple(RHS)
-ti.stop_time(3.15e7*3e9)
+ti.stop_time(tstop)
 ti.set_nsnap(1000)
 ti.set_dtsnap(1e19)
-dt=3.15e7*1e7
-i = 0
+dt=10*Myr
 
 ddelta = []
 uu = []
-uk= []
-deltak = []
+uk = []
+
+while ti.ok:
+    ti.advance(data, dt)
+    
+    if data.time % (tstop/20) == 0:
+        tmp = na.zeros_like(data['u'][0]['xspace'][0,0,:].real)
+        tmp[:] = data['u'][0]['xspace'][0,0,:].real
+
+        tmp2 = na.zeros_like(data['delta']['xspace'][0,0,:].real)
+        tmp2[:] = data['delta']['xspace'][0,0,:].real
+
+        tmp3 = na.zeros_like(data['u'][0]['kspace'][0,0,:].real)
+        tmp3[:] = data['u'][0]['kspace'][0,0,:].real
+
+        uu.append(tmp)
+        ddelta.append(tmp2)
+        uk.append(tmp3)
 
 def reorder(arr):
     di = len(arr)/2
     tmp = [arr[i-di] for i in xrange(len(arr))]
     return tmp 
-
-while ti.ok:
-    print i
-    ti.advance(data, dt)
-    
-    if i % 50 == 40:
-        tmp = na.zeros_like(data['u'][2]['xspace'][:,0,0].real)
-        tmp[:] = data['u'][2]['xspace'][:,0,0].real
-
-        tmp2 = na.zeros_like(data['delta']['xspace'][:,0,0].real)
-        tmp2[:] = data['delta']['xspace'][:,0,0].real
-
-        tmp3 = na.zeros_like(data['u'][2]['kspace'][:,0,0])
-        tmp3[:] = na.abs(data['u'][2]['kspace'][:,0,0])
-
-        tmp4 = na.zeros_like(data['delta']['kspace'][:,0,0])
-        tmp4[:] = na.abs(data['delta']['kspace'][:,0,0])
-
-        if i % 2000 == 1999:
-            pl.figure()
-            pl.plot(reorder(tmp))
-            pl.show()
-
-        uu.append(tmp)
-        ddelta.append(tmp2)
-        uk.append(tmp3)
-        deltak.append(tmp4)
-    i += 1
 
 pl.figure()
 for i in xrange(len(ddelta)):
@@ -65,13 +55,7 @@ for i in xrange(len(uu)):
     pl.plot(reorder(uu[i]),hold=True)
 
 pl.figure()
-for i in xrange(len(deltak)):
-    pl.plot(reorder(deltak[i]),hold=True)
-
-pl.figure()
 for i in xrange(len(uk)):
-    pl.plot(reorder(uk[i]),hold=True)
+    pl.plot(reorder(uk[i][(len(uk[i])/2):]),hold=True)
 
 pl.show()
-
-
