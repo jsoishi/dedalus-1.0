@@ -53,6 +53,7 @@ class FourierRepresentation(Representation):
         self.shape = shape
         self.ndim = len(self.shape)
         self.data = na.zeros(self.shape, dtype=dtype)
+        self.__eps = na.finfo(dtype).eps
         self._curr_space = 'kspace'
         self.trans = {'x': 0, 'y': 1, 'z': 2} # for vector fields
         
@@ -114,8 +115,8 @@ class FourierRepresentation(Representation):
         
     def set_fft(self, method):
         if method == 'fftw':
-            self.fplan = fftw3.Plan(self.data,direction='forward', flags=['measure'])
-            self.rplan = fftw3.Plan(self.data,direction='backward', flags=['measure'])
+            self.fplan = fftw3.Plan(self.data, direction='forward', flags=['measure'])
+            self.rplan = fftw3.Plan(self.data, direction='backward', flags=['measure'])
             self.fft = self.fwd_fftw
             self.ifft = self.rev_fftw
         if method == 'numpy':
@@ -131,6 +132,7 @@ class FourierRepresentation(Representation):
     def fwd_fftw(self):
         self.fplan()
         self.data /= self.data.size
+        self.data[na.abs(self.data) < self.__eps] = 0.
 
     def rev_fftw(self):
         self.rplan()
@@ -138,10 +140,10 @@ class FourierRepresentation(Representation):
 
     def fwd_np(self):
         self.data = fpack.fftn(self.data)
-        self.data.imag = 0
 
     def rev_np(self):
         self.data = fpack.ifftn(self.data)
+        self.data.imag = 0
 
     def forward(self):
         self.fft()
