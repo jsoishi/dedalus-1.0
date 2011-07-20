@@ -25,11 +25,11 @@ License:
 from dedalus.mods import *
 from dedalus.funcs import insert_ipython
 
-shape = (32,32)
+shape = (32, 32, 32)
 RHS = MHD(shape, FourierRepresentation)
 data = RHS.create_fields(0.)
 
-k = (1, 0)
+k = (1, 1, 0)
 alfven(data, k=k)
 
 ti = RK2simple(RHS, CFL=0.4)
@@ -38,7 +38,7 @@ ti.stop_walltime(3600.) # stop after 1 hour
 
 an = AnalysisSet(data, ti)
 an.add("field_snap", 10)
-an.add("phase_amp", 10, {'fclist': [('u', 'y'), ('B', 'y')], 'klist': [k, (9, 0)]})
+an.add("phase_amp", 10, {'fclist': [('u', 'z'), ('B', 'z')], 'klist': [k]})
 an.add("en_spec", 10)
 
 # Main loop

@@ -132,7 +132,6 @@ class FourierRepresentation(Representation):
     def fwd_fftw(self):
         self.fplan()
         self.data /= self.data.size
-        self.data[na.abs(self.data) < self.__eps] = 0.
 
     def rev_fftw(self):
         self.rplan()
@@ -146,12 +145,17 @@ class FourierRepresentation(Representation):
         self.data.imag = 0
 
     def forward(self):
+        """FFT method to go from xspace to kspace."""
+        
         self.fft()
         self._curr_space = 'kspace'
         if self.dealias: self.dealias()
         self.zero_nyquist()
+        self.zero_under_eps()
 
     def backward(self):
+        """IFFT method to go from kspace to xspace."""
+        
         if self.dealias: self.dealias()
         self.ifft()
         self._curr_space = 'xspace'
@@ -199,6 +203,13 @@ class FourierRepresentation(Representation):
             nyspace[i] = self.shape[i] / 2
             self.data[nyspace] = 0.
             nyspace[i] = slice(None)
+
+    def zero_under_eps(self):
+        """Zero out any modes with coefficients smaller than machine epsilon."""
+        
+        self['kspace']  # Dummy call to ensure in kspace
+        self.data[na.abs(self.data) < self.__eps] = 0.
+
 
 class FourierShearRepresentation(FourierRepresentation):
     """
