@@ -274,11 +274,14 @@ class Hydro(Physics):
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1.}
-
-        #self.q = self.create_dealias_field(0.,['u','gu','ugu'])
-        self._setup_aux_fields(0., self._aux_fields)
         self._setup_parameters(params)
+        #self.q = self.create_dealias_field(0.,['u','gu','ugu'])
+        self.__finalized = False
+
+    def _finalize_init(self):
+        self._setup_aux_fields(0., self._aux_fields)
         self._RHS = self.create_fields(0.)
+        self.__finalized = True
 
     def RHS(self, data):
         """
@@ -288,7 +291,8 @@ class Hydro(Physics):
         u_t + nu k^2 u = -ugradu - i k p / rho0
 
         """
-        
+        if not self.__finalized:
+            self._finalize_init()
         # Compute terms
         self.XgradY(data['u'], data['u'], self.aux_fields['gradu'],
                     self.aux_fields['ugradu'])
@@ -306,6 +310,7 @@ class Hydro(Physics):
         self._RHS['u'].integrating_factor = self.parameters['nu'] * self._RHS['u']['x'].k2()
             
         self._RHS.time = data.time        
+        self.aux_fields.time = data.time
         return self._RHS
 
     def pressure(self, data):
