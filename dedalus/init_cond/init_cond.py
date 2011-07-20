@@ -65,7 +65,7 @@ def alfven(data, k=(1, 0, 0)):
     """
     
     # Field setup and calculation
-    B0 = na.array([1., 0., 0.]) * 5.0
+    B0 = na.array([1., 0.]) * 5.0
     B0mag = na.linalg.norm(B0)
     
     kmag = na.linalg.norm(k)
@@ -80,7 +80,7 @@ def alfven(data, k=(1, 0, 0)):
                                       na.array(data['u']['x'].shape)) / cA
     
     # u and B perturbations
-    u1 = na.array([0., 0., 1.]) * 1e-6
+    u1 = na.array([0., 1.]) * 5e-6
     u1mag = na.linalg.norm(u1)
     
     B1 = (na.dot(k, u1) * B0 - na.dot(k, B0) * u1) / omega
