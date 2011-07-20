@@ -53,6 +53,7 @@ class FourierRepresentation(Representation):
         self.shape = shape
         self.ndim = len(self.shape)
         self.data = na.zeros(self.shape, dtype=dtype)
+        self.__eps = na.finfo(dtype).eps
         self._curr_space = 'kspace'
         self.trans = {'x': 0, 'y': 1, 'z': 2} # for vector fields
         
@@ -131,6 +132,7 @@ class FourierRepresentation(Representation):
     def fwd_fftw(self):
         self.fplan()
         self.data /= self.data.size
+        self.data[na.abs(self.data) < self.__eps] = 0.
 
     def rev_fftw(self):
         self.rplan()

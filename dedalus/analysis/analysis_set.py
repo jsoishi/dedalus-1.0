@@ -159,7 +159,6 @@ def en_spec(data, it):
     # Plotting
     fig = P.figure(1, figsize=(8, 6))
     P.semilogy(k[1:], spec[1:], 'o-')
-    print spec[0], spec[1], spec[2]
     
     #from dedalus.init_cond.api import mcwilliams_spec
     #mspec = mcwilliams_spec(k,30.)
