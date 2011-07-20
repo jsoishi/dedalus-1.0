@@ -31,19 +31,20 @@ class StateData(object):
     according to the coordinate system in use (xyz/rthetaphi/rphiz/etc
     etc etc)...or 0,1,2
     """
-    def __init__(self, time, field_class_dict, field_list=[], params={}, length=None):
+    def __init__(self, time, shape, length, field_class_dict, field_list=[], params={}):
         self.time = time
-        self.fields = OrderedDict()
-        self._field_classes = field_class_dict
-        if not length:
-            length = (2*na.pi,) * len(self._field_classes.values()[0].shape)
+        self.shape = shape
         self.length = length
+        self._field_classes = field_class_dict
         self.parameters = params
+        self.fields = OrderedDict()
+        
         for f,t in field_list:
             self.add_field(f, t)
                                 
     def clone(self):
-        return self.__class__(self.time, self._field_classes, length=self.length, params=self.parameters)
+        return self.__class__(self.time, self.shape, self.length, self._field_classes, 
+                              params=self.parameters)
         
     def __getitem__(self, item):
         return self.fields[item]
@@ -55,7 +56,7 @@ class StateData(object):
 
         """
         if field not in self.fields.keys():
-            self.fields[field] = self._field_classes[field_type](self, length=self.length)
+            self.fields[field] = self._field_classes[field_type](self)
 
     def snapshot(self, nsnap):
         """NEEDS TO BE UPDATED FOR NEW FIELD TYPES
