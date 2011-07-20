@@ -75,7 +75,7 @@ class BaseField(object):
         else:
             self.ncomp = ncomp
 
-        for f in range(self.ncomp):
+        for f in xrange(self.ncomp):
             self.components.append(self.representation(self.sd, self.shape, length=self.length))
 
         # Take translation table for coordinate names from representation

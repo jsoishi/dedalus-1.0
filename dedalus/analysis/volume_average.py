@@ -55,7 +55,7 @@ class VolumeAverageSet(object):
 @VolumeAverageSet.register_task
 def ekin(data):
     en = na.zeros(data['u']['x'].data.shape)
-    for i in range(data['u'].ndim):
+    for i in xrange(data['u'].ndim):
         en += 0.5*(data['u'][i]['kspace']*data['u'][i]['kspace'].conj()).real
 
     return en.sum()
