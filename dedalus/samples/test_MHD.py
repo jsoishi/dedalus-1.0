@@ -33,7 +33,7 @@ k = (1, 1, 0)
 alfven(data, k=k)
 
 ti = RK2simple(RHS, CFL=0.4)
-ti.stop_time(100.) # set stoptime
+ti.stop_time(50.) # set stoptime
 ti.stop_walltime(3600.) # stop after 1 hour
 
 an = AnalysisSet(data, ti)

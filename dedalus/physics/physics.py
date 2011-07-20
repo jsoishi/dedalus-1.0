@@ -237,24 +237,33 @@ class Physics(object):
         Return list of components of curl X.
         
         Inputs:
-            X           Input VectorField object
-            output      Output Vector/ScalarField object (3D/2D)
+            X           Input Scalar/Vector/VectorField object
+            output      Output Vector/Scalar/VectorField object (2D/2D/3D)
         
         Note: 
-            2D input requires scalar output
-            3D input requires vector output
+            2D: Vector input requires Scalar output
+                Scalar input requires Vector output
+            3D: Vector input requires Vector output
             
         """
         
-        N = X.ndim
+        N = X.ncomp
 
-        # Calculate curl, scalar if N == 2
+        # Calculate curl
+        # 3D input yields 3D output
         if N == 3:
             output[0]['kspace'] = X[2].deriv(self._trans[1]) - X[1].deriv(self._trans[2])
             output[1]['kspace'] = X[0].deriv(self._trans[2]) - X[2].deriv(self._trans[0])
             output[2]['kspace'] = X[1].deriv(self._trans[0]) - X[0].deriv(self._trans[1])
-        else:
+        
+        # 2D input (xy) yields scalar output (z)
+        elif N == 2:
             output['kspace'] = X[1].deriv(self._trans[0]) - X[0].deriv(self._trans[1])    
+            
+        # Scalar input (z) yeilds vector output (xy)
+        elif N == 1:
+            output[0]['kspace'] = X[0].deriv(self._trans[1])
+            output[1]['kspace'] = -X[0].deriv(self._trans[0])
         
 class Hydro(Physics):
     """Incompressible hydrodynamics."""
