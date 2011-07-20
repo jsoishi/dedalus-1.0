@@ -64,8 +64,10 @@ def alfven(data, k=(1, 0, 0)):
     For 2d, must have k and B0 in same direction
     """
     
+    N = len(k)
+    
     # Field setup and calculation
-    B0 = na.array([1., 0.]) * 5.0
+    B0 = na.array([1., 0., 0.])[:N] * 5.0
     B0mag = na.linalg.norm(B0)
     
     kmag = na.linalg.norm(k)
@@ -78,9 +80,10 @@ def alfven(data, k=(1, 0, 0)):
     print 'cA * cos(theta) = ', cA * na.dot(k, B0) / B0mag / kmag
     print 'Max dt (CFL=1) = ', na.min(na.array(data['u']['x'].length) / 
                                       na.array(data['u']['x'].shape)) / cA
+    print '-' * 20
     
     # u and B perturbations
-    u1 = na.array([0., 1.]) * 5e-6
+    u1 = na.array([0., 0., 1.])[3-N:] * 5e-6
     u1mag = na.linalg.norm(u1)
     
     B1 = (na.dot(k, u1) * B0 - na.dot(k, B0) * u1) / omega
