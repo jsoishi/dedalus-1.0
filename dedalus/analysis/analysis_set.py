@@ -24,14 +24,17 @@ License:
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import pylab as P
+import matplotlib.pyplot as P
 from mpl_toolkits.axes_grid1 import AxesGrid
 import numpy as na
 import os
 from functools import wraps
 
 class AnalysisSet(object):
+
+    # Dictionary of registered analysis tasks
     known_analysis = {}
+    
     def __init__(self, data, ti):
         self.data = data
         self.ti = ti
@@ -48,6 +51,7 @@ class AnalysisSet(object):
             else:
                 f(self.data, self.ti.iter, **kwargs)
 
+    # Task registration
     @classmethod
     def register_task(cls, func):
         cls.known_analysis[func.func_name] = func
@@ -58,15 +62,15 @@ def volume_average(data, it, va_obj=None):
 
 @AnalysisSet.register_task
 def field_snap(data, it, use_extent=False, **kwargs):
-    """take a snapshot of all fields defined. currently only works in
-    2D; it will need a slice index for 3D.
-
+    """
+    Take a snapshot of all fields defined. Currently takes z[0] slice for 3D.
+    
     """
     
     # Determine image grid size
     nvars = 0
     for f in data.fields.values():
-        nvars += f.ndim
+        nvars += f.ncomp
     if nvars == 4:
         nrow = ncol = 2
     elif nvars == 9:
@@ -96,12 +100,13 @@ def field_snap(data, it, use_extent=False, **kwargs):
     # Plot field components
     I = 0
     for k,f in data.fields.iteritems():
-        for i in xrange(f.ndim):
+        for i in xrange(f.ncomp):
             if f[i].ndim == 3:
                 plot_array = f[i]['xspace'][0,:,:].real
             else:
                 plot_array = f[i]['xspace'].real
-            im = grid[I].imshow(plot_array, extent=extent, origin='lower', **kwargs)
+            im = grid[I].imshow(plot_array, extent=extent, origin='lower', 
+                                interpolation=None, **kwargs)
             grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='white')
             grid.cbar_axes[I].colorbar(im)
             I += 1
@@ -129,33 +134,145 @@ def print_energy(data, it):
 
 @AnalysisSet.register_task
 def en_spec(data, it):
-    kk = na.sqrt(data['u']['x'].k2())
-    power = na.zeros(data['u']['x'].data.shape)
-    for i in range(data['u'].ndim):
-        power += (data['u'][i]['kspace']*data['u'][i]['kspace'].conj()).real
-
+    """Record power spectrum of velocity field."""
+    
+    ux = data['u']['x']
+    
+    # Calculate power in each mode
+    power = na.zeros(ux.data.shape)
+    for i in xrange(data['u'].ncomp):
+        power += na.abs(data['u'][i]['kspace'] ** 2)
     power *= 0.5
-    nbins = (data['u']['x'].k['x'].size)/2 
-    k = na.arange(nbins)
-    spec = na.zeros(nbins)
-    for i in range(nbins):
-        #spec[i] = (4*na.pi*i**2*power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
-        spec[i] = (power[(kk >= (i-1/2.)) & (kk <= (i+1/2.))]).sum()
+    
+    # Construct bins by wavevector magnitude
+    kmag = na.sqrt(ux.k2())
+    k = ux.k['x'].flatten()
+    k = na.abs(k[0:(k.size / 2 + 1)])
+    kbottom = k - k[1] / 2.
+    ktop = k + k[1] / 2.
+    spec = na.zeros_like(k)
+    
+    for i in xrange(k.size):
+        #spec[i] = (4*na.pi*i**2*power[(kmag >= (i-1/2.)) & (kmag <= (i+1/2.))]).sum()
+        spec[i] = (power[(kmag >= kbottom[i]) & (kmag < ktop[i])]).sum()
 
-    P.loglog(k[1:],spec[1:])
-    from dedalus.init_cond.api import mcwilliams_spec
-    mspec = mcwilliams_spec(k,30.)
-    mspec *= 0.5/mspec.sum()
-    print "E tot spec 1D = %10.5e" % mspec.sum()
+    # Plotting
+    fig = P.figure(1, figsize=(8, 6))
+    P.semilogy(k[1:], spec[1:], 'o-')
+    print spec[0], spec[1], spec[2]
+    
+    #from dedalus.init_cond.api import mcwilliams_spec
+    #mspec = mcwilliams_spec(k,30.)
+    #mspec *= 0.5/mspec.sum()
+    #print "E tot spec 1D = %10.5e" % mspec.sum()
     print "E tot spec 2D = %10.5e" % spec.sum()
     print "E0 2D = %10.5e" % spec[0]
-    P.loglog(k[1:], mspec[1:])
+    #P.loglog(k[1:], mspec[1:])
     P.xlabel(r"$k$")
     P.ylabel(r"$E(k)$")
-
+    
+    # Add timestamp
+    tstr = 't = %5.2f' % data.time
+    P.text(-0.3,1.,tstr, transform=P.gca().transAxes,size=24,color='black')
+   
     if not os.path.exists('frames'):
         os.mkdir('frames')
     outfile = "frames/enspec_%04i.png" % it
     P.savefig(outfile)
     P.clf()
+    
+@AnalysisSet.register_task
+def phase_amp(data, it, fclist=[], klist=[]):
+    """
+    Plot phase velocity and amplification of specified modes.
+    
+    Inputs:
+        data        Data object
+        it          Iteration number
+        fclist      List of field/component tuples to track: [('u', 'x'), ('phi', 0), ...]
+        klist       List of wavevectors given as tuples: [(1,0,0), (1,1,1), ...]
+    
+    """
+    
+    if it == 0:
+        # Construct container on first pass
+        data._save_modes = {}
+        data._init_power = {}
+        
+        for f,c in fclist:
+            data._init_power[f] = 0
+        
+        for f,c in fclist:
+            for k in klist:
+                data._save_modes[(f,c,k)] = [data[f][c]['kspace'][k[::-1]]]
+                data._init_power[f] += na.abs(data._save_modes[(f,c,k)]) ** 2.
+        data._save_modes['time'] = [data.time]
+        return
+        
+    # Save components and time
+    for f,c in fclist:
+        for k in klist:
+            data._save_modes[(f,c,k)].append(data[f][c]['kspace'][k[::-1]])
+    data._save_modes['time'].append(data.time)
+    
+    # Plotting setup
+    nvars = len(fclist)
+    fig, axs = P.subplots(2, nvars, num=1, figsize=(8 * nvars, 6 * 2)) 
+
+    # Plot field components
+    time = na.array(data._save_modes['time'])
+    
+    I = 0
+    for f,c in fclist:
+        for k in klist:
+            plot_array = na.array(data._save_modes[(f,c,k)])
+            
+            # Calculate amplitude growth, normalized to initial power
+            amp_growth = na.abs(plot_array) / na.sqrt(data._init_power[f]) - 1
+            
+            # Phase evolution at fixed point is propto exp(-omega * t)
+            dtheta = -na.diff(na.angle(plot_array))
+            
+            # Correct for pi boundary crossing
+            dtheta[dtheta > na.pi] -= 2 * na.pi
+            dtheta[dtheta < -na.pi] += 2 * na.pi
+            
+            # Calculate phase velocity
+            omega = dtheta / na.diff(time)
+            phase_velocity = omega / na.linalg.norm(k)
+
+            axs[0, I].plot(time, amp_growth, '.-', label=str(k))
+            axs[1, I].plot(time[1:], phase_velocity, '.-', label=str(k))
+
+        # Pad and label axes
+        axs[0, I].axis(padrange(axs[0, I].axis(), 0.05))
+        axs[1, I].axis(padrange(axs[1, I].axis(), 0.05))
+                        
+        if I == 0:
+            axs[0, I].set_ylabel('normalized amplitude growth')
+            axs[1, I].set_ylabel('phase velocity')
+            axs[1, I].set_xlabel('time')
+        
+        axs[0, I].legend()
+        axs[1, I].legend()
+        axs[0, I].set_title(f + c)
+
+        I += 1
+
+    if not os.path.exists('frames'):
+        os.mkdir('frames')
+    outfile = "frames/phase_amp.png"
+    fig.savefig(outfile)
+    fig.clf()
+    
+def padrange(range, pad=0.05):
+    xmin, xmax, ymin, ymax = range
+    outrange = [xmin - pad * (xmax - xmin),
+                xmax + pad * (xmax - xmin),
+                ymin - pad * (ymax - ymin),
+                ymax + pad * (ymax - ymin)]
+                
+    return outrange
+    
+     
 
