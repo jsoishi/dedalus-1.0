@@ -30,7 +30,7 @@ class Representation(object):
 
     """
 
-    def __init__(self, shape):
+    def __init__(self, shape, length):
         pass
 
 class FourierRepresentation(Representation):
@@ -41,7 +41,7 @@ class FourierRepresentation(Representation):
 
     """
 
-    def __init__(self, sd, shape, length=None, dtype='complex128', method='fftw',
+    def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
                  dealiasing='2/3'):
         """
         Inputs:
@@ -51,17 +51,12 @@ class FourierRepresentation(Representation):
         """
         self.sd = sd
         self.shape = shape
+        self.length = length
         self.ndim = len(self.shape)
         self.data = na.zeros(self.shape, dtype=dtype)
         self.__eps = na.finfo(dtype).eps
         self._curr_space = 'kspace'
         self.trans = {'x': 0, 'y': 1, 'z': 2} # for vector fields
-        
-        if not length:
-            # Default length is 2 pi in each direction
-            self.length = (2 * na.pi,) * self.ndim
-        else:
-            self.length = length
         
         # Get Nyquist wavenumbers
         self.kny = na.pi * na.array(self.shape) / na.array(self.length)

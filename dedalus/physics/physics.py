@@ -44,7 +44,7 @@ class Physics(object):
         self.dims = xrange(self.ndim)
         self._representation = representation
         self._field_classes = create_field_classes(
-                self._representation, self.shape, self.__class__.__name__)
+                self._representation, self.shape, self.length, self.__class__.__name__)
         self.parameters = {}
         self.aux_eqns = {}
     
@@ -57,8 +57,9 @@ class Physics(object):
     def create_fields(self, t, field_list=None):        
         if field_list == None:
             field_list = self.fields
-        return StateData(t, self._field_classes, field_list=field_list, params=self.parameters, length=self.length)    
-
+        return StateData(t, self.shape, self.length, self._field_classes, 
+                         field_list=field_list, params=self.parameters)
+                         
     def create_dealias_field(self, t, fields=None):
         """data object to implement Orszag 3/2 rule for non-linear
         terms.
