@@ -120,9 +120,9 @@ class Physics(object):
         
         Inputs:
             X           Input VectorField object
-            Y           Input VectorField object --or ScalarField--
-            gradY       TensorField object to hold gradY --or VectorField--
-            output      Output VectorField object --or ScalarField--
+            Y           Input Scalar/VectorField object
+            gradY       Vector/TensorField object to hold gradY
+            output      Output Scalar/VectorField object
             
         Keywords:
             compute_gradY   Set to False if gradY has been computed
@@ -174,7 +174,7 @@ class Physics(object):
         
         # Construct XgradY
         for i in xrange(Y.ncomp):
-            for j in xrange(N):
+            for j in self.dims:
                 tmp += X[j]['xspace'] * gradY[N * i + j]['xspace']
             output[i]['xspace'] = tmp.real                    
             tmp *= 0+0j
