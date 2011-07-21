@@ -111,7 +111,20 @@ class VectorField(BaseField):
 
     state data will be composed of vectors and scalars
     """
-    pass
+    
+    def div_free(self):
+        """Project off compressible parts of the field."""
+    
+        kV = 0
+        for i in xrange(self.ncomp):
+            kV += self[i].k[self.trans[i]] * self[i]['kspace']
+
+        k2 = self[i].k2(no_zero=True)
+        
+        for i in xrange(self.ncomp):
+            self[i]['kspace'] -= self[i].k[self.trans[i]] * kV / k2
+    
+    
 
 class ScalarField(BaseField):
     """Scalar class; always has one component."""
