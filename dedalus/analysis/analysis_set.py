@@ -156,8 +156,11 @@ def en_spec(data, it):
         #spec[i] = (4*na.pi*i**2*power[(kmag >= (i-1/2.)) & (kmag <= (i+1/2.))]).sum()
         spec[i] = (power[(kmag >= kbottom[i]) & (kmag < ktop[i])]).sum()
 
-    # Plotting
+    # Plotting, skip if all modes are zero
+    if spec[1:].nonzero()[0].size == 0:
+        return
     fig = P.figure(1, figsize=(8, 6))
+
     P.semilogy(k[1:], spec[1:], 'o-')
     
     #from dedalus.init_cond.api import mcwilliams_spec
