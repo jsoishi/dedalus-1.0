@@ -115,6 +115,23 @@ class Physics(object):
             for j in self.dims:
                 output[N * i + j]['kspace'] = X[i].deriv(self._trans[j]) 
                 
+    def divX(self, X, output):
+        """
+        Compute divergence: divX = dX_i/dx_i
+        
+        Inputs:
+            X           Input VectorField object
+            output      Output ScalarField object
+
+        """
+
+        N = self.ndim
+        output.zero()
+
+        # Construct divergence
+        for i in xrange(X.ncomp):
+            output['kspace'] += X[i].deriv(self._trans[i]) 
+                
     def XgradY(self, X, Y, gradY, output, compute_gradY=True):
         """
         Calculate "X dot (grad X)" term, with dealiasing options.
@@ -235,7 +252,7 @@ class Physics(object):
             
     def curlX(self, X, output):
         """
-        Return list of components of curl X.
+        Calculate curl of X.
         
         Inputs:
             X           Input Scalar/Vector/VectorField object
