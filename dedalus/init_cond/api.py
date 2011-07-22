@@ -25,6 +25,8 @@ from .init_cond import \
     taylor_green, \
     sin_x, \
     sin_y, \
+    sin_k, \
+    cos_k, \
     turb, \
     MIT_vortices, \
     shearing_wave, \

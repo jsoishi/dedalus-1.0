@@ -299,12 +299,12 @@ class Hydro(Physics):
         params = {'nu': 0., 'rho0': 1.}
         self._setup_parameters(params)
         #self.q = self.create_dealias_field(0.,['u','gu','ugu'])
-        self.__finalized = False
+        self._finalized = False
 
     def _finalize_init(self):
         self._setup_aux_fields(0., self._aux_fields)
         self._RHS = self.create_fields(0.)
-        self.__finalized = True
+        self._finalized = True
 
     def RHS(self, data):
         """
@@ -314,7 +314,7 @@ class Hydro(Physics):
         u_t + nu k^2 u = -ugradu - i k p / rho0
 
         """
-        if not self.__finalized:
+        if not self._finalized:
             self._finalize_init()
         # Compute terms
         self.XgradY(data['u'], data['u'], self.aux_fields['gradu'],
@@ -363,7 +363,46 @@ class Hydro(Physics):
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             #zero_nyquist(pressure[i].data)
             pressure[i].zero_nyquist()
- 
+
+class ShearHydro(Hydro):
+    def RHS(self, data):
+        Hydro.RHS(self, data)
+
+        self._RHS['u']['x']['kspace'] += 2.*self.parameters['Omega']*data['u']['y']['kspace']
+        self._RHS['u']['y']['kspace'] += -(2*self.parameters['Omega'] + self.parameters['S'])*data['u']['x']['kspace']
+        
+        return self._RHS
+
+    def pressure(self, data):
+        """
+        Compute pressure term for ufields: i k p / rho0
+        
+        p / rho0 = i (k * ugradu + rotation + shear)/ k^2
+        ==> pressure term = - k (k * ugradu + rotation + shear) / k^2
+        
+        """
+        
+        # Place references
+        ugradu = self.aux_fields['ugradu']
+        pressure = self.aux_fields['pressure']
+        
+        # Setup temporary data container
+        sampledata = data['u']['x']
+        tmp = na.zeros_like(sampledata.data)
+        k2 = sampledata.k2(no_zero=True)
+        
+        # Construct k * ugradu
+        for i in self.dims:
+            tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace'] 
+
+        tmp += 2. * self.parameters['S'] * data['u']['x'].k['y'] * data['u']['x']['kspace'] - 2. * self.parameters['Omega'] * data['u']['y'].k['x'] * data['u']['y']['kspace'] + 2 * self.parameters['Omega'] * data['u']['x'].k['y'] * data['u']['x']['kspace']
+
+        # Construct full term
+        for i in self.dims:            
+            pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
+            #zero_nyquist(pressure[i].data)
+            pressure[i].zero_nyquist()
+
 class MHD(Hydro):
     """Incompressible magnetohydrodynamics."""
     
