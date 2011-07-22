@@ -44,6 +44,7 @@ from dedalus.init_cond.api import \
 
 from dedalus.physics.api import \
     Hydro, \
+    ShearHydro, \
     MHD, \
     LinearCollisionlessCosmology,\
     CollisionlessCosmology

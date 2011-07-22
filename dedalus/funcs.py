@@ -21,6 +21,11 @@ License:
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import inspect
+import os
+import sys
+import subprocess
+import re
+
 __header = """
 == Welcome to the embedded IPython Shell ==
 
@@ -54,3 +59,24 @@ def insert_ipython(num_up=1):
     del ipshell
 
 
+
+
+def get_mercurial_changeset_id():
+    """from Jason F. Harris.
+
+    http://jasonfharris.com/blog/2010/05/versioning-your-application-with-the-mercurial-changeset-hash/
+
+    """
+    targetBuildDir = os.getenv("TARGET_BUILD_DIR")
+    getChangeset = subprocess.Popen('hg parent --template "{node|short}" --cwd ' + targetBuildDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+
+    if (getChangeset.stderr.read() != ""):
+        print "Error in obtaining current changeset of the Mercurial repository"
+        changeset = None
+
+    changeset = getChangeset.stdout.read()
+    if (not re.search("^[0-9a-f]{12}$", changeset)):
+        print "Current changeset of the Mercurial repository is malformed"
+        changeset = None
+
+    return changeset
