@@ -30,7 +30,7 @@ class Representation(object):
 
     """
 
-    def __init__(self, shape, length):
+    def __init__(self, sd, shape, length):
         pass
 
 class FourierRepresentation(Representation):
@@ -211,7 +211,7 @@ class FourierShearRepresentation(FourierRepresentation):
     """
 
     """
-    def __init__(self, sd, shape, **kwargs):    
+    def __init__(self, sd, shape, length, **kwargs):    
         """Shearing box implementation.
 
 
@@ -221,7 +221,7 @@ class FourierShearRepresentation(FourierRepresentation):
             the *dimensional* shear rate in 1/t units
 
         """
-        FourierRepresentation.__init__(self, sd, shape, **kwargs)
+        FourierRepresentation.__init__(self, sd, shape, length, **kwargs)
         self.shear_rate = self.sd.parameters['S']
 
         # for now, only numpy's fft is supported
