@@ -30,7 +30,7 @@ class Representation(object):
 
     """
 
-    def __init__(self, shape):
+    def __init__(self, shape, length):
         pass
 
 class FourierRepresentation(Representation):
@@ -41,7 +41,7 @@ class FourierRepresentation(Representation):
 
     """
 
-    def __init__(self, sd, shape, length=None, dtype='complex128', method='fftw',
+    def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
                  dealiasing='2/3'):
         """
         Inputs:
@@ -51,16 +51,13 @@ class FourierRepresentation(Representation):
         """
         self.sd = sd
         self.shape = shape
+        self.length = length
         self.ndim = len(self.shape)
         self.data = na.zeros(self.shape, dtype=dtype)
+        self.__eps = na.finfo(dtype).eps
         self._curr_space = 'kspace'
-        self.trans = {'x': 0, 'y': 1, 'z': 2} # for vector fields
-        
-        if not length:
-            # Default length is 2 pi in each direction
-            self.length = (2 * na.pi,) * self.ndim
-        else:
-            self.length = length
+        self.trans = {'x': 0, 'y': 1, 'z': 2,
+                      0:'x', 1:'y', 2:'y'} # for vector fields
         
         # Get Nyquist wavenumbers
         self.kny = na.pi * na.array(self.shape) / na.array(self.length)
@@ -114,8 +111,8 @@ class FourierRepresentation(Representation):
         
     def set_fft(self, method):
         if method == 'fftw':
-            self.fplan = fftw3.Plan(self.data,direction='forward', flags=['measure'])
-            self.rplan = fftw3.Plan(self.data,direction='backward', flags=['measure'])
+            self.fplan = fftw3.Plan(self.data, direction='forward', flags=['measure'])
+            self.rplan = fftw3.Plan(self.data, direction='backward', flags=['measure'])
             self.fft = self.fwd_fftw
             self.ifft = self.rev_fftw
         if method == 'numpy':
@@ -138,18 +135,23 @@ class FourierRepresentation(Representation):
 
     def fwd_np(self):
         self.data = fpack.fftn(self.data)
-        self.data.imag = 0
 
     def rev_np(self):
         self.data = fpack.ifftn(self.data)
+        self.data.imag = 0
 
     def forward(self):
+        """FFT method to go from xspace to kspace."""
+        
         self.fft()
         self._curr_space = 'kspace'
         if self.dealias: self.dealias()
         self.zero_nyquist()
+        self.zero_under_eps()
 
     def backward(self):
+        """IFFT method to go from kspace to xspace."""
+        
         if self.dealias: self.dealias()
         self.ifft()
         self._curr_space = 'xspace'
@@ -197,6 +199,13 @@ class FourierRepresentation(Representation):
             nyspace[i] = self.shape[i] / 2
             self.data[nyspace] = 0.
             nyspace[i] = slice(None)
+
+    def zero_under_eps(self):
+        """Zero out any modes with coefficients smaller than machine epsilon."""
+        
+        self['kspace']  # Dummy call to ensure in kspace
+        self.data[na.abs(self.data) < self.__eps] = 0.
+
 
 class FourierShearRepresentation(FourierRepresentation):
     """

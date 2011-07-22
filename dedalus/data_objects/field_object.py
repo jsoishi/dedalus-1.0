@@ -24,20 +24,20 @@ License:
 import weakref
 import h5py
 
-def create_field_classes(representation, shape, name):
+def create_field_classes(representation, shape, length, name):
     """utility function to bind representation and shape to tensor,
     vector, and scalar fields.
 
     """
     tname = "%sTensorField" % name
     new_tensorclass = type(tname, (TensorField,), {'representation': representation,
-                                                  'shape': shape})
+                                                  'shape': shape, 'length': length})
     vname = "%sVectorField" % name
     new_vectorclass = type(vname, (VectorField,), {'representation': representation,
-                                                  'shape': shape})
+                                                  'shape': shape, 'length': length})
     sname = "%sScalarField" % name
     new_scalarclass = type(sname, (ScalarField,), {'representation': representation,
-                                                  'shape': shape})
+                                                  'shape': shape, 'length': length})
 
     return {'tensor': new_tensorclass,
             'vector': new_vectorclass,
@@ -52,21 +52,21 @@ def lookup(name, translation_table):
     return name
     
 class BaseField(object):
-    def __init__(self, sd, ncomp=-1, length=None):
+    def __init__(self, sd, ncomp=-1):
         """
         inputs
         ------
         sd -- state data object that creates it. stored as a weak ref
 
         ncomp (optional) -- the number of components
-        length (optional) -- the box length. defaults to 2*pi
 
         """
+        
         # self.representation provided in call to create_field_classes
         # self.shape provided in call to create_field_classes
+        # self.length provided in call to create_field_classes
         self.sd = weakref.proxy(sd)
         self.ndim = len(self.shape)
-        self.length = length
 
         # Construct components
         self.components = []
@@ -76,7 +76,7 @@ class BaseField(object):
             self.ncomp = ncomp
 
         for f in xrange(self.ncomp):
-            self.components.append(self.representation(self.sd, self.shape, length=self.length))
+            self.components.append(self.representation(self.sd, self.shape, self.length))
 
         # Take translation table for coordinate names from representation
         self.trans = self.components[-1].trans
@@ -111,7 +111,20 @@ class VectorField(BaseField):
 
     state data will be composed of vectors and scalars
     """
-    pass
+    
+    def div_free(self):
+        """Project off compressible parts of the field."""
+    
+        kV = 0
+        for i in xrange(self.ncomp):
+            kV += self[i].k[self.trans[i]] * self[i]['kspace']
+
+        k2 = self[i].k2(no_zero=True)
+        
+        for i in xrange(self.ncomp):
+            self[i]['kspace'] -= self[i].k[self.trans[i]] * kV / k2
+    
+    
 
 class ScalarField(BaseField):
     """Scalar class; always has one component."""

@@ -44,7 +44,7 @@ class Physics(object):
         self.dims = xrange(self.ndim)
         self._representation = representation
         self._field_classes = create_field_classes(
-                self._representation, self.shape, self.__class__.__name__)
+                self._representation, self.shape, self.length, self.__class__.__name__)
         self.parameters = {}
         self.aux_eqns = {}
     
@@ -57,8 +57,9 @@ class Physics(object):
     def create_fields(self, t, field_list=None):        
         if field_list == None:
             field_list = self.fields
-        return StateData(t, self._field_classes, field_list=field_list, params=self.parameters, length=self.length)    
-
+        return StateData(t, self.shape, self.length, self._field_classes, 
+                         field_list=field_list, params=self.parameters)
+                         
     def create_dealias_field(self, t, fields=None):
         """data object to implement Orszag 3/2 rule for non-linear
         terms.
@@ -114,15 +115,32 @@ class Physics(object):
             for j in self.dims:
                 output[N * i + j]['kspace'] = X[i].deriv(self._trans[j]) 
                 
+    def divX(self, X, output):
+        """
+        Compute divergence: divX = dX_i/dx_i
+        
+        Inputs:
+            X           Input VectorField object
+            output      Output ScalarField object
+
+        """
+
+        N = self.ndim
+        output.zero()
+
+        # Construct divergence
+        for i in xrange(X.ncomp):
+            output['kspace'] += X[i].deriv(self._trans[i]) 
+                
     def XgradY(self, X, Y, gradY, output, compute_gradY=True):
         """
         Calculate "X dot (grad X)" term, with dealiasing options.
         
         Inputs:
             X           Input VectorField object
-            Y           Input VectorField object --or ScalarField--
-            gradY       TensorField object to hold gradY --or VectorField--
-            output      Output VectorField object --or ScalarField--
+            Y           Input Scalar/VectorField object
+            gradY       Vector/TensorField object to hold gradY
+            output      Output Scalar/VectorField object
             
         Keywords:
             compute_gradY   Set to False if gradY has been computed
@@ -174,7 +192,7 @@ class Physics(object):
         
         # Construct XgradY
         for i in xrange(Y.ncomp):
-            for j in xrange(N):
+            for j in self.dims:
                 tmp += X[j]['xspace'] * gradY[N * i + j]['xspace']
             output[i]['xspace'] = tmp.real                    
             tmp *= 0+0j
@@ -234,27 +252,36 @@ class Physics(object):
             
     def curlX(self, X, output):
         """
-        Return list of components of curl X.
+        Calculate curl of X.
         
         Inputs:
-            X           Input VectorField object
-            output      Output Vector/ScalarField object (3D/2D)
+            X           Input Scalar/Vector/VectorField object
+            output      Output Vector/Scalar/VectorField object (2D/2D/3D)
         
         Note: 
-            2D input requires scalar output
-            3D input requires vector output
+            2D: Vector input requires Scalar output
+                Scalar input requires Vector output
+            3D: Vector input requires Vector output
             
         """
         
-        N = X.ndim
+        N = X.ncomp
 
-        # Calculate curl, scalar if N == 2
+        # Calculate curl
+        # 3D input yields 3D output
         if N == 3:
             output[0]['kspace'] = X[2].deriv(self._trans[1]) - X[1].deriv(self._trans[2])
             output[1]['kspace'] = X[0].deriv(self._trans[2]) - X[2].deriv(self._trans[0])
             output[2]['kspace'] = X[1].deriv(self._trans[0]) - X[0].deriv(self._trans[1])
-        else:
+        
+        # 2D input (xy) yields scalar output (z)
+        elif N == 2:
             output['kspace'] = X[1].deriv(self._trans[0]) - X[0].deriv(self._trans[1])    
+            
+        # Scalar input (z) yeilds vector output (xy)
+        elif N == 1:
+            output[0]['kspace'] = X[0].deriv(self._trans[1])
+            output[1]['kspace'] = -X[0].deriv(self._trans[0])
         
 class Hydro(Physics):
     """Incompressible hydrodynamics."""
