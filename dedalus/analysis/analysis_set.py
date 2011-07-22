@@ -32,7 +32,7 @@ from functools import wraps
 
 class AnalysisSet(object):
 
-    # Dictionary of registered analysis tasks
+    # Dictionary of registered tasks
     known_analysis = {}
     
     def __init__(self, data, ti):
@@ -106,7 +106,7 @@ def field_snap(data, it, use_extent=False, **kwargs):
             else:
                 plot_array = f[i]['xspace'].real
             im = grid[I].imshow(plot_array, extent=extent, origin='lower', 
-                                interpolation=None, **kwargs)
+                                interpolation='nearest', **kwargs)
             grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='white')
             grid.cbar_axes[I].colorbar(im)
             I += 1

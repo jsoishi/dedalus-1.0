@@ -166,7 +166,7 @@ class FourierRepresentation(Representation):
         if self.ndim == 3:
             dmask = dmask | (na.abs(self.k['z']) > 2/3. * self.kny[-3])
 
-        self['kspace'] # dummy call to switch spaces
+        self['kspace'] # Dummy call to switch spaces
         self.data[dmask] = 0.
 
         
