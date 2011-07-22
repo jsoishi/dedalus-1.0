@@ -26,11 +26,11 @@ RHS.parameters['Omega_r'] = 0#8.4e-5
 RHS.parameters['Omega_m'] = 1#0.276
 RHS.parameters['Omega_l'] = 0#0.724
 RHS.parameters['H0'] = H_0
-zeldovich(data, ampl)
+zeldovich(data, ampl, a_i, a_cross)
 
 Myr = 3.15e13 # 10^6 years in seconds
-tstop = tcross
-dt = Myr*1e1
+tstop = tcross - t_init
+dt = Myr*1e1/4
 
 ti = RK2simple(RHS)
 ti.stop_time(tstop)
@@ -52,10 +52,10 @@ i = 0
 #an.run()
 while ti.ok:
     print "step: ", i
-    if i % 20 == 0:
+    if i % 80 == 0:
         tmp = na.zeros_like(data['u'][0]['xspace'][0,0,:].real)
         tmp[:] = data['u'][0]['xspace'][0,0,:].real
-
+        
         tmp2 = na.zeros_like(data['delta']['xspace'][0,0,:].real)
         tmp2[:] = data['delta']['xspace'][0,0,:].real
 
@@ -70,6 +70,21 @@ while ti.ok:
     ti.advance(data, dt)
     #an.run()
     i = i + 1
+
+tmp = na.zeros_like(data['u'][0]['xspace'][0,0,:].real)
+tmp[:] = data['u'][0]['xspace'][0,0,:].real
+
+tmp2 = na.zeros_like(data['delta']['xspace'][0,0,:].real)
+tmp2[:] = data['delta']['xspace'][0,0,:].real
+
+tmp3 = na.zeros_like(data['u'][0]['kspace'][0,0,:].real)
+tmp3[:] = na.abs(data['u'][0]['kspace'][0,0,:])
+
+uu.append(tmp)
+ddelta.append(tmp2)
+uk.append(tmp3)
+t_snapshots.append(data.time)
+a_snapshots.append(RHS.aux_eqns['a'].value)
 print "a_stop = ", RHS.aux_eqns['a'].value
 
 def reorder(arr):
@@ -77,33 +92,31 @@ def reorder(arr):
     tmp = [arr[i-di] for i in xrange(len(arr))]
     return tmp 
 
+xx = [L*i/len(uu[0]) for i in xrange(len(uu[0]))]
 pl.figure()
-for i in xrange(len(ddelta)):
-    pl.plot(reorder(ddelta[i]),hold=True)
+for delta in ddelta:
+    pl.plot(xx, reorder(delta),hold=True)
 
 pl.figure()
-for i in xrange(len(uu)):
-    pl.plot(reorder(uu[i]),hold=True)
+for u in uu:
+    pl.plot(xx, reorder(u),hold=True)
 
 pl.figure()
-for i in xrange(len(uk)):
-    pl.plot(reorder(uk[i])[(len(uk[i])/2):],hold=True)
+for u in uk:
+    pl.plot(reorder(u)[(len(u)/2):],hold=True)
 
-pl.figure()
-for t in t_snapshots:
-    t = t + t_init
-    a = (t/t0)**(2./3)
+for i,a in enumerate(a_snapshots):
+    t = a**(3./2.) * t0
     D = a / a_i
     x = q + D*A*na.sin(k*q)
     Ddot = (2./3.) * ((1./t0)**(2./3.)) * (t**(-1./3.)) / a_i
-    delta = 1./(1.+D*A*k*na.cos(k*q))-1.
+    #delta = 1./(1.+D*A*k*na.cos(k*q))-1.
     v = a * Ddot * A * na.sin(k*q)
-    phi = 3/2/a * ( (q**2 - x**2)/2 + 
-                    D * A * k * (k*q*na.sin(k*q) + na.cos(k*q) - 1) )
-    pl.plot(x, v, hold=True)
-pl.figure()
-pl.plot(x, v, hold=True)
-x = [2*na.pi*i/16. for i in xrange(16)]
-pl.plot(x, reorder(uu[-1]), '.', hold=True)
+    #phi = 3/2/a * ( (q**2 - x**2)/2 + 
+    #                D * A * k * (k*q*na.sin(k*q) + na.cos(k*q) - 1) )
+    pl.figure()
+    pl.plot(x, v)
+    pl.plot(xx, reorder(uu[i]), '.', hold=True)
+    pl.title(a)
 
 pl.show()

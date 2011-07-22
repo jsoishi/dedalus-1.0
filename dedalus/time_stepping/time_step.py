@@ -127,7 +127,7 @@ class RK2simple(TimeStepBase):
             a_old = a.value # OK if we only have one aux eqn...
             # need to update actual value so RHS can use it
             a.value = a.value + dt / 2. * a.RHS(a.value)
-            
+                        
         self.tmp_fields.time = data.time + dt / 2.
 
         # Second step
@@ -139,7 +139,7 @@ class RK2simple(TimeStepBase):
 
         for a in self.RHS.aux_eqns.values():
             a.value = a_old + dt * a.RHS(a.value)
-
+                       
         data.time += dt
         self.time += dt
         self.iter += 1

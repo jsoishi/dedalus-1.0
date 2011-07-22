@@ -30,6 +30,7 @@ import numpy as na
 try:
     from scipy.interpolate import interp1d
     from scipy.integrate import simps
+    from scipy.optimize import broyden1
 except ImportError:
     print "Warning: Scipy not found. Interpolation won't work."
 from dedalus.data_objects import hermitianize
@@ -185,10 +186,20 @@ def shearing_wave(data, wampl, kinit):
     data['u']['x']['kspace'] = aux['psi'].deriv('y')
     data['u']['y']['kspace'] = -aux['psi'].deriv('x')
 
-def zeldovich(data, ampl=1e-22):
+def zeldovich(data, ampl, a_ini, a_cross):
     """velocity wave IC, for testing nonlinear collisionless cosmology
     against the Zeldovich approximation
     """
+    k = 2*na.pi/data.length[0]
+    N = data['delta'].shape[0]
+    D = 1.
+    A = a_ini/(a_cross * k)
+    x = na.array([i - N/2 for i in xrange(N)])*data.length[0]/N
+    q = na.array(broyden1(lambda y: na.array(y) + D*A*na.sin(k*na.array(y)) - x, x))
+    delta1d = 1./(1. + D*A*k*na.cos(k*q)) - 1.
+    for i in xrange(N):
+        for j in xrange(N):
+            data['delta']['xspace'][i,j,:] = delta1d
     data['u'][0]['kspace'][0,0,1] = ampl * 1j / 2
     data['u'][0]['kspace'][0,0,-1] = -data['u'][0]['kspace'][0,0,1]
 
