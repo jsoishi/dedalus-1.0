@@ -23,6 +23,7 @@ License:
 
 from .physics import \
     Hydro,\
+    ShearHydro, \
     MHD, \
     LinearCollisionlessCosmology, \
     CollisionlessCosmology
