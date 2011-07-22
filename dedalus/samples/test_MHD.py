@@ -25,11 +25,11 @@ License:
 from dedalus.mods import *
 from dedalus.funcs import insert_ipython
 
-shape = (32,32,32)
+shape = (32, 32, 32)
 RHS = MHD(shape, FourierRepresentation)
 data = RHS.create_fields(0.)
 
-k = (1, 0, 0)
+k = (1, 1, 0)
 alfven(data, k=k)
 
 ti = RK2simple(RHS, CFL=0.4)
@@ -42,7 +42,7 @@ an.add("phase_amp", 10, {'fclist': [('u', 'z'), ('B', 'z')], 'klist': [k]})
 an.add("en_spec", 10)
 
 # Main loop
-dt = 0.05
+dt = 0.1
 an.run()
 while ti.ok:
     print "step: %i" %ti.iter
