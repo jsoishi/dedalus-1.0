@@ -1,6 +1,13 @@
 from dedalus.mods import *
+from scipy.optimize import broyden1
 import numpy as na
 import pylab as pl
+import os
+
+def reorder(arr):
+    di = len(arr)/2
+    tmp = na.array([arr[i-di] for i in xrange(len(arr))])
+    return tmp 
 
 shape = (16,16,16)
 RHS = CollisionlessCosmology(shape, FourierRepresentation)
@@ -11,6 +18,7 @@ ampl = 5e-5 # amplitude of initial velocity wave
 L = 2*na.pi # size of box
 N_p = 128 # resolution of analytic solution
 q = na.array([i for i in xrange(0,N_p)]) * L / N_p
+print q
 k = 2*na.pi/L # wavenumber of initial velocity perturbation
 a_i = 0.002 # initial scale factor
 t0 = (2./3.)/H_0 # present age of E-dS universe
@@ -34,8 +42,6 @@ dt = Myr
 
 ti = RK2simple(RHS)
 ti.stop_time(tstop)
-ti.set_nsnap(1000)
-ti.set_dtsnap(1e19)
 
 ddelta = []
 uu = []
@@ -87,25 +93,28 @@ t_snapshots.append(data.time)
 a_snapshots.append(RHS.aux_eqns['a'].value)
 print "a_stop = ", RHS.aux_eqns['a'].value
 
-def reorder(arr):
-    di = len(arr)/2
-    tmp = [arr[i-di] for i in xrange(len(arr))]
-    return tmp 
+x_grid = na.array([i for i in xrange(shape[0])])*data.length[0]/shape[0]
+#pl.figure()
+#for delta in ddelta:
+#    pl.plot(x_grid, reorder(delta),hold=True)
+#
+#pl.figure()
+#for u in uu:
+#    pl.plot(x_grid, reorder(u),hold=True)
+#
+#pl.figure()
+#for u in uk:
+#    pl.plot(reorder(u)[(len(u)/2):],hold=True)
+#
+#pl.show()
 
-xx = [L*i/len(uu[0]) for i in xrange(len(uu[0]))]
-pl.figure()
-for delta in ddelta:
-    pl.plot(xx, reorder(delta),hold=True)
+if not os.path.exists('frames'):
+    os.mkdir('frames')
 
-pl.figure()
-for u in uu:
-    pl.plot(xx, reorder(u),hold=True)
-
-pl.figure()
-for u in uk:
-    pl.plot(reorder(u)[(len(u)/2):],hold=True)
-
+fig = pl.figure()
 for i,a in enumerate(a_snapshots):
+    # Compare to smooth analytic solution
+    outfile = "frames/cmp_a%05f.png" % a
     t = a**(3./2.) * t0
     D = a / a_i
     x = q + D*A*na.sin(k*q)
@@ -114,9 +123,20 @@ for i,a in enumerate(a_snapshots):
     v = a * Ddot * A * na.sin(k*q)
     #phi = 3/2/a * ( (q**2 - x**2)/2 + 
     #                D * A * k * (k*q*na.sin(k*q) + na.cos(k*q) - 1) )
-    pl.figure()
     pl.plot(x, v)
-    pl.plot(xx, reorder(uu[i]), '.', hold=True)
-    pl.title(a)
-
-pl.show()
+    pl.plot(x_grid, reorder(uu[i]), '.', hold=True)
+    pl.title('a = %05f' % a)
+    fig.savefig(outfile)
+    fig.clf()
+    
+    # Residuals
+    q_grid = na.array(broyden1(lambda y: na.array(y) + 
+                              D*A*na.sin(k*na.array(y)) - x_grid,x_grid))
+    v_grid = a * Ddot * A * na.sin(k*q_grid)
+    resid = v_grid - reorder(uu[i])
+    
+    pl.plot(x_grid, resid, '.')
+    outfile = "frames/res_a%05f.png" % a
+    pl.title('a = %05f' % a)
+    fig.savefig(outfile)
+    fig.clf()

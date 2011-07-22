@@ -251,15 +251,15 @@ def get_normalization(Ttot0, ak, sigma_8, nspect):
     ampl = sigma_8/na.sqrt(sig2)
     return ampl
 
-def create_cosmo_field(field, spec, freq, mean=0., stdev=1.):
+def create_cosmo_field(field, spec, freq, mean=0., stdev=1., space='kspace'):
     """fill 3-d field with values sampled from gaussians with amplitudes 
     given by spec.
 
     """
     shape = spec.shape
-    field[:,:,:] = spec * (na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape)) # Use field[:,:,:] so we don't lose the pointer
-    hermitianize.enforce_hermitian(field)
-    hermitianize.zero_nyquist(field)
+    field[space] = spec * (na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape))
+    hermitianize.enforce_hermitian(field[space])
+    field.zero_nyquist()
 
 def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     """generate realization of initial conditions in CDM overdensity
@@ -317,6 +317,6 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     spec_theta[0,0,0] = 0
 
     # create realizations
-    create_cosmo_field(data['delta']['kspace'], spec_delta, freq)
+    create_cosmo_field(data['delta'], spec_delta, freq)
     for i in xrange(3):
-        create_cosmo_field(data['u'][i]['kspace'], spec_theta, freq)
+        create_cosmo_field(data['u'][i], spec_theta, freq)
