@@ -26,8 +26,8 @@ from dedalus.mods import *
 from dedalus.funcs import insert_ipython
 import numpy as na
 
-shape = (64, 64)
-length = (2. , 2.)
+shape = (128, 128)
+length = (2., 2.)
 RHS = MHD(shape, FourierRepresentation, length=length)
 data = RHS.create_fields(0.)
 
@@ -39,29 +39,22 @@ y -= length[-2] / 2.
 r = na.sqrt(x ** 2 + y ** 2)
 theta = na.arctan2(y, x)
 
-# Create vector potential
-# A = data._field_classes['scalar'](data)
-# Amag = 1.0e-3
-# R0 = 0.3
-# A['xspace'] = Amag * (R0 - r)
-# A['xspace'][A['xspace'] < 0.] = 0.
-#
-#RHS.curlX(A, data['B'])
-
-env = na.sin(r * 8 * na.pi / length[-1]) ** 2
+# Setup B field
+env = 1e-3 * na.cos(r * 4 * na.pi / length[-1]) ** 2
 data['B']['x']['xspace'] = -env * na.sin(theta)
 data['B']['y']['xspace'] = env * na.cos(theta)
 
 data['B']['x']['xspace'][r < length[-1] * 0.25 / 2] = 0
 data['B']['y']['xspace'][r < length[-2] * 0.25 / 2] = 0
-data['B']['x']['xspace'][r > length[-1] * 0.5 / 2] = 0
-data['B']['y']['xspace'][r > length[-2] * 0.5 / 2] = 0
+
+data['B']['x']['xspace'][r > length[-1] * 0.75 / 2] = 0
+data['B']['y']['xspace'][r > length[-2] * 0.75 / 2] = 0
 
 data['B'].div_free()
 
 # Setup flow
-V = length[-1] / 2.
-vangle = na.pi / 2.
+V = 1.0
+vangle = na.pi / 3.
 data['u']['x']['xspace'] += V * na.sin(vangle)
 data['u']['y']['xspace'] += V * na.cos(vangle)
 
@@ -76,7 +69,7 @@ an.add("en_spec", 1)
 
 # Main loop
 CFLtime = na.min(na.array(length) / na.array(shape)) / V
-dt = 0.005
+dt = CFLtime / 10
 print 'CFL time: ', CFLtime
 print 'Chosen dt: ', dt
 
