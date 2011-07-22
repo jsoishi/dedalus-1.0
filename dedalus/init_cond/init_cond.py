@@ -56,8 +56,13 @@ def sin_y(f,ampl=1.):
     f.data[-1,0] = -f.data[1,0]
 
 def sin_k(f, kindex, ampl=1.):
-    f[tuple(kindex)] = ampl*1j
+    f[tuple(kindex)] = ampl*1j/2.
     f[tuple(-1*na.array(kindex))] = f[tuple(kindex)].conjugate()
+
+def cos_k(f, kindex, ampl=1.):
+    f[tuple(kindex)] = ampl/2.
+    f[tuple(-1*na.array(kindex))] = f[tuple(kindex)].conjugate()
+
 
 def alfven(data, k=(1, 0, 0)):
     """
@@ -183,7 +188,7 @@ def shearing_wave(data, wampl, kinit):
     aux = data.clone()
     aux.add_field('w','scalar')
     aux.add_field('psi','scalar')
-    sin_k(aux['w']['kspace'],kinit,ampl=wampl)
+    cos_k(aux['w']['kspace'],kinit,ampl=wampl)
     aux['psi']['kspace'] = aux['w']['kspace']/aux['w'].k2(no_zero=True)
 
     data['u']['x']['kspace'] = aux['psi'].deriv('y')
