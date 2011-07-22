@@ -5,8 +5,8 @@ import pylab as pl
 shape = (16,16,16)
 RHS = CollisionlessCosmology(shape, FourierRepresentation)
 data = RHS.create_fields(0.)
-H_0 = 2.27826587e-18 # 70.3 km/s/Mpc in seconds^-1
-ampl = 4e-19 # amplitude of initial velocity wave
+H_0 = 7.185e-5 # 70.3 km/s/Mpc in Myr^-1 (2.27826587e-18 seconds^-1) 
+ampl = 5e-5 # amplitude of initial velocity wave
 
 L = 2*na.pi # size of box
 N_p = 128 # resolution of analytic solution
@@ -28,9 +28,9 @@ RHS.parameters['Omega_l'] = 0#0.724
 RHS.parameters['H0'] = H_0
 zeldovich(data, ampl, a_i, a_cross)
 
-Myr = 3.15e13 # 10^6 years in seconds
+Myr = 1 # 3.15e13 seconds
 tstop = tcross - t_init
-dt = Myr*1e1/4
+dt = Myr
 
 ti = RK2simple(RHS)
 ti.stop_time(tstop)
@@ -51,7 +51,7 @@ an.add("en_spec", 20)
 i = 0
 #an.run()
 while ti.ok:
-    print "step: ", i
+    print "step: ", i, " a = ", RHS.aux_eqns['a'].value
     if i % 80 == 0:
         tmp = na.zeros_like(data['u'][0]['xspace'][0,0,:].real)
         tmp[:] = data['u'][0]['xspace'][0,0,:].real
@@ -61,7 +61,7 @@ while ti.ok:
 
         tmp3 = na.zeros_like(data['u'][0]['kspace'][0,0,:].real)
         tmp3[:] = na.abs(data['u'][0]['kspace'][0,0,:])
-
+        
         uu.append(tmp)
         ddelta.append(tmp2)
         uk.append(tmp3)
