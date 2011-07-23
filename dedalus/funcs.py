@@ -62,13 +62,14 @@ def insert_ipython(num_up=1):
 
 
 def get_mercurial_changeset_id():
-    """from Jason F. Harris.
+    """adapted from a script by Jason F. Harris, published at
 
     http://jasonfharris.com/blog/2010/05/versioning-your-application-with-the-mercurial-changeset-hash/
 
     """
-    targetBuildDir = os.getenv("TARGET_BUILD_DIR")
-    getChangeset = subprocess.Popen('hg parent --template "{node|short}" --cwd ' + targetBuildDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    import dedalus
+    targetDir = dedalus.__path__[0]
+    getChangeset = subprocess.Popen('hg parent --template "{node|short}" --cwd ' + targetDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 
     if (getChangeset.stderr.read() != ""):
         print "Error in obtaining current changeset of the Mercurial repository"
