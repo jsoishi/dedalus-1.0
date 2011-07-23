@@ -45,8 +45,8 @@ class TimeStepBase(object):
         self._stop_iter = 100000
         self._stop_time = -1.
         self._stop_wall = 3600.*24. # 24 hours
-        self._dnsnap  = 1
-        self._dtsnap = 10.
+        self._dnsnap  = 100
+        self._dtsnap = 1.
 
         self.__start_time = time.time()
 
