@@ -101,7 +101,6 @@ class BaseField(object):
 
     def save(self, group):
         for f in range(self.ncomp):
-            print f, self.trans[f]
             group.create_dataset(self.trans[f], data=self.components[f].data)
 
 class TensorField(BaseField):
