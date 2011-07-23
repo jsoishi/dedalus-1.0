@@ -99,6 +99,11 @@ class BaseField(object):
         for f in self.components:
             f.data[:] = 0.
 
+    def save(self, group):
+        for f in range(self.ncomp):
+            print f, self.trans[f]
+            group.create_dataset(self.trans[f], data=self.components[f].data)
+
 class TensorField(BaseField):
     """Tensor class. Currently used mostly for the velocity gradient tensor."""
     
