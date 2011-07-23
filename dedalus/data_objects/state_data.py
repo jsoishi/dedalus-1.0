@@ -21,8 +21,10 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-import numpy as na
 from collections import OrderedDict
+import h5py
+import numpy as na
+from dedalus.funcs import get_mercurial_changeset_id
 
 class StateData(object):
     """the object containing all relevant data for the state of the
@@ -62,14 +64,14 @@ class StateData(object):
         """NEEDS TO BE UPDATED FOR NEW FIELD TYPES
 
         """
-        pass
-        #filename = "snap_%05i.cpu%04i" % (nsnap, 0)
-        #outfile = h5py.File(filename, mode='w')
-        #grp = outfile.create_group('/data')
-        #dset = outfile.create_dataset('time',data=self.time)
-        #for f in self.fields.keys():
-        #    dset = grp.create_dataset(f,data=self[f].data)
-        #    dset.attrs["space"] = self[f]._curr_space
-        #
-        #outfile.close()
+        filename = "snap_%05i.cpu%04i" % (nsnap, 0)
+        outfile = h5py.File(filename, mode='w')
+        root_grp = outfile.create_group('/fields')
+        dset = outfile.create_dataset('time',data=self.time)
+        root_grp.attrs['hg_version'] = get_mercurial_changeset_id()
+        for name, field in self.fields.iteritems():
+            fgrp = root_grp.create_group(name)
+            field.save(fgrp)
+
+        outfile.close()
 
