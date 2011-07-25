@@ -18,7 +18,6 @@ ampl = 5e-5 # amplitude of initial velocity wave
 L = 2*na.pi # size of box
 N_p = 128 # resolution of analytic solution
 q = na.array([i for i in xrange(0,N_p)]) * L / N_p
-print q
 k = 2*na.pi/L # wavenumber of initial velocity perturbation
 a_i = 0.002 # initial scale factor
 t0 = (2./3.)/H_0 # present age of E-dS universe

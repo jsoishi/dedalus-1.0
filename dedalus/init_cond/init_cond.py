@@ -206,7 +206,7 @@ def zeldovich(data, ampl, a_ini, a_cross):
     data['u'][0]['kspace'][0,0,1] = ampl * 1j / 2
     data['u'][0]['kspace'][0,0,-1] = -data['u'][0]['kspace'][0,0,1]
 
-def get_ic_data(fname, ak, deltacp, thetac):
+def read_linger_ic_data(fname, ak, deltacp, thetac):
     """read certain values from a linger output file
 
     """
@@ -219,7 +219,7 @@ def get_ic_data(fname, ak, deltacp, thetac):
         thetac.append(float(values[11]))
     infile.close()
 
-def get_norm_data(fname, ak_trans, Ttot0):
+def read_linger_norm_data(fname, ak_trans, Ttot0):
     """read certain values from a transfer-mode linger++ output file
 
     """
@@ -279,8 +279,8 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     Ttot0 = []
     ak_trans = [] # the k-values that go with Ttot0
 
-    get_ic_data(ic_fname, ak, deltacp, thetac)
-    get_norm_data(norm_fname, ak_trans, Ttot0)
+    read_linger_ic_data(ic_fname, ak, deltacp, thetac)
+    read_linger_norm_data(norm_fname, ak_trans, Ttot0)
     ak = na.array(ak)
     deltacp = na.array(deltacp)
     thetac = na.array(thetac)
