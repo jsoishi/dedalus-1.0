@@ -98,9 +98,9 @@ class TimeStepBase(object):
 
 
 class RK2simple(TimeStepBase):
-    def __init__(self, *arg, **kwargs):
-        """Basic second-order (midpoint) Runga-Kutta integrator."""
+    """Basic second-order (midpoint) Runga-Kutta integrator."""
         
+    def __init__(self, *arg, **kwargs):        
         TimeStepBase.__init__(self, *arg, **kwargs)
         self.tmp_fields = self.RHS.create_fields(0.)
         self.field_dt = self.RHS.create_fields(0.)
@@ -136,7 +136,7 @@ class RK2simple(TimeStepBase):
         for k,f in data.fields.iteritems():
             for i in xrange(f.ncomp):
                 data[k][i]['kspace'] = data[k][i]['kspace'] + dt * self.field_dt[k][i]['kspace']
-                #data[k][i].dealias()
+                data[k][i].dealias()
 
         for a in self.RHS.aux_eqns.values():
             a.value = a_old + dt * a.RHS(a.value)
@@ -149,9 +149,8 @@ class RK2simple(TimeStepBase):
             self.field_dt[k].zero_all()
 
 class RK2simplevisc(RK2simple):
-    """Runga-Kutta 2 with integrating factor for viscosity. 
-
-    """
+    """Midpoing RK2 with integrating factors."""
+    
     def do_advance(self, data, dt):
         """
         from NR:
@@ -159,29 +158,51 @@ class RK2simplevisc(RK2simple):
           k2 = h * RHS(x_n + 1/2*h, y_n + 1/2*k1)
           y_n+1 = y_n + k2 +O(h**3)
         """
+        
         self.tmp_fields.time = data.time
         self.field_dt.time = data.time
 
-        k2 = data['ux'].k2()
-        # first step
-        viscosity = na.exp(-k2*dt/2.*self.RHS.parameters['nu'])
+        # First step
         self.field_dt = self.RHS.RHS(data)
+        
         for k,f in self.RHS.fields.iteritems():
-            for i in xrange(f.ndim):
-                self.tmp_fields[f][i]['kspace'] = (data[k][i]['kspace'] + dt/2. * self.field_dt[k][i]['kspace'])*viscosity
+            # Exponentiate the integrating factor
+            IF = data[k].integrating_factor
+            EIF = na.exp(IF * dt / 2.)
+            EIFconj = EIF.conj()
+        
+            for i in xrange(f.ncomp):
+                self.tmp_fields[k][i]['kspace'] = (data[k][i]['kspace'] + self.field_dt[k][i]['kspace'] / IF * (EIF - 1.)) * EIFconj
+              
+        for a in self.RHS.aux_eqns.values():
+            a_old = a.value # OK if we only have one aux eqn...
+            # need to update actual value so RHS can use it
+            a.value = a.value + dt / 2. * a.RHS(a.value)
+                        
         self.tmp_fields.time = data.time + dt/2.
 
-        # second step
+        # Second step
         self.field_dt = self.RHS.RHS(self.tmp_fields)
+        
         for k,f in self.RHS.fields.iteritems:
-            for i in xrange(f.ndim):
-                data[k][i]['kspace'] = (data[f][i]['kspace']*viscosity + dt * self.field_dt[f][i]['kspace'])*viscosity
+            # Exponentiate the integrating factor
+            IF = data[k].integrating_factor
+            EIF = na.exp(IF * dt)
+            EIFconj = EIF.conj()
+        
+            for i in xrange(f.ncomp):
+                self.tmp_fields[k][i]['kspace'] = (data[k][i]['kspace'] + self.field_dt[k][i]['kspace'] / IF * (EIF - 1.)) * EIFconj
+                data[k][i].dealias()
+
+        for a in self.RHS.aux_eqns.values():
+            a.value = a_old + dt * a.RHS(a.value)
 
         data.time += dt
         self.time += dt
         self.iter += 1
-        self.tmp_fields.zero_all() 
-        self.field_dt.zero_all()
+        for k,f in data.fields.iteritems():
+            self.tmp_fields[k].zero_all() 
+            self.field_dt[k].zero_all()
 
 class RK2simplehypervisc4(RK2simple):
     """Runga-Kutta 2 with integrating factor for 4th order

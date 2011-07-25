@@ -102,8 +102,6 @@ class FourierRepresentation(Representation):
             self.data[:] = data[sli]
 
         self._curr_space = space
-        #if self.dealias: self.dealias()
-        #self.zero_under_eps()
 
     def initialize(self, data, space):
         """should provide some way to initialize data
@@ -147,7 +145,7 @@ class FourierRepresentation(Representation):
         self.fft()
         self._curr_space = 'kspace'
         if self.dealias: self.dealias()
-        #self.zero_nyquist()
+        self.zero_nyquist()
         self.zero_under_eps()
 
     def backward(self):
@@ -169,7 +167,15 @@ class FourierRepresentation(Representation):
 
         self['kspace'] # Dummy call to switch spaces
         self.data[dmask] = 0.
+        
+    def dealias_spherical_23(self):
+        """Spherical 2/3 dealiasing rule."""
+        
+        # Zeroing mask   
+        dmask = na.sqrt(self.k2()) >= 2/3. * na.min(self.kny)
 
+        self['kspace'] # Dummy call to switch spaces
+        self.data[dmask] = 0.
         
     def deriv(self,dim):
         """take a derivative along dim"""
