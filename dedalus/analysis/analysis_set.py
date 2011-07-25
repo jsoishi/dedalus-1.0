@@ -61,7 +61,7 @@ def volume_average(data, it, va_obj=None):
     va_obj.run()
 
 @AnalysisSet.register_task
-def field_snap(data, it, use_extent=False, **kwargs):
+def field_snap(data, it, use_extent=False, space='xspace', **kwargs):
     """
     Take a snapshot of all fields defined. Currently takes z[0] slice for 3D.
     
@@ -102,9 +102,15 @@ def field_snap(data, it, use_extent=False, **kwargs):
     for k,f in data.fields.iteritems():
         for i in xrange(f.ncomp):
             if f[i].ndim == 3:
-                plot_array = f[i]['xspace'][0,:,:].real
+                plot_array = f[i][space][0,:,:]
             else:
-                plot_array = f[i]['xspace'].real
+                plot_array = f[i][space]
+                
+            if space == 'kspace':
+                plot_array = na.log10(na.abs(plot_array))
+            else:
+                plot_array = plot_array.real
+                
             im = grid[I].imshow(plot_array, extent=extent, origin='lower', 
                                 interpolation='nearest', **kwargs)
             grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='white')
@@ -114,7 +120,10 @@ def field_snap(data, it, use_extent=False, **kwargs):
     grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
     if not os.path.exists('frames'):
         os.mkdir('frames')
-    outfile = "frames/snap_%04i.png" % it
+    if space == 'kspace':
+        outfile = "frames/k_snap_%04i.png" % it
+    else:
+        outfile = "frames/snap_%04i.png" % it
     fig.savefig(outfile)
     fig.clf()
 
