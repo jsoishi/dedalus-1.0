@@ -57,7 +57,7 @@ class FourierRepresentation(Representation):
         self.__eps = na.finfo(dtype).eps
         self._curr_space = 'kspace'
         self.trans = {'x': 0, 'y': 1, 'z': 2,
-                      0:'x', 1:'y', 2:'y'} # for vector fields
+                      0:'x', 1:'y', 2:'z'} # for vector fields
         
         # Get Nyquist wavenumbers
         self.kny = na.pi * na.array(self.shape) / na.array(self.length)
