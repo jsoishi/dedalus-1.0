@@ -165,7 +165,7 @@ class RK2simplevisc(RK2simple):
         # First step
         self.field_dt = self.RHS.RHS(data)
         
-        for k,f in self.RHS.fields.iteritems():
+        for k,f in data.fields.iteritems():
             # Exponentiate the integrating factor
             IF = data[k].integrating_factor
             EIF = na.exp(IF * dt / 2.)
@@ -184,7 +184,7 @@ class RK2simplevisc(RK2simple):
         # Second step
         self.field_dt = self.RHS.RHS(self.tmp_fields)
         
-        for k,f in self.RHS.fields.iteritems:
+        for k,f in data.fields.iteritems():
             # Exponentiate the integrating factor
             IF = data[k].integrating_factor
             EIF = na.exp(IF * dt)
