@@ -165,11 +165,17 @@ class FourierRepresentation(Representation):
         if self.ndim == 3:
             dmask = dmask | (na.abs(self.k['z']) >= 2/3. * self.kny[-3])
 
-        #dmask = na.sqrt(self.k2()) >= 2/3. * na.min(self.kny)
+        self['kspace'] # Dummy call to switch spaces
+        self.data[dmask] = 0.
+        
+    def dealias_spherical_23(self):
+        """Spherical 2/3 dealiasing rule."""
+        
+        # Zeroing mask   
+        dmask = na.sqrt(self.k2()) >= 2/3. * na.min(self.kny)
 
         self['kspace'] # Dummy call to switch spaces
         self.data[dmask] = 0.
-
         
     def deriv(self,dim):
         """take a derivative along dim"""
