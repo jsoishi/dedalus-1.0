@@ -23,8 +23,8 @@ RHS.parameters['H0'] = 7.185e-5 # 70.3 km/s/Mpc in Myr
 cosmology(data, icfname, normfname)
 
 ti = RK2simple(RHS)
-ti.stop_time(3.15e7*1e9)
-dt = 1
+ti.stop_time(1000)
+dt = 1 # time in Myr
 
 outfile = open('growth.dat','w')
 
