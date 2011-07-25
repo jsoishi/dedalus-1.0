@@ -100,8 +100,15 @@ class BaseField(object):
             f.data[:] = 0.
 
     def save(self, group):
+        group.attrs["representation"] = self.representation.__name__
+        group.attrs["type"] = self.__class__.__name__
         for f in range(self.ncomp):
-            group.create_dataset(self.trans[f], data=self.components[f].data)
+            dset = group.create_dataset(self.trans[f], 
+                                        self.shape, 
+                                        dtype=self.components[f].data.dtype)
+            
+            self.components[f].save(dset)
+
 
 class TensorField(BaseField):
     """Tensor class. Currently used mostly for the velocity gradient tensor."""

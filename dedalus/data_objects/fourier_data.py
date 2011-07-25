@@ -206,6 +206,16 @@ class FourierRepresentation(Representation):
         self['kspace']  # Dummy call to ensure in kspace
         self.data[na.abs(self.data) < self.__eps] = 0.
 
+    def save(self, dataset):
+        """save data to HDF5 dataset
+
+        inputs 
+        ------
+        dataset -- an h5py dataset opbject
+
+        """
+        dataset[:] = self.data
+        dataset.attrs['space'] = self._curr_space
 
 class FourierShearRepresentation(FourierRepresentation):
     """
