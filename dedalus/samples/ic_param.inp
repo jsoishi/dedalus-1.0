@@ -4,9 +4,9 @@ omega_L			= 0.724			# Omega cosmological constant today
 H0			= 70.3			# Hubble constant today
 Tcmb			= 2.726			# CMB temperature today (in K)
 YHe			= 0.248			# Helium fraction
-aout			= 0.00009999 		# output times (given in expansion factor a)
+aout			= 0.002 		# output times (given in expansion factor a)
 kmin			= 1e-4			# minimum wavenumber to compute
-kmax			= 1e1			# maximum wavenumber 
+kmax			= 2e1			# maximum wavenumber 
 numk			= 200			# number of wavenumbers
 lmax			= 12			# maximum number of modes allowed 
 						# for photon anisotropy spectrum
