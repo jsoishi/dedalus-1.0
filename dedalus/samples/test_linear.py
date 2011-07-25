@@ -19,14 +19,12 @@ data = RHS.create_fields(0.)
 RHS.parameters['Omega_r'] = 0#8.4e-5
 RHS.parameters['Omega_m'] = 1#0.276
 RHS.parameters['Omega_l'] = 0#0.724
-RHS.parameters['H0'] = 2.27826587e-18 # 70.3 km/s/Mpc in seconds^-1
+RHS.parameters['H0'] = 7.185e-5 # 70.3 km/s/Mpc in Myr
 cosmology(data, icfname, normfname)
 
 ti = RK2simple(RHS)
-ti.stop_time(3.15e7*1e9)
-ti.set_nsnap(1000)
-ti.set_dtsnap(1e17)
-dt=3.15e7*1e6
+ti.stop_time(1000)
+dt = 1 # time in Myr
 
 outfile = open('growth.dat','w')
 
