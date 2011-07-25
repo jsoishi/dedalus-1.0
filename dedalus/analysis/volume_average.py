@@ -27,7 +27,10 @@ License:
 import numpy as na
 
 class VolumeAverageSet(object):
+
+    # Dictionary of registered tasks
     known_analysis = {}
+    
     def __init__(self, data, filename='time_series.dat'):
         self.data = data
         self.filename = filename

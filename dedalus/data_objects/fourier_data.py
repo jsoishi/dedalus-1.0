@@ -102,7 +102,8 @@ class FourierRepresentation(Representation):
             self.data[:] = data[sli]
 
         self._curr_space = space
-        if self.dealias: self.dealias()
+        #if self.dealias: self.dealias()
+        #self.zero_under_eps()
 
     def initialize(self, data, space):
         """should provide some way to initialize data
@@ -146,7 +147,7 @@ class FourierRepresentation(Representation):
         self.fft()
         self._curr_space = 'kspace'
         if self.dealias: self.dealias()
-        self.zero_nyquist()
+        #self.zero_nyquist()
         self.zero_under_eps()
 
     def backward(self):
@@ -160,13 +161,13 @@ class FourierRepresentation(Representation):
         """Orszag 2/3 dealias rule"""
         
         # Zeroing mask   
-        dmask = ((na.abs(self.k['x']) > 2/3. * self.kny[-1]) | 
-                 (na.abs(self.k['y']) > 2/3. * self.kny[-2]))
+        dmask = ((na.abs(self.k['x']) >= 2/3. * self.kny[-1]) | 
+                 (na.abs(self.k['y']) >= 2/3. * self.kny[-2]))
         
         if self.ndim == 3:
-            dmask = dmask | (na.abs(self.k['z']) > 2/3. * self.kny[-3])
+            dmask = dmask | (na.abs(self.k['z']) >= 2/3. * self.kny[-3])
 
-        self['kspace'] # dummy call to switch spaces
+        self['kspace'] # Dummy call to switch spaces
         self.data[dmask] = 0.
 
         

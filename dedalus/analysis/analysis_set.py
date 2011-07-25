@@ -32,7 +32,7 @@ from functools import wraps
 
 class AnalysisSet(object):
 
-    # Dictionary of registered analysis tasks
+    # Dictionary of registered tasks
     known_analysis = {}
     
     def __init__(self, data, ti):
@@ -106,7 +106,7 @@ def field_snap(data, it, use_extent=False, **kwargs):
             else:
                 plot_array = f[i]['xspace'].real
             im = grid[I].imshow(plot_array, extent=extent, origin='lower', 
-                                interpolation=None, **kwargs)
+                                interpolation='nearest', **kwargs)
             grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='white')
             grid.cbar_axes[I].colorbar(im)
             I += 1
@@ -133,55 +133,57 @@ def print_energy(data, it):
     print "x energy: %10.5e" % (0.5*energy.sum()/energy.size)
 
 @AnalysisSet.register_task
-def en_spec(data, it):
-    """Record power spectrum of velocity field."""
+def en_spec(data, it, flist=['u']):
+    """Record power spectrum of specified fields."""
     
-    ux = data['u']['x']
+    for f in flist:
+        fx = data[f]['x']
+        
+        # Calculate power in each mode
+        power = na.zeros(fx.data.shape)
+        for i in xrange(data[f].ncomp):
+            power += na.abs(data[f][i]['kspace'] ** 2)
+        power *= 0.5
+        
+        # Construct bins by wavevector magnitude
+        kmag = na.sqrt(fx.k2())
+        k = fx.k['x'].flatten()
+        k = na.abs(k[0:(k.size / 2 + 1)])
+        kbottom = k - k[1] / 2.
+        ktop = k + k[1] / 2.
+        spec = na.zeros_like(k)
+        
+        for i in xrange(k.size):
+            #spec[i] = (4*na.pi*i**2*power[(kmag >= (i-1/2.)) & (kmag <= (i+1/2.))]).sum()
+            spec[i] = (power[(kmag >= kbottom[i]) & (kmag < ktop[i])]).sum()
     
-    # Calculate power in each mode
-    power = na.zeros(ux.data.shape)
-    for i in xrange(data['u'].ncomp):
-        power += na.abs(data['u'][i]['kspace'] ** 2)
-    power *= 0.5
+        # Plotting, skip if all modes are zero
+        if spec[1:].nonzero()[0].size == 0:
+            return
+        fig = P.figure(1, figsize=(8, 6))
     
-    # Construct bins by wavevector magnitude
-    kmag = na.sqrt(ux.k2())
-    k = ux.k['x'].flatten()
-    k = na.abs(k[0:(k.size / 2 + 1)])
-    kbottom = k - k[1] / 2.
-    ktop = k + k[1] / 2.
-    spec = na.zeros_like(k)
-    
-    for i in xrange(k.size):
-        #spec[i] = (4*na.pi*i**2*power[(kmag >= (i-1/2.)) & (kmag <= (i+1/2.))]).sum()
-        spec[i] = (power[(kmag >= kbottom[i]) & (kmag < ktop[i])]).sum()
-
-    # Plotting, skip if all modes are zero
-    if spec[1:].nonzero()[0].size == 0:
-        return
-    fig = P.figure(1, figsize=(8, 6))
-
-    P.semilogy(k[1:], spec[1:], 'o-')
-    
-    #from dedalus.init_cond.api import mcwilliams_spec
-    #mspec = mcwilliams_spec(k,30.)
-    #mspec *= 0.5/mspec.sum()
-    #print "E tot spec 1D = %10.5e" % mspec.sum()
-    print "E tot spec 2D = %10.5e" % spec.sum()
-    print "E0 2D = %10.5e" % spec[0]
-    #P.loglog(k[1:], mspec[1:])
-    P.xlabel(r"$k$")
-    P.ylabel(r"$E(k)$")
-    
-    # Add timestamp
-    tstr = 't = %5.2f' % data.time
-    P.text(-0.3,1.,tstr, transform=P.gca().transAxes,size=24,color='black')
-   
-    if not os.path.exists('frames'):
-        os.mkdir('frames')
-    outfile = "frames/enspec_%04i.png" % it
-    P.savefig(outfile)
-    P.clf()
+        P.semilogy(k[1:], spec[1:], 'o-')
+        
+        #from dedalus.init_cond.api import mcwilliams_spec
+        #mspec = mcwilliams_spec(k,30.)
+        #mspec *= 0.5/mspec.sum()
+        #print "E tot spec 1D = %10.5e" % mspec.sum()
+        print "%s E tot spec 2D = %10.5e" %(f, spec.sum())
+        print "%s E0 2D = %10.5e" %(f, spec[0])
+        #P.loglog(k[1:], mspec[1:])
+        P.xlabel(r"$k$")
+        P.ylabel(r"$E(k)$")
+        
+        # Add timestamp
+        #tstr = 't = %5.2f' % data.time
+        #P.text(-0.3,1.,tstr, transform=P.gca().transAxes,size=24,color='black')
+        P.title('%s Power, t = %5.2f' %(f, data.time))
+       
+        if not os.path.exists('frames'):
+            os.mkdir('frames')
+        outfile = "frames/enspec_%s_%04i.png" %(f,it)
+        P.savefig(outfile)
+        P.clf()
     
 @AnalysisSet.register_task
 def phase_amp(data, it, fclist=[], klist=[]):

@@ -24,12 +24,14 @@ License:
 
 from dedalus.mods import *
 from dedalus.funcs import insert_ipython
+import numpy as na
 
 shape = (32, 32, 32)
+length = (2 * na.pi,) * 3
 RHS = MHD(shape, FourierRepresentation)
 data = RHS.create_fields(0.)
 
-k = (1, 1, 0)
+k = (2, 0, 0)
 alfven(data, k=k)
 
 ti = RK2simple(RHS, CFL=0.4)
