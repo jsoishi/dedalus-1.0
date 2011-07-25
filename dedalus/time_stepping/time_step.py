@@ -136,6 +136,7 @@ class RK2simple(TimeStepBase):
         for k,f in data.fields.iteritems():
             for i in xrange(f.ncomp):
                 data[k][i]['kspace'] = data[k][i]['kspace'] + dt * self.field_dt[k][i]['kspace']
+                #data[k][i].dealias()
 
         for a in self.RHS.aux_eqns.values():
             a.value = a_old + dt * a.RHS(a.value)
