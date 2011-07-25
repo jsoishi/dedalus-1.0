@@ -297,7 +297,6 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
    
     nk = shape[0]
     freq = data['delta'].k['x']
-   
     kk = na.sqrt(data['delta'].k2(no_zero=True))
 
     maxkk = kk[nk/2, nk/2, nk/2]
