@@ -81,7 +81,7 @@ class BaseField(object):
         # Take translation table for coordinate names from representation
         self.trans = self.components[-1].trans
                                                
-        self.integrating_factor = 0.
+        self.integrating_factor = None
 
     def __getitem__(self, comp_name):
         """If item is not a component number, lookup in translation table."""
