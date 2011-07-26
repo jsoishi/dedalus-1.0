@@ -167,16 +167,15 @@ class RK2simplevisc(RK2simple):
         
         for k,f in data.fields.iteritems():
             # Exponentiate the integrating factor
-            IF = data[k].integrating_factor
+            IF = self.field_dt[k].integrating_factor
             if IF == None:
                 IF = 1e-10
             else:
                 IF[IF == 0] = 1e-10
             EIF = na.exp(IF * dt / 2.)
-            EIFconj = EIF.conj()
         
             for i in xrange(f.ncomp):
-                self.tmp_fields[k][i]['kspace'] = (data[k][i]['kspace'] + self.field_dt[k][i]['kspace'] / IF * (EIF - 1.)) * EIFconj
+                self.tmp_fields[k][i]['kspace'] = (data[k][i]['kspace'] + self.field_dt[k][i]['kspace'] / IF * (EIF - 1.)) / EIF
               
         for a in self.RHS.aux_eqns.values():
             a_old = a.value # OK if we only have one aux eqn...
@@ -190,16 +189,15 @@ class RK2simplevisc(RK2simple):
         
         for k,f in data.fields.iteritems():
             # Exponentiate the integrating factor
-            IF = data[k].integrating_factor
+            IF = self.field_dt[k].integrating_factor
             if IF == None:
                 IF = 1e-10
             else:
                 IF[IF == 0] = 1e-10
             EIF = na.exp(IF * dt)
-            EIFconj = EIF.conj()
-        
+
             for i in xrange(f.ncomp):
-                data[k][i]['kspace'] = (data[k][i]['kspace'] + self.field_dt[k][i]['kspace'] / IF * (EIF - 1.)) * EIFconj
+                data[k][i]['kspace'] = (data[k][i]['kspace'] + self.field_dt[k][i]['kspace'] / IF * (EIF - 1.)) / EIF
                 data[k][i].dealias()
 
         for a in self.RHS.aux_eqns.values():
