@@ -64,19 +64,17 @@ def cos_k(f, kindex, ampl=1.):
     f[tuple(-1*na.array(kindex))] = f[tuple(kindex)].conjugate()
 
 
-def alfven(data, k=(1, 0, 0)):
+def alfven(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6):
     """
     Generate conditions for simulating Alfven waves in MHD.
     For 2d, must have k and B0 in same direction
     """
     
     N = len(k)
+    kmag = na.linalg.norm(k)
     
     # Field setup and calculation
-    B0 = na.array([1., 0., 0.])[:N] * 5.0
-    B0mag = na.linalg.norm(B0)
-    
-    kmag = na.linalg.norm(k)
+    B0 = na.array([1., 0., 0.])[:N] * B0mag
         
     # Alfven speed and wave frequency
     cA = B0mag / na.sqrt(4 * na.pi * data.parameters['rho0'])
@@ -89,8 +87,7 @@ def alfven(data, k=(1, 0, 0)):
     print '-' * 20
     
     # u and B perturbations
-    u1 = na.array([0., 0., 1.])[3-N:] * 5e-6
-    u1mag = na.linalg.norm(u1)
+    u1 = na.array([0., 0., 1.])[3-N:] * u1mag
     
     B1 = (na.dot(k, u1) * B0 - na.dot(k, B0) * u1) / omega
     B1mag = na.linalg.norm(B1)
