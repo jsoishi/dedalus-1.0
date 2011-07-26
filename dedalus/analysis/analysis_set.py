@@ -195,7 +195,7 @@ def en_spec(data, it, flist=['u']):
         P.clf()
     
 @AnalysisSet.register_task
-def phase_amp(data, it, fclist=[], klist=[]):
+def phase_amp(data, it, fclist=[], klist=[], log=False):
     """
     Plot phase velocity and amplification of specified modes.
     
@@ -211,14 +211,12 @@ def phase_amp(data, it, fclist=[], klist=[]):
         # Construct container on first pass
         data._save_modes = {}
         data._init_power = {}
-        
+
         for f,c in fclist:
             data._init_power[f] = 0
-        
-        for f,c in fclist:
             for k in klist:
                 data._save_modes[(f,c,k)] = [data[f][c]['kspace'][k[::-1]]]
-                data._init_power[f] += na.abs(data._save_modes[(f,c,k)]) ** 2.
+                data._init_power[f] += 0.5 * na.abs(data._save_modes[(f,c,k)]) ** 2.
         data._save_modes['time'] = [data.time]
         return
         
@@ -241,10 +239,12 @@ def phase_amp(data, it, fclist=[], klist=[]):
             plot_array = na.array(data._save_modes[(f,c,k)])
             
             # Calculate amplitude growth, normalized to initial power
-            amp_growth = na.abs(plot_array) / na.sqrt(data._init_power[f]) - 1
+            relative_power = 0.5 * na.abs(plot_array) ** 2 / data._init_power[f]
             
             # Phase evolution at fixed point is propto exp(-omega * t)
             dtheta = -na.diff(na.angle(plot_array))
+            print f,c,k
+            print dtheta
             
             # Correct for pi boundary crossing
             dtheta[dtheta > na.pi] -= 2 * na.pi
@@ -254,7 +254,10 @@ def phase_amp(data, it, fclist=[], klist=[]):
             omega = dtheta / na.diff(time)
             phase_velocity = omega / na.linalg.norm(k)
 
-            axs[0, I].plot(time, amp_growth, '.-', label=str(k))
+            if log:
+                axs[0, I].semilogy(time, relative_power, '.-', label=str(k))
+            else:
+                axs[0, I].plot(time, relative_power, '.-', label=str(k))                
             axs[1, I].plot(time[1:], phase_velocity, '.-', label=str(k))
 
         # Pad and label axes
@@ -262,7 +265,7 @@ def phase_amp(data, it, fclist=[], klist=[]):
         axs[1, I].axis(padrange(axs[1, I].axis(), 0.05))
                         
         if I == 0:
-            axs[0, I].set_ylabel('normalized amplitude growth')
+            axs[0, I].set_ylabel('normalized power')
             axs[1, I].set_ylabel('phase velocity')
             axs[1, I].set_xlabel('time')
         

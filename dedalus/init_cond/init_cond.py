@@ -67,7 +67,13 @@ def cos_k(f, kindex, ampl=1.):
 def alfven(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6):
     """
     Generate conditions for simulating Alfven waves in MHD.
-    For 2d, must have k and B0 in same direction
+    For 2d, must have k and B0 in same direction.
+    
+    Inputs:
+        data        StateData object
+        k           k-index tuple, (kx, ky, kz), adds sine wave here in u1 and B1
+        B0mag       B0 magnitude along x-direction
+        u1mag       u1 magnitude for k-wave being added
     """
     
     N = len(k)
@@ -86,6 +92,11 @@ def alfven(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6):
                                       na.array(data['u']['x'].shape)) / cA
     print '-' * 20
     
+    # Background magnetic field
+    for i in xrange(data['B'].ndim):
+        k0 = (0,) * N
+        data['B'][i]['kspace'][k0] = B0[i]
+
     # u and B perturbations
     u1 = na.array([0., 0., 1.])[3-N:] * u1mag
     
@@ -93,15 +104,11 @@ def alfven(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6):
     B1mag = na.linalg.norm(B1)
     
     for i in xrange(data['u'].ndim):
+        data['u'][i]['kspace']
+        data['B'][i]['kspace']
+    
         sin_k(data['u'][i].data, k[::-1], ampl=u1[i])
         sin_k(data['B'][i].data, k[::-1], ampl=B1[i])
-    
-        data['u'][i]._curr_space = 'kspace'
-        data['B'][i]._curr_space = 'kspace'
-    
-    # Background magnetic field
-    for i in xrange(data['B'].ndim):
-        data['B'][i]['xspace'] += B0[i]
 
 def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     """generate noise with a random phase and a spectrum given by
