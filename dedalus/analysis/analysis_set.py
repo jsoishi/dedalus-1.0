@@ -247,8 +247,8 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
             
             # Phase evolution at fixed point is propto exp(-omega * t)
             dtheta = -na.diff(na.angle(plot_array))
-            print f,c,k
-            print dtheta
+            #print f,c,k
+            #print dtheta
             
             # Correct for pi boundary crossing
             dtheta[dtheta > na.pi] -= 2 * na.pi
