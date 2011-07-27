@@ -174,7 +174,7 @@ class Physics(object):
                 
                 # Add term to each output
                 for k,X in enumerate(Xlist):
-                    outlist[k][i] += (X[j]['xspace'] * tmp['xspace']).real
+                    outlist[k][i]['xspace'] += (X[j]['xspace'] * tmp['xspace']).real
      
     def XcrossY(self, X, Y, output, space):
         """
@@ -391,9 +391,8 @@ class MHD(Hydro):
         self.fields = [('u', 'vector'),
                        ('B', 'vector')]
         self._aux_fields = [('Ptotal', 'vector'),
-                            ('gradu', 'tensor'),
+                            ('mathtmp', 'scalar'),
                             ('ugradu', 'vector'),
-                            ('gradB', 'tensor'),
                             ('BgradB', 'vector'),
                             ('ugradB', 'vector'),
                             ('Bgradu', 'vector')]
@@ -419,8 +418,7 @@ class MHD(Hydro):
         # Place references
         u = data['u']
         B = data['B']
-        gradu = self.aux_fields['gradu']
-        gradB = self.aux_fields['gradB']
+        mathtmp = self.aux_fields['mathtmp']
         ugradu = self.aux_fields['ugradu']
         BgradB = self.aux_fields['BgradB']
         ugradB = self.aux_fields['ugradB']
@@ -429,10 +427,8 @@ class MHD(Hydro):
         pr4 = 4 * na.pi * self.parameters['rho0']
         
         # Compute terms
-        self.XgradY(u, u, gradu, ugradu)
-        self.XgradY(B, B, gradB, BgradB)
-        self.XgradY(u, B, gradB, ugradB, compute_gradY=False)
-        self.XgradY(B, u, gradu, Bgradu, compute_gradY=False)
+        self.XlistgradY([u, B], u, mathtmp, [ugradu, Bgradu])
+        self.XlistgradY([u, B], B, mathtmp, [ugradB, BgradB])
         self.total_pressure(data)
         
         # Construct time derivatives
