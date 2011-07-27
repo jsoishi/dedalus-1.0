@@ -59,20 +59,6 @@ class Physics(object):
             field_list = self.fields
         return StateData(t, self.shape, self.length, self._field_classes, 
                          field_list=field_list, params=self.parameters)
-                         
-    def create_dealias_field(self, t, fields=None):
-        """data object to implement Orszag 3/2 rule for non-linear
-        terms.
-
-        """
-        name = "%sDealiasData" % self.__class__.__name__
-        shape = [3*d/2 for d in self.shape]
-        data_class = create_data(self._representation, shape, name)
-
-        if fields == None:
-            return data_class(self.fields, t)
-        else:
-            return data_class(fields, t)
 
     def _setup_parameters(self, params):
         for k,v in params.iteritems():
@@ -146,39 +132,6 @@ class Physics(object):
             compute_gradY   Set to False if gradY has been computed
 
         """
-
-#         if dealias == '3/2':
-#             # Uses temporary dealias fields with 3/2 as many points 
-#             # as the shape of the data object.
-#             
-#             # ****** THIS HAS NOT BEEN UPDATED TO WORK WITH NEW HANDLING ******
-# 
-#             d = data['ux']
-#             self.gradu(data)
-#             gradu = self.aux_fields['gradu']
-#             ugradu = self.aux_fields['ugradu']
-#             trans = {0: 'ux', 1: 'uy', 2: 'uz'}
-#             self.q.zero_all()
-#             for i,f in enumerate(self.fields):
-#                 b = [i * self.ndim + j for j in self.dims]
-#                 tmp = na.zeros_like(self.q['ugu'].data)
-#                 for ii,j, in enumerate(b):
-#                     self.q['u'].data[:]= 0+0j
-#                     self.q['u']._curr_space = 'kspace'
-#                     self.q['gu'].data[:] = 0+0j
-#                     self.q['gu']._curr_space = 'kspace'
-#                     #zero_nyquist(data[trans[ii]]['kspace'])
-#                     data[trans[ii]].zero_nyquist()
-#                     self.q['u'] = na.fft.fftshift(data[trans[ii]]['kspace'])
-#                     self.q['u'] = na.fft.fftshift(self.q['u']['kspace'])
-#                     self.q['gu'] = na.fft.fftshift(gradu[j]['kspace'])
-#                     self.q['gu'] = na.fft.fftshift(self.q['gu']['kspace'])
-#                     tmp += self.q['u']['xspace'] * self.q['gu']['xspace']
-#                 tmp.imag = 0.
-#                 self.q['ugu'] = tmp
-#                 self.q['ugu']._curr_space = 'xspace'
-#                 ugradu[f] = self.q['ugu']['kspace']
-#                 tmp *= 0+0j
 
         N = self.ndim
     
@@ -298,7 +251,6 @@ class Hydro(Physics):
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1.}
         self._setup_parameters(params)
-        #self.q = self.create_dealias_field(0.,['u','gu','ugu'])
         self._finalized = False
 
     def _finalize_init(self):
@@ -423,7 +375,6 @@ class MHD(Hydro):
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1., 'eta': 0.}
 
-        #self.q = self.create_dealias_field(0.,['u','gu','ugu'])
         self._setup_aux_fields(0., self._aux_fields)
         self._setup_parameters(params)
         self._RHS = self.create_fields(0.)
