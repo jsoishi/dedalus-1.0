@@ -40,7 +40,7 @@ class Physics(object):
         if length:
             self.length = length
         else:
-            self.length = (2*na.pi,) * self.ndim
+            self.length = (2 * na.pi,) * self.ndim
         self.dims = xrange(self.ndim)
         self._representation = representation
         self._field_classes = create_field_classes(
@@ -82,8 +82,6 @@ class Physics(object):
     def RHS(self):
         pass
 
-        
-        
     def gradX(self, X, output):
         """
         Compute Jacobian: gradX[N * i + j] = dX_i/dx_j
@@ -120,7 +118,7 @@ class Physics(object):
                 
     def XgradY(self, X, Y, gradY, output, compute_gradY=True):
         """
-        Calculate "X dot (grad X)" term, with dealiasing options.
+        Calculate X dot (grad Y).
         
         Inputs:
             X           Input VectorField object
@@ -149,7 +147,35 @@ class Physics(object):
                 tmp += X[j]['xspace'] * gradY[N * i + j]['xspace']
             output[i]['xspace'] = tmp.real                    
             tmp *= 0+0j
+            
+    def XlistgradY(self, Xlist, Y, tmp, outlist):
+        """
+        Calculate X dot (grad Y) for X in Xlist.
+        This is a low-memory alternative to XgradY (never stores a full gradY tensor).
+        
+        Inputs:
+            Xlist       List of input VectorField objects
+            Y           Input Scalar/VectorField object
+            tmp         ScalarField object for use in internal calculations
+            outlist     List of output Scalar/VectorField object
+
+        """
+
+        N = self.ndim
+
+        # Zero all output fields
+        for outfield in outlist:
+            outfield.zero_all()
+
+        for i in xrange(Y.ncomp):
+            for j in self.dims:
+                # Compute dY_i/dx_j
+                tmp['kspace'] = Y[i].deriv(self._trans[j])
                 
+                # Add term to each output
+                for k,X in enumerate(Xlist):
+                    outlist[k][i] += (X[j]['xspace'] * tmp['xspace']).real
+     
     def XcrossY(self, X, Y, output, space):
         """
         Calculate X cross Y.
