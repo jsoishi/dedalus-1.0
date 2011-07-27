@@ -82,7 +82,7 @@ def field_snap(data, it, use_extent=False, space='xspace', **kwargs):
     ncol = na.int(ncol)
 
     if use_extent:
-        extent = [0.,data.length[1], 0., data.length[0]]
+        extent = [0.,data.length[-1], 0., data.length[-2]]
     else:
         extent = None
     
@@ -107,7 +107,9 @@ def field_snap(data, it, use_extent=False, space='xspace', **kwargs):
                 plot_array = f[i][space]
                 
             if space == 'kspace':
-                plot_array = na.log10(na.abs(plot_array))
+                plot_array = na.abs(plot_array)
+                plot_array[plot_array == 0] = na.nan
+                plot_array = na.log10(plot_array)
             else:
                 plot_array = plot_array.real
                 
@@ -217,6 +219,8 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
             for k in klist:
                 data._save_modes[(f,c,k)] = [data[f][c]['kspace'][k[::-1]]]
                 data._init_power[f] += 0.5 * na.abs(data._save_modes[(f,c,k)]) ** 2.
+            if data._init_power[f] == 0:
+                data._init_power[f] = 1.
         data._save_modes['time'] = [data.time]
         return
         
@@ -283,10 +287,14 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
     
 def padrange(range, pad=0.05):
     xmin, xmax, ymin, ymax = range
-    outrange = [xmin - pad * (xmax - xmin),
-                xmax + pad * (xmax - xmin),
-                ymin - pad * (ymax - ymin),
-                ymax + pad * (ymax - ymin)]
+    dx = xmax - xmin
+    dy = ymax - ymin
+    if dx == 0: dx = 1.
+    if dy == 0: dy = 1.
+    outrange = [xmin - pad * dx,
+                xmax + pad * dx,
+                ymin - pad * dy,
+                ymax + pad * dy]
                 
     return outrange
     

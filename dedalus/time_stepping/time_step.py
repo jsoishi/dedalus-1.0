@@ -111,6 +111,8 @@ class RK2simple(TimeStepBase):
           k1 = h * RHS(x_n, y_n)
           k2 = h * RHS(x_n + 1/2*h, y_n + 1/2*k1)
           y_n+1 = y_n + k2 +O(h**3)
+          
+          Peyret 143 for high order
         """
         
         self.tmp_fields.time = data.time

@@ -146,7 +146,7 @@ class FourierRepresentation(Representation):
         self._curr_space = 'kspace'
         if self.dealias: self.dealias()
         self.zero_nyquist()
-        self.zero_under_eps()
+        #self.zero_under_eps()
 
     def backward(self):
         """IFFT method to go from kspace to xspace."""
