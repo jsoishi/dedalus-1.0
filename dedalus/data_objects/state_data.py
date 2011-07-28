@@ -25,6 +25,17 @@ from collections import OrderedDict
 import h5py
 import numpy as na
 from dedalus.funcs import get_mercurial_changeset_id
+from field_object import create_field_classes
+
+def _reconstruct_data(*args, **kwargs):
+    arg1 = args[1]
+    field_classes = create_field_classes(args[2], arg1['shape'], arg1['length'])
+    new_args = [arg1['time'], arg1['shape'], arg1['length'], field_classes]
+    obj = args[0](*new_args)
+    obj.__dict__.update(arg1)
+    for f, t in args[3]:
+        obj.add_field(f, t)
+    return obj
 
 class StateData(object):
     """the object containing all relevant data for the state of the
@@ -51,6 +62,19 @@ class StateData(object):
     def __getitem__(self, item):
         return self.fields[item]
 
+    def __reduce__(self):
+        savedict = {}
+        exclude = ['fields', '_field_classes']
+        field_keys = zip(self.fields.keys(), [f.__class__.__name__ for f in self.fields.values()])
+        # grap representation from first fieldclass
+        k = self._field_classes.keys()[0]
+        field_class_rep = self._field_classes[k].representation
+
+        for k,v in self.__dict__.iteritems():
+            if k not in exclude:
+                savedict[k] = v
+        return (_reconstruct_data, (self.__class__, savedict, field_class_rep, field_keys))
+
     def add_field(self, field, field_type):
         """add a new field. There is a SIGNIFICANT performace penalty
         for doing this (creating the FFTW plan), so make sure it does
@@ -60,18 +84,15 @@ class StateData(object):
         if field not in self.fields.keys():
             self.fields[field] = self._field_classes[field_type](self)
 
-    def snapshot(self, nsnap):
-        """NEEDS TO BE UPDATED FOR NEW FIELD TYPES
+    def snapshot(self, root_grp):
+        """save all fields to the HDF5 group given by input
+
+        input
+        -----
+        root_grp -- h5py group object where all fields go
 
         """
-        filename = "snap_%05i.cpu%04i" % (nsnap, 0)
-        outfile = h5py.File(filename, mode='w')
-        root_grp = outfile.create_group('/fields')
-        dset = outfile.create_dataset('time',data=self.time)
-        root_grp.attrs['hg_version'] = get_mercurial_changeset_id()
         for name, field in self.fields.iteritems():
             fgrp = root_grp.create_group(name)
             field.save(fgrp)
-
-        outfile.close()
 
