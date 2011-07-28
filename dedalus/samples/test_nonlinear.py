@@ -15,7 +15,7 @@ icfname = sys.argv[1]
 normfname = sys.argv[2]
 
 shape = (32,32,32)
-L = 1000
+L = (1000,)*3
 RHS = CollisionlessCosmology(shape, FourierRepresentation, length=L)
 data = RHS.create_fields(0.)
 H0 = 7.185e-5 # 70.3 km/s/Mpc in Myr
@@ -50,19 +50,19 @@ RHS.parameters['Omega_l'] = 0.724
 RHS.parameters['H0'] = H0
 cosmology(data, icfname, normfname)
 
-dt = 1./64 # time in Myr
+dt = 50. # time in Myr
 ti = RK2simple(RHS)
 ti.stop_time(100.*dt)
 
 an = AnalysisSet(data, ti)
 
 an.add("field_snap", 20)
-#an.add("en_spec", 20)
+an.add("en_spec", 20)
 i=0
 an.run()
 while ti.ok:
     Dplus = ((data.time + t_ini)/t_ini) ** (2./3.)
-    print 'step: ', i
+    print 'step: ', i, ' a = ', RHS.aux_eqns['a'].value
     if i % 20 == 0:
         pow_spec(data, i, Dplus)
     ti.advance(data, dt)
