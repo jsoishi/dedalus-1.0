@@ -34,13 +34,14 @@ class Physics(object):
     a right hand side for a time integration scheme.
     """
     
-    def __init__(self, shape, representation, length=None):
+    def __init__(self, shape, representation, length=None, visc_order=1):
         self.shape = shape
         self.ndim = len(self.shape)
         if length:
             self.length = length
         else:
             self.length = (2 * na.pi,) * self.ndim
+        self.visc_order = visc_order
         self.dims = xrange(self.ndim)
         self._representation = representation
         self._field_classes = create_field_classes(
@@ -314,7 +315,7 @@ class Hydro(Physics):
             self._RHS['u'][i]['kspace'] = -ugradu[i]['kspace'] - pressure[i]['kspace']
             
         # Set integrating factors
-        self._RHS['u'].integrating_factor = self.parameters['nu'] * self._RHS['u']['x'].k2()
+        self._RHS['u'].integrating_factor = self.parameters['nu'] * (self._RHS['u']['x'].k2()) ** self.visc_order
             
         self._RHS.time = data.time        
         self.aux_fields.time = data.time
@@ -447,8 +448,8 @@ class MHD(Hydro):
             self._RHS['B'][i]['kspace'] = Bgradu[i]['kspace'] - ugradB[i]['kspace']
 
         # Set integrating factors
-        self._RHS['u'].integrating_factor = self.parameters['nu'] * self._RHS['u']['x'].k2()
-        self._RHS['B'].integrating_factor = self.parameters['eta'] * self._RHS['B']['x'].k2()
+        self._RHS['u'].integrating_factor = self.parameters['nu'] * (self._RHS['u']['x'].k2()) ** self.visc_order
+        self._RHS['B'].integrating_factor = self.parameters['eta'] * (self._RHS['B']['x'].k2()) ** self.visc_order
 
         self._RHS.time = data.time        
         return self._RHS

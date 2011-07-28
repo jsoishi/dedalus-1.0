@@ -102,8 +102,12 @@ class RK2simple(TimeStepBase):
         
     def __init__(self, *arg, **kwargs):        
         TimeStepBase.__init__(self, *arg, **kwargs)
+        
+        # Create StateData for storing stage
         self.tmp_fields = self.RHS.create_fields(0.)
-        self.field_dt = self.RHS.create_fields(0.)
+        
+        # Create internal reference to derivative StateData from RHS
+        self.field_dt = None
 
     def do_advance(self, data, dt):
         """
@@ -116,7 +120,7 @@ class RK2simple(TimeStepBase):
         """
         
         self.tmp_fields.time = data.time
-        self.field_dt.time = data.time
+        #self.field_dt.time = data.time
         
         # First step
         self.field_dt = self.RHS.RHS(data)
@@ -150,6 +154,8 @@ class RK2simple(TimeStepBase):
             self.tmp_fields[k].zero_all() 
             self.field_dt[k].zero_all()
 
+
+
 class RK2simplevisc(RK2simple):
     """Midpoing RK2 with integrating factors."""
     
@@ -162,7 +168,7 @@ class RK2simplevisc(RK2simple):
         """
         
         self.tmp_fields.time = data.time
-        self.field_dt.time = data.time
+        #self.field_dt.time = data.time
 
         # First step
         self.field_dt = self.RHS.RHS(data)
@@ -210,7 +216,7 @@ class RK2simplevisc(RK2simple):
         self.iter += 1
         for k,f in data.fields.iteritems():
             self.tmp_fields[k].zero_all() 
-            self.field_dt[k].zero_all()
+            self.field_dt[k].zero_all()            
 
 class RK2simplehypervisc4(RK2simple):
     """Runga-Kutta 2 with integrating factor for 4th order
@@ -224,8 +230,9 @@ class RK2simplehypervisc4(RK2simple):
           k2 = h * RHS(x_n + 1/2*h, y_n + 1/2*k1)
           y_n+1 = y_n + k2 +O(h**3)
         """
+        
         self.tmp_fields.time = data.time
-        self.field_dt.time = data.time
+        #self.field_dt.time = data.time
 
         k4 = na.zeros(data['u']['x'].data.shape)
         for k in data['u']['x'].k.values():
@@ -268,3 +275,47 @@ class CrankNicholsonVisc(TimeStepBase):
         data.time += dt
         self.time += dt
         self.iter += 1
+            
+def linear_step(start, deriv, dt, output):
+    """
+    Take a linear step in all fields.
+    
+    Inputs:
+        start       StateData object at initial time
+        deriv       StateData object containing derivatives
+        dt          Timestep
+        output      StateData object to take the output
+        
+    """
+    
+    for k,f in start.fields.iteritems():
+        for i in xrange(f.ncomp):
+            output[k][i]['kspace'] = start[k][i]['kspace'] + dt * deriv[k][i]['kspace']
+            if output[k][i].dealias: output[k][i].dealias()
+                
+def integrating_factor_step(start, deriv, dt, output):
+    """
+    Take a step using integrating factors in all fields.
+    
+    Inputs:
+        start       StateData object at initial time
+        deriv       StateData object containing derivatives
+        dt          Timestep
+        output      StateData object to take the output
+        
+    """
+    
+    for k,f in start.fields.iteritems():
+        # Exponentiate the integrating factor
+        IF = deriv[k].integrating_factor
+        
+        # Turn zeros into small numbers: to first order, reduces to linear step
+        if IF == None:
+            IF = 1e-10
+        else:
+            IF[IF == 0] = 1e-10
+        EIF = na.exp(IF * dt)
+            
+        for i in xrange(f.ncomp):
+            output[k][i]['kspace'] = (start[k][i]['kspace'] + deriv[k][i]['kspace'] / IF * (EIF - 1.)) / EIF
+            if output[k][i].dealias: output[k][i].dealias()
