@@ -165,8 +165,8 @@ def MIT_vortices(data):
     sh = data['u']['x']['kspace'].shape
     x, y = na.meshgrid(na.r_[0:sh[0]]*2*na.pi/sh[0],na.r_[0:sh[1]]*2*na.pi/sh[1])
     aux = data.clone()
-    aux.add_field('w','scalar')
-    aux.add_field('psi','scalar')
+    aux.add_field('w','ScalarField')
+    aux.add_field('psi','ScalarField')
     aux['w']['xspace']=na.exp(-((x-na.pi)**2+(y-na.pi+na.pi/4)**2)/(0.2)) \
         +na.exp(-((x-na.pi)**2+(y-na.pi-na.pi/4)**2)/(0.2)) \
         -0.5*na.exp(-((x-na.pi-na.pi/4)**2+(y-na.pi-na.pi/4)**2)/(0.4))
@@ -186,8 +186,8 @@ def shearing_wave(data, wampl, kinit):
     kinit -- initial wave vector in index space
     """
     aux = data.clone()
-    aux.add_field('w','scalar')
-    aux.add_field('psi','scalar')
+    aux.add_field('w','ScalarField')
+    aux.add_field('psi','ScalarField')
     cos_k(aux['w']['kspace'],kinit,ampl=wampl)
     aux['psi']['kspace'] = aux['w']['kspace']/aux['w'].k2(no_zero=True)
 
