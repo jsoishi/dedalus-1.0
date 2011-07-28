@@ -49,10 +49,11 @@ from dedalus.physics.api import \
     LinearCollisionlessCosmology,\
     CollisionlessCosmology
 
-
 from dedalus.time_stepping.api import \
     RK2simple,\
     RK2simplevisc, \
     RK2simplehypervisc4, \
     CrankNicholsonVisc
 
+from dedalus.utils.api import \
+    restart
