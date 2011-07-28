@@ -267,7 +267,6 @@ def collisionless_cosmo_fields(delta, u, spec_delta, spec_u, mean=0., stdev=1.):
     amplitudes given by spec.
 
     """
-    na.random.seed(1)
     shape = spec_delta.shape
     rand = na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape)
     delta['kspace'] = spec_delta * rand
@@ -309,9 +308,9 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     deltacp = na.array(deltacp)
     phi = na.array(phi)
     thetac = na.array(thetac)
-    ak_trans = na.array(ak_trans) * .703
+    ak_trans = na.array(ak_trans) * .703 # should take h from input
     Ttot0 = na.array(Ttot0)    
-    thetac = -na.array(dTvc) * (.703/299792.458) * (ak_trans**2)
+    #thetac = -na.array(dTvc) * (.703/299792.458) * (ak_trans**2)
         
     # normalize
     ampl = get_normalization(Ttot0, ak_trans, sigma_8, nspect)
@@ -334,8 +333,8 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     f_deltacp = interp1d(ak[::-1], deltacp[::-1], kind='cubic')
     spec_delta = kk**(nspect/2.)*f_deltacp(kk)
     
-    f_thetac = interp1d(ak_trans, thetac, kind='cubic')
-    #f_thetac = interp1d(ak[::-1], thetac[::-1], kind='cubic')
+    #f_thetac = interp1d(ak_trans, thetac, kind='cubic') # if thetac comes from dTvc
+    f_thetac = interp1d(ak[::-1], thetac[::-1], kind='cubic')
     spec_vel = -1j*kk**(nspect/2. -1.)*f_thetac(kk)
     spec_vel[0,0,0] = 0
 
