@@ -152,7 +152,7 @@ class RK2simple(TimeStepBase):
             self.field_dt[k].zero_all()
 
 class RK2simplevisc(RK2simple):
-    """Midpoing RK2 with integrating factors."""
+    """Midpoint RK2 with integrating factors."""
     
     def do_advance(self, data, dt):
         """
@@ -185,6 +185,90 @@ class RK2simplevisc(RK2simple):
         data.time += dt
         self.time += dt
         self.iter += 1
+        
+class RK4simplevisc(RK2simple):
+    """Standard RK4 with integrating factors."""
+    
+    def __init__(self, *arg, **kwargs):        
+        TimeStepBase.__init__(self, *arg, **kwargs)
+        
+        # Create StateData for storing stages
+        self.tmp_stage = self.RHS.create_fields(0.)
+        
+        # Create StateData for building final step
+        self.tmp_final = self.RHS.create_fields(0.)
+        
+        # Create internal reference to derivative StateData from RHS
+        self.field_dt = None
+
+    
+    def do_advance(self, data, dt):
+        """
+        k1 = RHS(t_n, y_n)
+        k2 = RHS(t_n + h / 2, y_n + dt / 2 * k1)
+        k3 = RHS(t_n + h / 2, y_n + dt / 2 * k2)
+        k4 = RHS(t_n + h, y_n + dt * k3)
+          
+        y_n+1 = y_n + dt * (k1 + 2 * k2 + 2 * k3 + k4) / 6 + O(h ** 5)
+        t_n+1 = t_n + h
+        """
+        
+        # First stage
+        self.field_dt = self.RHS.RHS(data)
+        
+        for k,f in data.fields.iteritems():
+            for i in xrange(f.ncomp):
+                self.tmp_final[k][i]['kspace'] = self.field_dt[k][i]['kspace'] / 6.
+                
+        # Second stage
+        integrating_factor_step(data, self.field_dt, dt / 2., self.tmp_stage)
+        self.field_dt = self.RHS.RHS(self.tmp_stage)
+        
+        for k,f in data.fields.iteritems():
+            for i in xrange(f.ncomp):
+                self.tmp_final[k][i]['kspace'] += self.field_dt[k][i]['kspace'] / 3.
+                
+        # Third stage
+        integrating_factor_step(data, self.field_dt, dt / 2., self.tmp_stage)
+        self.field_dt = self.RHS.RHS(self.tmp_stage)
+                       
+        for k,f in data.fields.iteritems():
+            for i in xrange(f.ncomp):
+                self.tmp_final[k][i]['kspace'] += self.field_dt[k][i]['kspace'] / 3.
+                
+        # Fourth stage
+        integrating_factor_step(data, self.field_dt, dt, self.tmp_stage)
+        self.field_dt = self.RHS.RHS(self.tmp_stage)
+                               
+        for k,f in data.fields.iteritems():
+            for i in xrange(f.ncomp):
+                self.tmp_final[k][i]['kspace'] += self.field_dt[k][i]['kspace'] / 6.
+        
+        
+        
+        
+        
+        for a in self.RHS.aux_eqns.values():
+            # OK if we only have one aux eqn...
+            # need to update actual value so RHS can use it
+            a_old = a.value 
+            a.value = a.value + dt / 2. * a.RHS(a.value)
+                        
+        self.tmp_fields.time = data.time + dt/2.
+
+
+
+
+        # Final step
+        integrating_factor_step(data, self.tmp_final, dt, data)
+
+        for a in self.RHS.aux_eqns.values():
+            a.value = a_old + dt * a.RHS(a.value)
+
+        # Update data and integrator stats
+        data.time += dt
+        self.time += dt
+        self.iter += 1
 
 class CrankNicholsonVisc(TimeStepBase):
     """
@@ -194,11 +278,12 @@ class CrankNicholsonVisc(TimeStepBase):
     """
     
     def do_advance(self, data, dt):
+    
         deriv = self.RHS.RHS(data)
         for k,f in deriv.fields.iteritems():
             top = 1. / dt - 0.5 * f.integrating_factor
             bottom = 1. / dt + 0.5 * f.integrating_factor
-            for i in xrange(f.ndim):
+            for i in xrange(f.ncomp):
                 data[k][i]['kspace'] = (top / bottom * data[k][i]['kspace'] + 
                                         1. / bottom * deriv[k][i]['kspace'])
 
