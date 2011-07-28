@@ -119,9 +119,6 @@ class RK2simple(TimeStepBase):
           Peyret 143 for high order
         """
         
-        self.tmp_fields.time = data.time
-        #self.field_dt.time = data.time
-        
         # First step
         self.field_dt = self.RHS.RHS(data)
         
@@ -166,9 +163,6 @@ class RK2simplevisc(RK2simple):
           k2 = h * RHS(x_n + 1/2*h, y_n + 1/2*k1)
           y_n+1 = y_n + k2 +O(h**3)
         """
-        
-        self.tmp_fields.time = data.time
-        #self.field_dt.time = data.time
 
         # First step
         self.field_dt = self.RHS.RHS(data)
