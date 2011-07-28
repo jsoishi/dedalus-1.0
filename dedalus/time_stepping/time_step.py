@@ -151,8 +151,6 @@ class RK2simple(TimeStepBase):
             self.tmp_fields[k].zero_all() 
             self.field_dt[k].zero_all()
 
-
-
 class RK2simplevisc(RK2simple):
     """Midpoing RK2 with integrating factors."""
     
@@ -166,89 +164,27 @@ class RK2simplevisc(RK2simple):
 
         # First step
         self.field_dt = self.RHS.RHS(data)
-        
-        for k,f in data.fields.iteritems():
-            # Exponentiate the integrating factor
-            IF = self.field_dt[k].integrating_factor
-            if IF == None:
-                IF = 1e-10
-            else:
-                IF[IF == 0] = 1e-10
-            EIF = na.exp(IF * dt / 2.)
-        
-            for i in xrange(f.ncomp):
-                self.tmp_fields[k][i]['kspace'] = (data[k][i]['kspace'] + self.field_dt[k][i]['kspace'] / IF * (EIF - 1.)) / EIF
+        integrating_factor_step(data, self.field_dt, dt / 2., self.tmp_fields)
               
         for a in self.RHS.aux_eqns.values():
-            a_old = a.value # OK if we only have one aux eqn...
+            # OK if we only have one aux eqn...
             # need to update actual value so RHS can use it
+            a_old = a.value 
             a.value = a.value + dt / 2. * a.RHS(a.value)
                         
         self.tmp_fields.time = data.time + dt/2.
 
         # Second step
         self.field_dt = self.RHS.RHS(self.tmp_fields)
-        
-        for k,f in data.fields.iteritems():
-            # Exponentiate the integrating factor
-            IF = self.field_dt[k].integrating_factor
-            if IF == None:
-                IF = 1e-10
-            else:
-                IF[IF == 0] = 1e-10
-            EIF = na.exp(IF * dt)
-
-            for i in xrange(f.ncomp):
-                data[k][i]['kspace'] = (data[k][i]['kspace'] + self.field_dt[k][i]['kspace'] / IF * (EIF - 1.)) / EIF
-                data[k][i].dealias()
+        integrating_factor_step(data, self.field_dt, dt, data)
 
         for a in self.RHS.aux_eqns.values():
             a.value = a_old + dt * a.RHS(a.value)
 
+        # Update data and integrator stats
         data.time += dt
         self.time += dt
         self.iter += 1
-        for k,f in data.fields.iteritems():
-            self.tmp_fields[k].zero_all() 
-            self.field_dt[k].zero_all()            
-
-class RK2simplehypervisc4(RK2simple):
-    """Runga-Kutta 2 with integrating factor for 4th order
-    hyperviscosity (i.e., \nu_4 \nabla^4 )
-
-    """
-    def do_advance(self, data, dt):
-        """
-        from NR:
-          k1 = h * RHS(x_n, y_n)
-          k2 = h * RHS(x_n + 1/2*h, y_n + 1/2*k1)
-          y_n+1 = y_n + k2 +O(h**3)
-        """
-        
-        self.tmp_fields.time = data.time
-        #self.field_dt.time = data.time
-
-        k4 = na.zeros(data['u']['x'].data.shape)
-        for k in data['u']['x'].k.values():
-            k4 += k**4
-
-        # first step
-        viscosity = na.exp(-k4*dt/2.*self.RHS.parameters['nu'])
-        self.field_dt = self.RHS.RHS(data)
-        for k,f in data.fields.iteritems():
-            for i in xrange(f.ndim):
-                self.tmp_fields[k][i]['kspace'] = (data[k][i]['kspace'] + dt/2. * self.field_dt[k][i]['kspace'])*viscosity
-        self.tmp_fields.time = data.time + dt/2.
-        # second step
-        self.field_dt = self.RHS.RHS(self.tmp_fields)
-        for k,f in data.fields.iteritems():
-            for i in xrange(f.ndim):
-                data[k][i]['kspace'] = (data[k][i]['kspace']*viscosity + dt * self.field_dt[k][i]['kspace'])*viscosity
-        data.time += dt
-        self.time += dt
-        self.iter += 1
-        #self.tmp_fields.zero_all() 
-        #self.field_dt.zero_all()
 
 class CrankNicholsonVisc(TimeStepBase):
     """
@@ -266,6 +202,7 @@ class CrankNicholsonVisc(TimeStepBase):
                 data[k][i]['kspace'] = (top / bottom * data[k][i]['kspace'] + 
                                         1. / bottom * deriv[k][i]['kspace'])
 
+        # Update data and integrator stats
         data.time += dt
         self.time += dt
         self.iter += 1
