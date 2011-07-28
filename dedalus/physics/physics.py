@@ -292,16 +292,22 @@ class Hydro(Physics):
         u_t + nu k^2 u = -ugradu - i k p / rho0
 
         """
+        
         if not self._finalized:
             self._finalize_init()
-        # Compute terms
-        self.XgradY(data['u'], data['u'], self.aux_fields['gradu'],
-                    self.aux_fields['ugradu'])
-        self.pressure(data)
-        
+            
         # Place references
+        u = data['u']
+        B = data['B']
+        #mathtmp = self.aux_fields['mathtmp']
+        gradu = self.aux_fields['gradu']
         ugradu = self.aux_fields['ugradu']
         pressure = self.aux_fields['pressure']
+        
+        # Compute terms
+        self.XgradY(u, u, gradu, ugradu)
+        #self.XlistgradY([u], u, mathtmp, [ugradu]) 
+        self.pressure(data)
         
         # Construct time derivatives
         for i in self.dims:
@@ -343,6 +349,7 @@ class Hydro(Physics):
             pressure[i].zero_nyquist()
 
 class ShearHydro(Hydro):
+
     def RHS(self, data):
         Hydro.RHS(self, data)
 
