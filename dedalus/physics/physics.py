@@ -28,6 +28,12 @@ from dedalus.data_objects.api import create_field_classes, AuxEquation, StateDat
 from dedalus.utils.api import friedmann
 from dedalus.funcs import insert_ipython
 
+def _reconstruct_object(*args, **kwargs):
+    new_args = [args[1]['shape'], args[1]['_representation'], args[1]['length']]
+    obj = args[0](*new_args)
+    obj.__dict__.update(args[1])
+    return obj
+
 class Physics(object):
     """
     This is a base class for a physics object. It needs to provide
@@ -40,11 +46,11 @@ class Physics(object):
         if length:
             self.length = length
         else:
-            self.length = (2*na.pi,) * self.ndim
+            self.length = (2 * na.pi,) * self.ndim
         self.dims = xrange(self.ndim)
         self._representation = representation
         self._field_classes = create_field_classes(
-                self._representation, self.shape, self.length, self.__class__.__name__)
+                self._representation, self.shape, self.length)
         self.parameters = {}
         self.aux_eqns = {}
     
@@ -54,25 +60,19 @@ class Physics(object):
               raise KeyError
          return value
 
+    def __reduce__(self):
+        savedict = {}
+        exclude = ['aux_fields', '_field_classes']
+        for k,v in self.__dict__.iteritems():
+            if k not in exclude:
+                savedict[k] = v
+        return (_reconstruct_object, (self.__class__, savedict))
+
     def create_fields(self, t, field_list=None):        
         if field_list == None:
             field_list = self.fields
         return StateData(t, self.shape, self.length, self._field_classes, 
                          field_list=field_list, params=self.parameters)
-                         
-    def create_dealias_field(self, t, fields=None):
-        """data object to implement Orszag 3/2 rule for non-linear
-        terms.
-
-        """
-        name = "%sDealiasData" % self.__class__.__name__
-        shape = [3*d/2 for d in self.shape]
-        data_class = create_data(self._representation, shape, name)
-
-        if fields == None:
-            return data_class(self.fields, t)
-        else:
-            return data_class(fields, t)
 
     def _setup_parameters(self, params):
         for k,v in params.iteritems():
@@ -96,8 +96,6 @@ class Physics(object):
     def RHS(self):
         pass
 
-        
-        
     def gradX(self, X, output):
         """
         Compute Jacobian: gradX[N * i + j] = dX_i/dx_j
@@ -134,7 +132,7 @@ class Physics(object):
                 
     def XgradY(self, X, Y, gradY, output, compute_gradY=True):
         """
-        Calculate "X dot (grad X)" term, with dealiasing options.
+        Calculate X dot (grad Y).
         
         Inputs:
             X           Input VectorField object
@@ -146,39 +144,6 @@ class Physics(object):
             compute_gradY   Set to False if gradY has been computed
 
         """
-
-#         if dealias == '3/2':
-#             # Uses temporary dealias fields with 3/2 as many points 
-#             # as the shape of the data object.
-#             
-#             # ****** THIS HAS NOT BEEN UPDATED TO WORK WITH NEW HANDLING ******
-# 
-#             d = data['ux']
-#             self.gradu(data)
-#             gradu = self.aux_fields['gradu']
-#             ugradu = self.aux_fields['ugradu']
-#             trans = {0: 'ux', 1: 'uy', 2: 'uz'}
-#             self.q.zero_all()
-#             for i,f in enumerate(self.fields):
-#                 b = [i * self.ndim + j for j in self.dims]
-#                 tmp = na.zeros_like(self.q['ugu'].data)
-#                 for ii,j, in enumerate(b):
-#                     self.q['u'].data[:]= 0+0j
-#                     self.q['u']._curr_space = 'kspace'
-#                     self.q['gu'].data[:] = 0+0j
-#                     self.q['gu']._curr_space = 'kspace'
-#                     #zero_nyquist(data[trans[ii]]['kspace'])
-#                     data[trans[ii]].zero_nyquist()
-#                     self.q['u'] = na.fft.fftshift(data[trans[ii]]['kspace'])
-#                     self.q['u'] = na.fft.fftshift(self.q['u']['kspace'])
-#                     self.q['gu'] = na.fft.fftshift(gradu[j]['kspace'])
-#                     self.q['gu'] = na.fft.fftshift(self.q['gu']['kspace'])
-#                     tmp += self.q['u']['xspace'] * self.q['gu']['xspace']
-#                 tmp.imag = 0.
-#                 self.q['ugu'] = tmp
-#                 self.q['ugu']._curr_space = 'xspace'
-#                 ugradu[f] = self.q['ugu']['kspace']
-#                 tmp *= 0+0j
 
         N = self.ndim
     
@@ -196,7 +161,35 @@ class Physics(object):
                 tmp += X[j]['xspace'] * gradY[N * i + j]['xspace']
             output[i]['xspace'] = tmp.real                    
             tmp *= 0+0j
+            
+    def XlistgradY(self, Xlist, Y, tmp, outlist):
+        """
+        Calculate X dot (grad Y) for X in Xlist.
+        This is a low-memory alternative to XgradY (never stores a full gradY tensor).
+        
+        Inputs:
+            Xlist       List of input VectorField objects
+            Y           Input Scalar/VectorField object
+            tmp         ScalarField object for use in internal calculations
+            outlist     List of output Scalar/VectorField object
+
+        """
+
+        N = self.ndim
+
+        # Zero all output fields
+        for outfield in outlist:
+            outfield.zero_all()
+
+        for i in xrange(Y.ncomp):
+            for j in self.dims:
+                # Compute dY_i/dx_j
+                tmp['kspace'] = Y[i].deriv(self._trans[j])
                 
+                # Add term to each output
+                for k,X in enumerate(Xlist):
+                    outlist[k][i]['xspace'] += (X[j]['xspace'] * tmp['xspace']).real
+     
     def XcrossY(self, X, Y, output, space):
         """
         Calculate X cross Y.
@@ -290,15 +283,14 @@ class Hydro(Physics):
         Physics.__init__(self, *args, **kwargs)
         
         # Setup data fields
-        self.fields = [('u', 'vector')]
-        self._aux_fields = [('pressure', 'vector'),
-                            ('gradu', 'tensor'),
-                            ('ugradu', 'vector')]
+        self.fields = [('u', 'VectorField')]
+        self._aux_fields = [('pressure', 'VectorField'),
+                            ('gradu', 'TensorField'),
+                            ('ugradu', 'VectorField')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1.}
         self._setup_parameters(params)
-        #self.q = self.create_dealias_field(0.,['u','gu','ugu'])
         self._finalized = False
 
     def _finalize_init(self):
@@ -410,20 +402,18 @@ class MHD(Hydro):
         Physics.__init__(self, *args, **kwargs)
         
         # Setup data fields
-        self.fields = [('u', 'vector'),
-                       ('B', 'vector')]
-        self._aux_fields = [('Ptotal', 'vector'),
-                            ('gradu', 'tensor'),
-                            ('ugradu', 'vector'),
-                            ('gradB', 'tensor'),
-                            ('BgradB', 'vector'),
-                            ('ugradB', 'vector'),
-                            ('Bgradu', 'vector')]
+        self.fields = [('u', 'VectorField'),
+                       ('B', 'VectorField')]
+        self._aux_fields = [('Ptotal', 'VectorField'),
+                            ('mathtmp', 'ScalarField'),
+                            ('ugradu', 'VectorField'),
+                            ('BgradB', 'VectorField'),
+                            ('ugradB', 'VectorField'),
+                            ('Bgradu', 'VectorField')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1., 'eta': 0.}
 
-        #self.q = self.create_dealias_field(0.,['u','gu','ugu'])
         self._setup_aux_fields(0., self._aux_fields)
         self._setup_parameters(params)
         self._RHS = self.create_fields(0.)
@@ -442,8 +432,7 @@ class MHD(Hydro):
         # Place references
         u = data['u']
         B = data['B']
-        gradu = self.aux_fields['gradu']
-        gradB = self.aux_fields['gradB']
+        mathtmp = self.aux_fields['mathtmp']
         ugradu = self.aux_fields['ugradu']
         BgradB = self.aux_fields['BgradB']
         ugradB = self.aux_fields['ugradB']
@@ -452,10 +441,8 @@ class MHD(Hydro):
         pr4 = 4 * na.pi * self.parameters['rho0']
         
         # Compute terms
-        self.XgradY(u, u, gradu, ugradu)
-        self.XgradY(B, B, gradB, BgradB)
-        self.XgradY(u, B, gradB, ugradB, compute_gradY=False)
-        self.XgradY(B, u, gradu, Bgradu, compute_gradY=False)
+        self.XlistgradY([u, B], u, mathtmp, [ugradu, Bgradu])
+        self.XlistgradY([u, B], B, mathtmp, [ugradB, BgradB])
         self.total_pressure(data)
         
         # Construct time derivatives
@@ -523,9 +510,9 @@ class LinearCollisionlessCosmology(Physics):
     """
     def __init__(self, *args, **kwargs):
         Physics.__init__(self, *args, **kwargs)
-        self.fields = [('delta', 'scalar'),
-                       ('u', 'vector')]
-        self._aux_fields = [('gradphi', 'vector')]
+        self.fields = [('delta', 'ScalarField'),
+                       ('u', 'VectorField')]
+        self._aux_fields = [('gradphi', 'VectorField')]
                             
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'Omega_r': 0.,
@@ -589,12 +576,12 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
 
     def __init__(self, *args, **kwargs):
         LinearCollisionlessCosmology.__init__(self, *args, **kwargs)
-        self._aux_fields.append(('graddelta', 'vector'))
-        self._aux_fields.append(('ugraddelta', 'scalar'))
-        self._aux_fields.append(('divu', 'scalar'))
-        self._aux_fields.append(('deltadivu', 'scalar'))
-        self._aux_fields.append(('gradu', 'tensor'))
-        self._aux_fields.append(('ugradu', 'vector'))
+        self._aux_fields.append(('graddelta', 'VectorField'))
+        self._aux_fields.append(('ugraddelta', 'ScalarField'))
+        self._aux_fields.append(('divu', 'ScalarField'))
+        self._aux_fields.append(('deltadivu', 'ScalarField'))
+        self._aux_fields.append(('gradu', 'TensorField'))
+        self._aux_fields.append(('ugradu', 'VectorField'))
         self._setup_aux_fields(0., self._aux_fields) # re-creates gradphi
 
     def div_u(self, data):
