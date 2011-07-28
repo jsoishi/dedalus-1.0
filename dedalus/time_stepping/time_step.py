@@ -20,10 +20,12 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
+import os
+import cPickle
 import time
+import h5py
 import numpy as na
-from dedalus.funcs import insert_ipython
+from dedalus.funcs import insert_ipython, get_mercurial_changeset_id
 
 class TimeStepBase(object):
     def __init__(self, RHS, CFL=0.4, int_factor=None):
@@ -66,14 +68,35 @@ class TimeStepBase(object):
 
     def advance(self, data, dt):
         if ((self.iter % self._dnsnap) == 0) or (data.time - self._tlastsnap >= self._dtsnap):
-            data.snapshot(self._nsnap)
-            self._nsnap += 1
-
+            self.snapshot(data)
         self.do_advance(data,dt)
 
     def do_advance(self, data, dt):
         raise NotImplementedError("do_advance must be provided by subclass.")
 
+    def snapshot(self, data):
+        pathname = "snap_%05i" % (self._nsnap)
+        if not os.path.exists(pathname):
+            os.mkdir(pathname)
+        
+        # first, pickle physics data
+        obj_file = open(os.path.join(pathname,'dedalus_obj.cpkl'),'w')
+        cPickle.dump(self.RHS, obj_file)
+        cPickle.dump(data, obj_file)
+        cPickle.dump(self, obj_file)
+        obj_file.close()
+
+        # now save fields
+        filename = os.path.join(pathname, "data.cpu%04i" % 0)
+        outfile = h5py.File(filename, mode='w')
+        root_grp = outfile.create_group('/fields')
+        dset = outfile.create_dataset('time',data=self.time)
+        root_grp.attrs['hg_version'] = get_mercurial_changeset_id()
+
+        data.snapshot(root_grp)        
+        outfile.close()
+        self._nsnap += 1
+        
     def stop_time(self,t):
         self._stop_time = t
 

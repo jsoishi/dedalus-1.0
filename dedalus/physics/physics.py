@@ -28,6 +28,12 @@ from dedalus.data_objects.api import create_field_classes, AuxEquation, StateDat
 from dedalus.utils.api import friedmann
 from dedalus.funcs import insert_ipython
 
+def _reconstruct_object(*args, **kwargs):
+    new_args = [args[1]['shape'], args[1]['_representation'], args[1]['length']]
+    obj = args[0](*new_args)
+    obj.__dict__.update(args[1])
+    return obj
+
 class Physics(object):
     """
     This is a base class for a physics object. It needs to provide
@@ -44,7 +50,7 @@ class Physics(object):
         self.dims = xrange(self.ndim)
         self._representation = representation
         self._field_classes = create_field_classes(
-                self._representation, self.shape, self.length, self.__class__.__name__)
+                self._representation, self.shape, self.length)
         self.parameters = {}
         self.aux_eqns = {}
     
@@ -53,6 +59,14 @@ class Physics(object):
          if value is None:
               raise KeyError
          return value
+
+    def __reduce__(self):
+        savedict = {}
+        exclude = ['aux_fields', '_field_classes']
+        for k,v in self.__dict__.iteritems():
+            if k not in exclude:
+                savedict[k] = v
+        return (_reconstruct_object, (self.__class__, savedict))
 
     def create_fields(self, t, field_list=None):        
         if field_list == None:
@@ -269,10 +283,10 @@ class Hydro(Physics):
         Physics.__init__(self, *args, **kwargs)
         
         # Setup data fields
-        self.fields = [('u', 'vector')]
-        self._aux_fields = [('pressure', 'vector'),
-                            ('gradu', 'tensor'),
-                            ('ugradu', 'vector')]
+        self.fields = [('u', 'VectorField')]
+        self._aux_fields = [('pressure', 'VectorField'),
+                            ('gradu', 'TensorField'),
+                            ('ugradu', 'VectorField')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1.}
@@ -388,14 +402,14 @@ class MHD(Hydro):
         Physics.__init__(self, *args, **kwargs)
         
         # Setup data fields
-        self.fields = [('u', 'vector'),
-                       ('B', 'vector')]
-        self._aux_fields = [('Ptotal', 'vector'),
-                            ('mathtmp', 'scalar'),
-                            ('ugradu', 'vector'),
-                            ('BgradB', 'vector'),
-                            ('ugradB', 'vector'),
-                            ('Bgradu', 'vector')]
+        self.fields = [('u', 'VectorField'),
+                       ('B', 'VectorField')]
+        self._aux_fields = [('Ptotal', 'VectorField'),
+                            ('mathtmp', 'ScalarField'),
+                            ('ugradu', 'VectorField'),
+                            ('BgradB', 'VectorField'),
+                            ('ugradB', 'VectorField'),
+                            ('Bgradu', 'VectorField')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1., 'eta': 0.}
@@ -496,9 +510,9 @@ class LinearCollisionlessCosmology(Physics):
     """
     def __init__(self, *args, **kwargs):
         Physics.__init__(self, *args, **kwargs)
-        self.fields = [('delta', 'scalar'),
-                       ('u', 'vector')]
-        self._aux_fields = [('gradphi', 'vector')]
+        self.fields = [('delta', 'ScalarField'),
+                       ('u', 'VectorField')]
+        self._aux_fields = [('gradphi', 'VectorField')]
                             
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'Omega_r': 0.,
@@ -562,12 +576,12 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
 
     def __init__(self, *args, **kwargs):
         LinearCollisionlessCosmology.__init__(self, *args, **kwargs)
-        self._aux_fields.append(('graddelta', 'vector'))
-        self._aux_fields.append(('ugraddelta', 'scalar'))
-        self._aux_fields.append(('divu', 'scalar'))
-        self._aux_fields.append(('deltadivu', 'scalar'))
-        self._aux_fields.append(('gradu', 'tensor'))
-        self._aux_fields.append(('ugradu', 'vector'))
+        self._aux_fields.append(('graddelta', 'VectorField'))
+        self._aux_fields.append(('ugraddelta', 'ScalarField'))
+        self._aux_fields.append(('divu', 'ScalarField'))
+        self._aux_fields.append(('deltadivu', 'ScalarField'))
+        self._aux_fields.append(('gradu', 'TensorField'))
+        self._aux_fields.append(('ugradu', 'VectorField'))
         self._setup_aux_fields(0., self._aux_fields) # re-creates gradphi
 
     def div_u(self, data):
