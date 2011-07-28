@@ -24,24 +24,25 @@ License:
 import weakref
 import h5py
 
-def create_field_classes(representation, shape, length, name):
+def create_field_classes(representation, shape, length):
     """utility function to bind representation and shape to tensor,
     vector, and scalar fields.
 
     """
-    tname = "%sTensorField" % name
-    new_tensorclass = type(tname, (TensorField,), {'representation': representation,
-                                                  'shape': shape, 'length': length})
-    vname = "%sVectorField" % name
-    new_vectorclass = type(vname, (VectorField,), {'representation': representation,
-                                                  'shape': shape, 'length': length})
-    sname = "%sScalarField" % name
-    new_scalarclass = type(sname, (ScalarField,), {'representation': representation,
+    tname = "TensorField"
+    new_tensorclass = type(tname, (TensorFieldBase,), {'representation': representation,
                                                   'shape': shape, 'length': length})
 
-    return {'tensor': new_tensorclass,
-            'vector': new_vectorclass,
-            'scalar': new_scalarclass}
+    vname = "VectorField"
+    new_vectorclass = type(vname, (VectorFieldBase,), {'representation': representation,
+                                                  'shape': shape, 'length': length})
+    sname = "ScalarField" 
+    new_scalarclass = type(sname, (ScalarFieldBase,), {'representation': representation,
+                                                  'shape': shape, 'length': length})
+
+    return {tname: new_tensorclass,
+            vname: new_vectorclass,
+            sname: new_scalarclass}
 
 def lookup(name, translation_table):
     """this may need to be inlined?"""
@@ -103,21 +104,21 @@ class BaseField(object):
         group.attrs["representation"] = self.representation.__name__
         group.attrs["type"] = self.__class__.__name__
         for f in range(self.ncomp):
-            dset = group.create_dataset(self.trans[f], 
+            dset = group.create_dataset(str(f), 
                                         self.shape, 
                                         dtype=self.components[f].data.dtype)
             
             self.components[f].save(dset)
 
 
-class TensorField(BaseField):
+class TensorFieldBase(BaseField):
     """Tensor class. Currently used mostly for the velocity gradient tensor."""
     
     def __init__(self, sd, **kwargs):
         ncomp = len(self.shape) ** 2
         BaseField.__init__(self, sd, ncomp=ncomp, **kwargs)
 
-class VectorField(BaseField):
+class VectorFieldBase(BaseField):
     """these should have N components with names defined at simulation initialization time.
 
     state data will be composed of vectors and scalars
@@ -135,9 +136,7 @@ class VectorField(BaseField):
         for i in xrange(self.ncomp):
             self[i]['kspace'] -= self[i].k[self.trans[i]] * kV / k2
     
-    
-
-class ScalarField(BaseField):
+class ScalarFieldBase(BaseField):
     """Scalar class; always has one component."""
     
     def __init__(self, sd, **kwargs):
