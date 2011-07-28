@@ -171,8 +171,6 @@ class RK2simplevisc(RK2simple):
             # need to update actual value so RHS can use it
             a_old = a.value 
             a.value = a.value + dt / 2. * a.RHS(a.value)
-                        
-        self.tmp_fields.time = data.time + dt/2.
 
         # Second step
         self.field_dt = self.RHS.RHS(self.tmp_fields)
@@ -181,8 +179,7 @@ class RK2simplevisc(RK2simple):
         for a in self.RHS.aux_eqns.values():
             a.value = a_old + dt * a.RHS(a.value)
 
-        # Update data and integrator stats
-        data.time += dt
+        # Update integrator stats
         self.time += dt
         self.iter += 1
         
@@ -265,8 +262,7 @@ class RK4simplevisc(RK2simple):
         for a in self.RHS.aux_eqns.values():
             a.value = a_old + dt * a.RHS(a.value)
 
-        # Update data and integrator stats
-        data.time += dt
+        # Update integrator stats
         self.time += dt
         self.iter += 1
 
@@ -308,6 +304,8 @@ def linear_step(start, deriv, dt, output):
         for i in xrange(f.ncomp):
             output[k][i]['kspace'] = start[k][i]['kspace'] + dt * deriv[k][i]['kspace']
             if output[k][i].dealias: output[k][i].dealias()
+            
+    output.time = start.time + dt
                 
 def integrating_factor_step(start, deriv, dt, output):
     """
@@ -335,3 +333,7 @@ def integrating_factor_step(start, deriv, dt, output):
         for i in xrange(f.ncomp):
             output[k][i]['kspace'] = (start[k][i]['kspace'] + deriv[k][i]['kspace'] / IF * (EIF - 1.)) / EIF
             if output[k][i].dealias: output[k][i].dealias()
+
+    output.time = start.time + dt
+    
+    
