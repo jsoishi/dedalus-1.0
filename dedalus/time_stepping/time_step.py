@@ -91,7 +91,7 @@ class TimeStepBase(object):
         outfile = h5py.File(filename, mode='w')
         root_grp = outfile.create_group('/fields')
         dset = outfile.create_dataset('time',data=self.time)
-        root_grp.attrs['hg_version'] = get_mercurial_changeset_id()
+        outfile.attrs['hg_version'] = get_mercurial_changeset_id()
 
         data.snapshot(root_grp)        
         outfile.close()
