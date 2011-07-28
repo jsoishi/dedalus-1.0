@@ -53,6 +53,5 @@ from dedalus.physics.api import \
 from dedalus.time_stepping.api import \
     RK2simple,\
     RK2simplevisc, \
-    RK2simplehypervisc4, \
     CrankNicholsonVisc
 
