@@ -64,7 +64,6 @@ def get_mercurial_changeset_id():
     http://jasonfharris.com/blog/2010/05/versioning-your-application-with-the-mercurial-changeset-hash/
 
     """
-    print "getting changeset"
     if not get_mercurial_changeset_id.changeset:
         import dedalus
         targetDir = dedalus.__path__[0]
@@ -79,7 +78,6 @@ def get_mercurial_changeset_id():
             print "Current changeset of the Mercurial repository is malformed"
             changeset = None
         get_mercurial_changeset_id.changeset = changeset
-        print "Changeset is %s" % changeset
 
     return get_mercurial_changeset_id.changeset
 
