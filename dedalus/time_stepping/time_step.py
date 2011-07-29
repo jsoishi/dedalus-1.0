@@ -240,6 +240,13 @@ class RK4simplevisc(RK2simple):
             for i in xrange(f.ncomp):
                 self.tmp_final[k][i]['kspace'] = self.field_dt[k][i]['kspace'] / 6.
                 
+        for a in self.RHS.aux_eqns.values():
+            # OK if we only have one aux eqn...
+            # need to update actual value so RHS can use it
+            a_old = a.value 
+            a_final_dt = a.RHS(a.value) / 6.
+            a.value = a_old + dt / 2. * a.RHS(a.value)
+                
         # Second stage
         integrating_factor_step(data, self.field_dt, dt / 2., self.tmp_stage)
         self.field_dt = self.RHS.RHS(self.tmp_stage)
@@ -247,6 +254,10 @@ class RK4simplevisc(RK2simple):
         for k,f in data.fields.iteritems():
             for i in xrange(f.ncomp):
                 self.tmp_final[k][i]['kspace'] += self.field_dt[k][i]['kspace'] / 3.
+                
+        for a in self.RHS.aux_eqns.values():
+            a_final_dt += a.RHS(a.value) / 3.
+            a.value = a_old + dt / 2. * a.RHS(a.value)
                 
         # Third stage
         integrating_factor_step(data, self.field_dt, dt / 2., self.tmp_stage)
@@ -256,6 +267,10 @@ class RK4simplevisc(RK2simple):
             for i in xrange(f.ncomp):
                 self.tmp_final[k][i]['kspace'] += self.field_dt[k][i]['kspace'] / 3.
                 
+        for a in self.RHS.aux_eqns.values():
+            a_final_dt += a.RHS(a.value) / 3.
+            a.value = a_old + dt * a.RHS(a.value)
+                
         # Fourth stage
         integrating_factor_step(data, self.field_dt, dt, self.tmp_stage)
         self.field_dt = self.RHS.RHS(self.tmp_stage)
@@ -263,27 +278,15 @@ class RK4simplevisc(RK2simple):
         for k,f in data.fields.iteritems():
             for i in xrange(f.ncomp):
                 self.tmp_final[k][i]['kspace'] += self.field_dt[k][i]['kspace'] / 6.
-        
-        
-        
-        
-        
+                
         for a in self.RHS.aux_eqns.values():
-            # OK if we only have one aux eqn...
-            # need to update actual value so RHS can use it
-            a_old = a.value 
-            a.value = a.value + dt / 2. * a.RHS(a.value)
-                        
-        self.tmp_fields.time = data.time + dt/2.
-
-
-
-
+            a_final_dt += a.RHS(a.value) / 6.
+        
         # Final step
         integrating_factor_step(data, self.tmp_final, dt, data)
 
         for a in self.RHS.aux_eqns.values():
-            a.value = a_old + dt * a.RHS(a.value)
+            a.value = a_old + dt * a_final_dt
 
         # Update integrator stats
         self.time += dt
