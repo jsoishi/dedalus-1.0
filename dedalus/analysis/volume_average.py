@@ -35,7 +35,7 @@ class VolumeAverageSet(object):
         self.data = data
         self.filename = filename
         self.tasks = []
-        self.outfile = open(self.filename,'wa')
+        self.outfile = open(self.filename,'a')
         self.outfile.write("# Dedalus Volume Average\n")
         self.outfile.write("# Column 0: time\n")
 
@@ -70,9 +70,9 @@ def enstrophy(data):
     HARDCODED FOR 2D CARTESIAN ONLY!
 
     """
-    aux = data.__class__(['vortz'],data.time)
+    #aux = data.__class__(['vortz'],data.time)
     aux = data.clone()
-    aux.add_field('vortz', 'scalar')
+    aux.add_field('vortz', 'ScalarField')
     aux['vortz']['kspace'] = data['u']['y'].deriv('x') - data['u']['x'].deriv('y')
     
     enstrophy = (aux['vortz']['xspace']**2).real

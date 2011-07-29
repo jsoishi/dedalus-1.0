@@ -22,9 +22,6 @@ License:
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 from .field_object import \
-    BaseField, \
-    VectorField, \
-    ScalarField,\
     create_field_classes
 
 from .state_data import \

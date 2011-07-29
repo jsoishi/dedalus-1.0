@@ -58,26 +58,29 @@ def insert_ipython(num_up=1):
             local_ns = loc, global_ns = glo)
     del ipshell
 
-
-
-
 def get_mercurial_changeset_id():
     """adapted from a script by Jason F. Harris, published at
 
     http://jasonfharris.com/blog/2010/05/versioning-your-application-with-the-mercurial-changeset-hash/
 
     """
-    import dedalus
-    targetDir = dedalus.__path__[0]
-    getChangeset = subprocess.Popen('hg parent --template "{node|short}" --cwd ' + targetDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    print "getting changeset"
+    if not get_mercurial_changeset_id.changeset:
+        import dedalus
+        targetDir = dedalus.__path__[0]
+        getChangeset = subprocess.Popen('hg parent --template "{node|short}" --cwd ' + targetDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        
+        if (getChangeset.stderr.read() != ""):
+            print "Error in obtaining current changeset of the Mercurial repository"
+            changeset = None
+            
+        changeset = getChangeset.stdout.read()
+        if (not re.search("^[0-9a-f]{12}$", changeset)):
+            print "Current changeset of the Mercurial repository is malformed"
+            changeset = None
+        get_mercurial_changeset_id.changeset = changeset
+        print "Changeset is %s" % changeset
 
-    if (getChangeset.stderr.read() != ""):
-        print "Error in obtaining current changeset of the Mercurial repository"
-        changeset = None
+    return get_mercurial_changeset_id.changeset
 
-    changeset = getChangeset.stdout.read()
-    if (not re.search("^[0-9a-f]{12}$", changeset)):
-        print "Current changeset of the Mercurial repository is malformed"
-        changeset = None
-
-    return changeset
+get_mercurial_changeset_id.changeset = None
