@@ -25,7 +25,7 @@ License:
 
 import numpy as na
 from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
-from dedalus.utils.api import friedmann
+from dedalus.utils.api import a_friedmann
 from dedalus.funcs import insert_ipython
 
 def _reconstruct_object(*args, **kwargs):
@@ -81,7 +81,7 @@ class Physics(object):
     def _setup_aux_fields(self, t, aux_field_list=None):
         self.aux_fields = self.create_fields(t, aux_field_list)
 
-    def _setup_aux_eqns(self, aux_eqns, RHS, ics):
+    def _setup_aux_eqns(self, aux_eqns, RHS, ics, arglists):
         """ create auxiliary ODEs to be solved alongside the spatial gradients.
 
         inputs
@@ -90,8 +90,8 @@ class Physics(object):
         RHS -- 
 
         """
-        for f, r, ic in zip(aux_eqns, RHS, ics):
-            self.aux_eqns[f] = AuxEquation(r, ic)
+        for f, r, ic, args in zip(aux_eqns, RHS, ics, arglists):
+            self.aux_eqns[f] = AuxEquation(r, args, ic)
 
     def RHS(self):
         pass
@@ -521,12 +521,12 @@ class LinearCollisionlessCosmology(Physics):
                   'H0': 100.}
         self._setup_parameters(params)
         self._setup_aux_fields(0., self._aux_fields)
-        aux_eqn_rhs = lambda a: a*friedmann(a, self.parameters['H0'],
-                                            self.parameters['Omega_r'],
-                                            self.parameters['Omega_m'], 
-                                            self.parameters['Omega_l'])
-        
-        self._setup_aux_eqns(['a'],[aux_eqn_rhs], [0.002])
+        aux_eqn_rhs = a_friedmann
+        self._setup_aux_eqns(['a'], [aux_eqn_rhs], [0.002], 
+                             [(self.parameters['H0'],
+                                self.parameters['Omega_r'],
+                                self.parameters['Omega_m'], 
+                                self.parameters['Omega_l'])])
 
         self._RHS = self.create_fields(0.)
 

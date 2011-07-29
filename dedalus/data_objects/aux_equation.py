@@ -23,13 +23,17 @@ License:
 """
 
 class AuxEquation(object):
-    def __init__(self, RHS, init_cond=0.):
+    def __init__(self, RHS, args, init_cond=0.):
         """a simple class to hold the current value and Right Hand
         Side (RHS) of an ODE.
 
         """
-        self.RHS = RHS
+        self._RHS = RHS
         self.value = init_cond
+        self.args = args
+
+    def RHS(self, value):
+        return self._RHS(value, *(self.args))
 
     def __setitem__(self, data):
         self.value = data

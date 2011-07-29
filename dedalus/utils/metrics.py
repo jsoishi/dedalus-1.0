@@ -28,3 +28,9 @@ def friedmann(a, H0, Omega_r, Omega_m, Omega_l):
 
     """
     return H0*na.sqrt(Omega_r / a**4 + Omega_m / a**3 + Omega_l)
+
+def a_friedmann(a, H0, Omega_r, Omega_m, Omega_l):
+    """a times the rhs of the first Friedmann equation
+
+    """
+    return a * friedmann(a, H0, Omega_r, Omega_m, Omega_l)

@@ -1,5 +1,5 @@
 from .metrics import \
-    friedmann
+    a_friedmann
 
 from .restart import \
     restart
