@@ -387,7 +387,9 @@ class ShearHydro(Hydro):
         for i in self.dims:
             tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace'] 
 
-        tmp += 2. * self.parameters['S'] * data['u']['x'].k['y'] * data['u']['x']['kspace'] - 2. * self.parameters['Omega'] * data['u']['y'].k['x'] * data['u']['y']['kspace'] + 2 * self.parameters['Omega'] * data['u']['x'].k['y'] * data['u']['x']['kspace']
+        tmp += 2. * self.parameters['S'] * data['u']['x'].k['y'] * data['u']['x']['kspace'] \
+            - 2. * self.parameters['Omega'] * data['u']['y'].k['x'] * data['u']['y']['kspace'] \
+            + 2 * self.parameters['Omega'] * data['u']['x'].k['y'] * data['u']['x']['kspace']
 
         # Construct full term
         for i in self.dims:            
