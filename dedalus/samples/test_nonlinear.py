@@ -44,9 +44,9 @@ def pow_spec(data, it, Dplus):
     pl.ylabel("$\mid \delta_k \mid^2$")
     fig.savefig(outfile)
 
-RHS.parameters['Omega_r'] = 8.4e-5
-RHS.parameters['Omega_m'] = 0.276
-RHS.parameters['Omega_l'] = 0.724
+RHS.parameters['Omega_r'] = 0.#8.4e-5
+RHS.parameters['Omega_m'] = 1.#0.276
+RHS.parameters['Omega_l'] = 0.#0.724
 RHS.parameters['H0'] = H0
 cosmology(data, icfname, normfname)
 
