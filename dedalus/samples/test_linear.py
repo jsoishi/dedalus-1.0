@@ -16,9 +16,9 @@ normfname = sys.argv[2]
 shape = (10,10,10)
 RHS = LinearCollisionlessCosmology(shape, FourierRepresentation)
 data = RHS.create_fields(0.)
-RHS.parameters['Omega_r'] = 0#8.4e-5
-RHS.parameters['Omega_m'] = 1#0.276
-RHS.parameters['Omega_l'] = 0#0.724
+RHS.parameters['Omega_r'] = 8.4e-5
+RHS.parameters['Omega_m'] = 0.276
+RHS.parameters['Omega_l'] = 0.724
 RHS.parameters['H0'] = 7.185e-5 # 70.3 km/s/Mpc in Myr
 cosmology(data, icfname, normfname)
 

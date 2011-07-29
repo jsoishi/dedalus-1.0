@@ -215,7 +215,7 @@ def zeldovich(data, ampl, a_ini, a_cross):
     data['u'][0]['kspace'][0,0,1] = ampl * 1j / 2
     data['u'][0]['kspace'][0,0,-1] = -data['u'][0]['kspace'][0,0,1]
 
-def read_linger_ic_data(fname, ak, deltacp, thetac):
+def read_linger_ic_data(fname, ak, deltacp, phi, thetac):
     """read certain values from a linger output file
 
     """
@@ -225,10 +225,11 @@ def read_linger_ic_data(fname, ak, deltacp, thetac):
         values = line.split()
         ak.append(float(values[1]))
         deltacp.append(float(values[6]))
-        thetac.append(float(values[11]))
+        phi.append(float(values[5]) + float(values[11])) # eta + etatophi
+        thetac.append(-float(values[11])*(ak[i]**2) / float(values[20]))
     infile.close()
 
-def read_linger_norm_data(fname, ak_trans, Ttot0):
+def read_linger_norm_data(fname, ak_trans, Ttot0, dTvc):
     """read certain values from a transfer-mode linger++ output file
 
     """
@@ -237,6 +238,7 @@ def read_linger_norm_data(fname, ak_trans, Ttot0):
         values = line.split()
         ak_trans.append(float(values[0]))
         Ttot0.append(float(values[6]))
+        dTvc.append(float(values[4]))
     infile.close()
 
 def sig2_integrand(Ttot0, ak, nspect):
@@ -260,53 +262,64 @@ def get_normalization(Ttot0, ak, sigma_8, nspect):
     ampl = sigma_8/na.sqrt(sig2)
     return ampl
 
-def create_cosmo_field(field, spec, freq, mean=0., stdev=1., space='kspace'):
-    """fill 3-d field with values sampled from gaussians with amplitudes 
-    given by spec.
+def collisionless_cosmo_fields(delta, u, spec_delta, spec_u, mean=0., stdev=1.):
+    """fill 3-d k-space fields with values sampled from gaussians with
+    amplitudes given by spec.
 
     """
-    shape = spec.shape
-    field[space] = spec * (na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape))
-    hermitianize.enforce_hermitian(field[space])
-    field.zero_nyquist()
+    shape = spec_delta.shape
+    rand = na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape)
+    delta['kspace'] = spec_delta * rand
+    hermitianize.enforce_hermitian(delta['kspace'])
+    delta.zero_nyquist()
+    delta['kspace'][0,0,0] = 0.
+
+    for i in xrange(3):
+        u[i]['kspace'] = rand * spec_u[i]
+        hermitianize.enforce_hermitian(u[i]['kspace'])
+        u[i].zero_nyquist()
+        u[i]['kspace'][0,0,0] = 0
 
 def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     """generate realization of initial conditions in CDM overdensity
     and velocity from linger++ output. Assumes 3-dimensional fields.
 
+    Length: Mpc
+    Time:   Myr (linger++ uses Mpc/c)
+
     (create_cosmo_field actually creates the realizations from
     spectra; the rest is generating the spectra from input, which
     might reasonably belong somewhere else)
 
-    ***** NEEDS TO CONSIDER RANGE OF WAVENUMBERS *****
-
     """
+    Myr_per_Mpc = 0.3063915366 # conversion factor for time units
 
     ak = []
     deltacp = []
+    phi = []
     thetac = []
     Ttot0 = []
+    dTvc = []
     ak_trans = [] # the k-values that go with Ttot0
-
-    read_linger_ic_data(ic_fname, ak, deltacp, thetac)
-    read_linger_norm_data(norm_fname, ak_trans, Ttot0)
+    
+    read_linger_ic_data(ic_fname, ak, deltacp, phi, thetac)
+    read_linger_norm_data(norm_fname, ak_trans, Ttot0, dTvc)
     ak = na.array(ak)
     deltacp = na.array(deltacp)
+    phi = na.array(phi)
     thetac = na.array(thetac)
-    ak_trans = na.array(ak_trans)
-    Ttot0 = na.array(Ttot0)
-    
+    ak_trans = na.array(ak_trans) * .703 # should take h from input
+    Ttot0 = na.array(Ttot0)    
+    #thetac = -na.array(dTvc) * (.703/299792.458) * (ak_trans**2)
+        
     # normalize
     ampl = get_normalization(Ttot0, ak_trans, sigma_8, nspect)
-
     deltacp = deltacp*ampl
-    thetac = thetac*ampl
+    thetac = thetac*ampl*Myr_per_Mpc
 
     shape = data['delta'].shape
    
     nk = shape[0]
-    freq = data['delta'].k['x']
-   
     kk = na.sqrt(data['delta'].k2(no_zero=True))
 
     maxkk = kk[nk/2, nk/2, nk/2]
@@ -319,13 +332,23 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     # calculate spectra
     f_deltacp = interp1d(ak[::-1], deltacp[::-1], kind='cubic')
     spec_delta = kk**(nspect/2.)*f_deltacp(kk)
-    spec_delta[0,0,0] = 0
-
+    
+    #f_thetac = interp1d(ak_trans, thetac, kind='cubic') # if thetac comes from dTvc
     f_thetac = interp1d(ak[::-1], thetac[::-1], kind='cubic')
-    spec_theta = kk**(nspect/2. -1.)*f_thetac(kk)
-    spec_theta[0,0,0] = 0
+    spec_vel = -1j*kk**(nspect/2. -1.)*f_thetac(kk)
+    spec_vel[0,0,0] = 0
 
+    spec_u = [na.zeros_like(spec_vel),]*3
+    for i,dim in enumerate(['x','y','z']):
+        spec_u[i] = (data['u'][i].k[dim]/kk) * spec_vel #*1/3. 
+        
+    #tmp = na.zeros(shape)
+    #for (i,j,k),t in na.ndenumerate(tmp):
+    #    tmp[i,j,k] = max([i,j,k])
+    #mask = (tmp > 5)
+    #spec_delta[mask] = 0.
+    #for i in xrange(3):
+    #    spec_u[i][:,:,:] = 0.
+    
     # create realizations
-    create_cosmo_field(data['delta'], spec_delta, freq)
-    for i in xrange(3):
-        create_cosmo_field(data['u'][i], spec_theta, freq)
+    collisionless_cosmo_fields(data['delta'], data['u'], spec_delta, spec_u)
