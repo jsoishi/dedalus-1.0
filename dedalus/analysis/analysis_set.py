@@ -24,6 +24,8 @@ License:
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import matplotlib
+matplotlib.use('AGG')
 import matplotlib.pyplot as P
 from mpl_toolkits.axes_grid1 import AxesGrid
 import numpy as na
@@ -155,7 +157,7 @@ def en_spec(data, it, flist=['u']):
         for i in xrange(data[f].ncomp):
             power += na.abs(data[f][i]['kspace'] ** 2)
         power *= 0.5
-        
+
         # Construct bins by wavevector magnitude
         kmag = na.sqrt(fx.k2())
         k = fx.k['x'].flatten()
