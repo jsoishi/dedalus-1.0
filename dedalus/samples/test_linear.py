@@ -24,6 +24,8 @@ cosmology(data, icfname, normfname)
 
 ti = RK2simple(RHS)
 ti.stop_time(1000)
+ti.set_nsnap(100)
+ti.set_dtsnap(1000)
 dt = 1 # time in Myr
 
 outfile = open('growth.dat','w')

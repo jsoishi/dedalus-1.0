@@ -36,7 +36,9 @@ def pow_spec(data, it, Dplus):
     spec = na.zeros_like(k)
 
     for i in xrange(k.size):
-        spec[i] = (power[(kmag >= kbottom[i]) & (kmag < ktop[i])]).sum()/(Dplus*Dplus)
+        kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
+        nk = (kshell * na.ones_like(kmag)).sum()
+        spec[i] = (power[kshell]).sum()/(Dplus*Dplus)/nk
         outfile = "frames/powspec_%d.png" % it
     fig = pl.figure()
     pl.semilogy(k[1:], spec[1:], 'o-')

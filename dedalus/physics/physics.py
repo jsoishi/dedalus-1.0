@@ -82,7 +82,7 @@ class Physics(object):
     def _setup_aux_fields(self, t, aux_field_list=None):
         self.aux_fields = self.create_fields(t, aux_field_list)
 
-    def _setup_aux_eqns(self, aux_eqns, RHS, ics, arglists):
+    def _setup_aux_eqns(self, aux_eqns, RHS, ics, kwarglists):
         """ create auxiliary ODEs to be solved alongside the spatial gradients.
 
         inputs
@@ -91,8 +91,8 @@ class Physics(object):
         RHS -- 
 
         """
-        for f, r, ic, args in zip(aux_eqns, RHS, ics, arglists):
-            self.aux_eqns[f] = AuxEquation(r, args, ic)
+        for f, r, ic, kwargs in zip(aux_eqns, RHS, ics, kwarglists):
+            self.aux_eqns[f] = AuxEquation(r, kwargs, ic)
 
     def RHS(self):
         pass
@@ -531,10 +531,7 @@ class LinearCollisionlessCosmology(Physics):
         self._setup_aux_fields(0., self._aux_fields)
         aux_eqn_rhs = a_friedmann
         self._setup_aux_eqns(['a'], [aux_eqn_rhs], [0.002], 
-                             [(self.parameters['H0'],
-                                self.parameters['Omega_r'],
-                                self.parameters['Omega_m'], 
-                                self.parameters['Omega_l'])])
+                             [self.parameters])
 
         self._RHS = self.create_fields(0.)
 
