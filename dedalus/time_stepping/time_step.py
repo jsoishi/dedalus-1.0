@@ -96,6 +96,7 @@ class TimeStepBase(object):
         data.snapshot(root_grp)        
         outfile.close()
         self._nsnap += 1
+        self._tlastsnap = self.time
         
     def stop_time(self,t):
         self._stop_time = t
