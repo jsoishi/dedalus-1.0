@@ -240,7 +240,7 @@ class FourierShearRepresentation(FourierRepresentation):
         """
         FourierRepresentation.__init__(self, sd, shape, length, **kwargs)
         self.shear_rate = self.sd.parameters['S']
-
+        self.kx = self.k['x'].copy()
         # for now, only numpy's fft is supported
         self.fft = fpack.fft
         self.ifft = fpack.ifft
@@ -259,6 +259,7 @@ class FourierShearRepresentation(FourierRepresentation):
 
     def forward(self):
         deltay = self.shear_rate*self.sd.time 
+        self.k['x'] = self.kx - deltay*self.k['y']
         x = na.linspace(0.,2*na.pi,self.shape[-1],endpoint=False)
         if self.ndim == 3:
             self.data = self.ifft(self.data,axis=2)
