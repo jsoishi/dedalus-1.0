@@ -22,7 +22,7 @@ RHS.parameters['Omega_l'] = 0.724
 RHS.parameters['H0'] = 7.185e-5 # 70.3 km/s/Mpc in Myr
 cosmology(data, icfname, normfname)
 
-ti = RK2simple(RHS)
+ti = RK4simplevisc(RHS)
 ti.stop_time(1000)
 ti.set_nsnap(100)
 ti.set_dtsnap(1000)
