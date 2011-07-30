@@ -41,7 +41,7 @@ def pow_spec(data, it, Dplus):
         spec[i] = (power[kshell]).sum()/(Dplus*Dplus)/nk
         outfile = "frames/powspec_%d.png" % it
     fig = pl.figure()
-    pl.semilogy(k[1:], spec[1:], 'o-')
+    pl.loglog(k[1:], spec[1:], 'o-')
     pl.xlabel("$k$")
     pl.ylabel("$\mid \delta_k \mid^2$")
     fig.savefig(outfile)
@@ -55,6 +55,8 @@ cosmology(data, icfname, normfname)
 dt = 50. # time in Myr
 ti = RK2simple(RHS)
 ti.stop_time(100.*dt)
+ti.set_nsnap(1)
+ti.set_dtsnap(100)
 
 an = AnalysisSet(data, ti)
 
