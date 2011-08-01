@@ -313,7 +313,7 @@ class Hydro(Physics):
             
         # Place references
         u = data['u']
-        B = data['B']
+
         #mathtmp = self.aux_fields['mathtmp']
         gradu = self.aux_fields['gradu']
         ugradu = self.aux_fields['ugradu']
