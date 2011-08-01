@@ -368,8 +368,8 @@ class ShearHydro(Hydro):
     def RHS(self, data):
         Hydro.RHS(self, data)
 
-        self._RHS['u']['x']['kspace'] += 2.*self.parameters['Omega']*data['u']['y']['kspace']
-        self._RHS['u']['y']['kspace'] += -(2*self.parameters['Omega'] + self.parameters['S'])*data['u']['x']['kspace']
+        self._RHS['u']['x']['kspace'] += 2. * self.parameters['Omega'] * data['u']['y']['kspace']
+        self._RHS['u']['y']['kspace'] += -(2 + self.parameters['S']) * self.parameters['Omega'] * data['u']['x']['kspace']
         
         return self._RHS
 
@@ -395,7 +395,7 @@ class ShearHydro(Hydro):
         for i in self.dims:
             tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace'] 
 
-        tmp += 2. * self.parameters['S'] * data['u']['x'].k['y'] * data['u']['x']['kspace'] \
+        tmp += 2. * self.parameters['S'] * self.parameters['Omega'] * data['u']['x'].k['y'] * data['u']['x']['kspace'] \
             - 2. * self.parameters['Omega'] * data['u']['y'].k['x'] * data['u']['y']['kspace'] \
             + 2 * self.parameters['Omega'] * data['u']['x'].k['y'] * data['u']['x']['kspace']
 
