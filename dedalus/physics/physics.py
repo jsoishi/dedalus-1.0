@@ -705,8 +705,29 @@ class BaryonCDMCosmology(Physics):
         aux_eqn_rhs = a_friedmann
         self._setup_aux_eqns(['a'], [aux_eqn_rhs], [0.002],
                              [self.parameters])
-        self.cs2 = None # read values off a table?
         self._RHS = self.create_fields(0.)
+
+        self._last_cs2a_index = 0
+        self._cs2_a = []
+        self._cs2_values = []
+    
+    def init_cs2(self, a, cs2):
+        self._cs2_values = cs2
+        self._cs2_a = a
+    
+    def cs2(self, a):
+        """look up cs2 in internal table at nearest scale factor
+
+        """
+        old_da = None
+        for i in range(len(self._cs2_a) - self._last_cs2a_index):
+            da = a - self._cs2_a[i + self._last_cs2a_index]
+            if old_da is None or da < old_da:
+                old_da = da
+            else:
+                self._last_cs2a_index = i-1
+                return self._cs2_values[i-1]
+        print "error: scale factor out of range"
 
     def RHS(self, data):
         self.d_b_RHS(data)

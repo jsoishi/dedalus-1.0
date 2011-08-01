@@ -291,18 +291,18 @@ def cosmo_fields(delta_c, u_c, delta_b, u_b, spec_delta_c, spec_u_c, spec_delta_
     """
     # use the same random number field as for delta_c
     rand = collisionless_cosmo_fields(delta_c, u_c, spec_delta_c, spec_u_c)
-    delta_b = spec_delta_b * rand
+    delta_b['kspace'] = spec_delta_b * rand
     hermitianize.enforce_hermitian(delta_b['kspace'])
     delta_b.zero_nyquist()
     delta_b['kspace'][0,0,0] = 0.
 
     for i in xrange(3):
-        u_b[i]['kspace'] = rand * spec_u[i]
-        hermitianize.enforce_hermitian(u[i]['kspace'])
+        u_b[i]['kspace'] = rand * spec_u_b[i]
+        hermitianize.enforce_hermitian(u_b[i]['kspace'])
         u_b[i].zero_nyquist()
         u_b[i]['kspace'][0,0,0] = 0
 
-def collisionless_cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryons=False):
+def cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryons=False):
     """generate spectra for CDM overdensity and velocity from linger++
     output. Assumes 3-dimensional fields.
 
@@ -363,6 +363,9 @@ def collisionless_cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_
         spec_u[i] = (sampledata.k[dim]/kk) * spec_vel #*1/3.
 
     if baryons:
+        deltabp = na.array(deltabp)
+        thetab = na.array(thetab)
+        
         deltabp = deltabp*ampl
         thetab = thetab*ampl*Myr_per_Mpc
         
@@ -375,6 +378,7 @@ def collisionless_cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_
         # ... relative velocity between CDM and baryons in the synchronous gauge
         f_thetab = interp1d(ak[::-1], thetac[::-1], kind='cubic')
         spec_vel_b = spec_vel - 1j * kk**(nspect/2. -1.)*f_thetab(kk)
+        spec_u_b = [na.zeros_like(spec_vel_b),]*3
         for i,dim in enumerate(['x','y','z']):
             spec_u_b[i] = (sampledata.k[dim]/kk) * spec_vel_b
 
@@ -389,14 +393,3 @@ def collisionless_cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_
     #for i in xrange(3):
     #    spec_u[i][:,:,:] = 0.
     return spec_delta, spec_u
-
-def cs2(thermo_fname):
-    """read baryon sound speed squared from linger++ thermal history output
-
-    """
-    cs2 = []
-    for line in open(thermo_fname):
-        values = line.split()
-        cs2.append(values[4])
-        
-    return na.array(cs2)

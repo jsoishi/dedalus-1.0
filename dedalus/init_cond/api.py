@@ -31,7 +31,8 @@ from .init_cond import \
     MIT_vortices, \
     shearing_wave, \
     collisionless_cosmo_fields, \
-    collisionless_cosmo_spectra, \
+    cosmo_fields, \
+    cosmo_spectra, \
     alfven, \
     zeldovich
 

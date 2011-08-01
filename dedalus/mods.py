@@ -39,7 +39,8 @@ from dedalus.init_cond.api import \
     MIT_vortices, \
     shearing_wave, \
     collisionless_cosmo_fields, \
-    collisionless_cosmo_spectra, \
+    cosmo_fields, \
+    cosmo_spectra, \
     alfven, \
     zeldovich
 
@@ -47,8 +48,9 @@ from dedalus.physics.api import \
     Hydro, \
     ShearHydro, \
     MHD, \
-    LinearCollisionlessCosmology,\
-    CollisionlessCosmology
+    LinearCollisionlessCosmology, \
+    CollisionlessCosmology, \
+    BaryonCDMCosmology
 
 from dedalus.time_stepping.api import \
     RK2simple,\
