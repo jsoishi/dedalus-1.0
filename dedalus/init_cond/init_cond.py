@@ -263,7 +263,8 @@ def get_normalization(Ttot0, ak, sigma_8, nspect):
     return ampl
 
 def collisionless_cosmo_fields(delta, u, spec_delta, spec_u, mean=0., stdev=1.):
-    """fill 3-d k-space fields with values sampled from gaussians with
+    """create realization of cosmological initial conditions by
+    filling 3-d k-space fields with values sampled from gaussians with
     amplitudes given by spec.
 
     """
@@ -279,17 +280,31 @@ def collisionless_cosmo_fields(delta, u, spec_delta, spec_u, mean=0., stdev=1.):
         hermitianize.enforce_hermitian(u[i]['kspace'])
         u[i].zero_nyquist()
         u[i]['kspace'][0,0,0] = 0
+        
+    return rand
 
-def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
-    """generate realization of initial conditions in CDM overdensity
-    and velocity from linger++ output. Assumes 3-dimensional fields.
+def cosmo_fields(delta_c, u_c, delta_b, u_b, spec_delta_c, spec_u_c, spec_delta_b, spec_u_b):
+    """create realization of baryon and CDM initial conditions
+
+    """
+    rand = collisionless_cosmo_fields(delta_c, u_c, spec_delta_c, spec_u_c)
+    delta_b = spec_delta_b * rand
+    hermitianize.enforce_hermitian(delta_b['kspace'])
+    delta_b.zero_nyquist()
+    delta_b['kspace'][0,0,0] = 0.
+
+    for i in xrange(3):
+        u_b[i]['kspace'] = rand * spec_u[i]
+        hermitianize.enforce_hermitian(u[i]['kspace'])
+        u_b[i].zero_nyquist()
+        u_b[i]['kspace'][0,0,0] = 0
+
+def collisionless_cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
+    """generate spectra for CDM overdensity and velocity from linger++
+    output. Assumes 3-dimensional fields.
 
     Length: Mpc
     Time:   Myr (linger++ uses Mpc/c)
-
-    (create_cosmo_field actually creates the realizations from
-    spectra; the rest is generating the spectra from input, which
-    might reasonably belong somewhere else)
 
     """
     Myr_per_Mpc = 0.3063915366 # conversion factor for time units
@@ -305,12 +320,12 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     read_linger_ic_data(ic_fname, ak, deltacp, phi, thetac)
     read_linger_norm_data(norm_fname, ak_trans, Ttot0, dTvc)
     ak = na.array(ak)
-    deltacp = na.array(deltacp)
+    deltacp = na.array(deltacp)/ak**2
     phi = na.array(phi)
-    thetac = na.array(thetac)
+    thetac = na.array(thetac)/ak**2
     ak_trans = na.array(ak_trans) * .703 # should take h from input
-    Ttot0 = na.array(Ttot0)    
-    #thetac = -na.array(dTvc) * (.703/299792.458) * (ak_trans**2)
+    Ttot0 = na.array(Ttot0)/ak_trans**2    
+    #thetac = -na.array(dTvc) * (.703/299792.458) #* (ak_trans**2)
         
     # normalize
     ampl = get_normalization(Ttot0, ak_trans, sigma_8, nspect)
@@ -340,7 +355,7 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
 
     spec_u = [na.zeros_like(spec_vel),]*3
     for i,dim in enumerate(['x','y','z']):
-        spec_u[i] = (data['u'][i].k[dim]/kk) * spec_vel #*1/3. 
+        spec_u[i] = (data['u'][i].k[dim]/kk) * spec_vel #*1/3.
         
     #tmp = na.zeros(shape)
     #for (i,j,k),t in na.ndenumerate(tmp):
@@ -349,6 +364,4 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     #spec_delta[mask] = 0.
     #for i in xrange(3):
     #    spec_u[i][:,:,:] = 0.
-    
-    # create realizations
-    collisionless_cosmo_fields(data['delta'], data['u'], spec_delta, spec_u)
+    return spec_delta, spec_u
