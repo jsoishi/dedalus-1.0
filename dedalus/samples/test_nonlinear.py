@@ -58,7 +58,7 @@ RHS.parameters['H0'] = H0
 spec_delta, spec_u = collisionless_cosmo_spectra(data, icfname, normfname)
 collisionless_cosmo_fields(data['delta'], data['u'], spec_delta, spec_u)
 
-dt = 50. # time in Myr
+dt = 5. # time in Myr
 ti = RK4simplevisc(RHS)
 ti.stop_time(100.*dt)
 ti.set_nsnap(1)
