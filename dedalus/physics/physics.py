@@ -715,13 +715,13 @@ class BaryonCDMCosmology(Physics):
         self._cs2_values = cs2
         self._cs2_a = a
     
-    def cs2(self, a):
+    def cs2_at(self, a):
         """look up cs2 in internal table at nearest scale factor
 
         """
         old_da = None
         for i in range(len(self._cs2_a) - self._last_cs2a_index):
-            da = a - self._cs2_a[i + self._last_cs2a_index]
+            da = abs(a - self._cs2_a[i + self._last_cs2a_index])
             if old_da is None or da < old_da:
                 old_da = da
             else:
@@ -793,33 +793,33 @@ class BaryonCDMCosmology(Physics):
         gradphi = self.aux_fields['gradphi']
         
         a = self.aux_eqns['a'].value
-        adot = self.aux_eqs['a'].RHS(a)
+        adot = self.aux_eqns['a'].RHS(a)
 
         u = data['u_b']
         gradu = self.aux_fields['gradu_b']
         ugradu = self.aux_fields['ugradu_b']
         self.XgradY(u, u, gradu, ugradu)
         graddelta = self.aux_fields['graddelta_b'] # calculated in d_b_RHS
-        cs2 = self.cs2(a)
+        cs2 = self.cs2_at(a)
         for i in self.dims:
-            self.RHS['u_b'][i]['kspace'] = -(gradphi[i]['kspace'] +
+            self._RHS['u_b'][i]['kspace'] = -(gradphi[i]['kspace'] +
                                              adot * u[i]['kspace'] +
                                              ugradu[i]['kspace'] + 
-                                             cs2 * graddelta) / a
+                                             cs2 * graddelta[i]['kspace']) / a
 
     def v_c_RHS(self, data):
         self.grad_phi(data)
         gradphi = self.aux_fields['gradphi']
         
         a = self.aux_eqns['a'].value
-        adot = self.aux_eqs['a'].RHS(a)
+        adot = self.aux_eqns['a'].RHS(a)
 
         u = data['u_c']
         gradu = self.aux_fields['gradu_c']
         ugradu = self.aux_fields['ugradu_c']
         self.XgradY(u, u, gradu, ugradu)
         for i in self.dims:
-            self.RHS['u_c'][i]['kspace'] = -(gradphi[i]['kspace'] +
+            self._RHS['u_c'][i]['kspace'] = -(gradphi[i]['kspace'] +
                                              adot * u[i]['kspace'] +
                                              ugradu[i]['kspace']) / a
         
