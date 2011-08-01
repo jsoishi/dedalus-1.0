@@ -823,7 +823,6 @@ class BaryonCDMCosmology(Physics):
                                              adot * u[i]['kspace'] +
                                              ugradu[i]['kspace']) / a
         
-        
 if __name__ == "__main__":
     import pylab as P
     from fourier_data import FourierData
