@@ -215,7 +215,7 @@ def zeldovich(data, ampl, a_ini, a_cross):
     data['u'][0]['kspace'][0,0,1] = ampl * 1j / 2
     data['u'][0]['kspace'][0,0,-1] = -data['u'][0]['kspace'][0,0,1]
 
-def read_linger_ic_data(fname, ak, deltacp, phi, thetac):
+def read_linger_ic_data(fname, ak, deltacp, deltabp, phi, thetac, thetab):
     """read certain values from a linger output file
 
     """
@@ -225,8 +225,10 @@ def read_linger_ic_data(fname, ak, deltacp, phi, thetac):
         values = line.split()
         ak.append(float(values[1]))
         deltacp.append(float(values[6]))
+        deltabp.append(float(values[7]))
         phi.append(float(values[5]) + float(values[11])) # eta + etatophi
         thetac.append(-float(values[11])*(ak[i]**2) / float(values[20]))
+        thetab.append(float(values[12]))
     infile.close()
 
 def read_linger_norm_data(fname, ak_trans, Ttot0, dTvc):
@@ -287,6 +289,7 @@ def cosmo_fields(delta_c, u_c, delta_b, u_b, spec_delta_c, spec_u_c, spec_delta_
     """create realization of baryon and CDM initial conditions
 
     """
+    # use the same random number field as for delta_c
     rand = collisionless_cosmo_fields(delta_c, u_c, spec_delta_c, spec_u_c)
     delta_b = spec_delta_b * rand
     hermitianize.enforce_hermitian(delta_b['kspace'])
@@ -299,7 +302,7 @@ def cosmo_fields(delta_c, u_c, delta_b, u_b, spec_delta_c, spec_u_c, spec_delta_
         u_b[i].zero_nyquist()
         u_b[i]['kspace'][0,0,0] = 0
 
-def collisionless_cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
+def collisionless_cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryons=False):
     """generate spectra for CDM overdensity and velocity from linger++
     output. Assumes 3-dimensional fields.
 
@@ -311,13 +314,15 @@ def collisionless_cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_
 
     ak = []
     deltacp = []
+    deltabp = []
     phi = []
     thetac = []
+    thetab = []
     Ttot0 = []
     dTvc = []
     ak_trans = [] # the k-values that go with Ttot0
     
-    read_linger_ic_data(ic_fname, ak, deltacp, phi, thetac)
+    read_linger_ic_data(ic_fname, ak, deltacp, deltabp, phi, thetac, thetab)
     read_linger_norm_data(norm_fname, ak_trans, Ttot0, dTvc)
     ak = na.array(ak)
     deltacp = na.array(deltacp)/ak**2
@@ -327,24 +332,24 @@ def collisionless_cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_
     Ttot0 = na.array(Ttot0)/ak_trans**2    
     #thetac = -na.array(dTvc) * (.703/299792.458) #* (ak_trans**2)
         
-    # normalize
+    # ... normalize
     ampl = get_normalization(Ttot0, ak_trans, sigma_8, nspect)
     deltacp = deltacp*ampl
     thetac = thetac*ampl*Myr_per_Mpc
+    # ... get sample data object for shape and k-values
+    sampledata = data.fields.values()[0][0]
+    shape = sampledata.shape
 
-    shape = data['delta'].shape
-   
     nk = shape[0]
-    kk = na.sqrt(data['delta'].k2(no_zero=True))
-
+    kk = na.sqrt(sampledata.k2(no_zero=True))
     maxkk = kk[nk/2, nk/2, nk/2]
     maxkinput = max(ak)
     if maxkk > maxkinput:
         print 'cannot interpolate: some grid wavenumbers larger than input wavenumbers; ICs for those modes are wrong'
-        # any |k| larger than the max input k is replaced by max input k
+        # ... any |k| larger than the max input k is replaced by max input k
         kk[:,:,:] = na.minimum(kk, maxkinput*na.ones_like(kk))
 
-    # calculate spectra
+    # ... calculate spectra
     f_deltacp = interp1d(ak[::-1], deltacp[::-1], kind='cubic')
     spec_delta = kk**(nspect/2.)*f_deltacp(kk)
     
@@ -355,8 +360,27 @@ def collisionless_cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_
 
     spec_u = [na.zeros_like(spec_vel),]*3
     for i,dim in enumerate(['x','y','z']):
-        spec_u[i] = (data['u'][i].k[dim]/kk) * spec_vel #*1/3.
+        spec_u[i] = (sampledata.k[dim]/kk) * spec_vel #*1/3.
+
+    if baryons:
+        deltabp = deltabp*ampl
+        thetab = thetab*ampl*Myr_per_Mpc
         
+        deltabp = na.array(deltabp)/ak**2
+        thetab = na.array(thetab)/ak**2
+
+        f_deltabp = interp1d(ak[::-1], deltabp[::-1], kind='cubic')
+        spec_delta_b = kk**(nspect/2.)*f_deltabp(kk)
+        
+        # ... relative velocity between CDM and baryons in the synchronous gauge
+        f_thetab = interp1d(ak[::-1], thetac[::-1], kind='cubic')
+        spec_vel_b = spec_vel - 1j * kk**(nspect/2. -1.)*f_thetab(kk)
+        for i,dim in enumerate(['x','y','z']):
+            spec_u_b[i] = (sampledata.k[dim]/kk) * spec_vel_b
+
+        return spec_delta, spec_u, spec_delta_b, spec_u_b
+       
+    # ... zero high k for debugging
     #tmp = na.zeros(shape)
     #for (i,j,k),t in na.ndenumerate(tmp):
     #    tmp[i,j,k] = max([i,j,k])
@@ -365,3 +389,14 @@ def collisionless_cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_
     #for i in xrange(3):
     #    spec_u[i][:,:,:] = 0.
     return spec_delta, spec_u
+
+def cs2(thermo_fname):
+    """read baryon sound speed squared from linger++ thermal history output
+
+    """
+    cs2 = []
+    for line in open(thermo_fname):
+        values = line.split()
+        cs2.append(values[4])
+        
+    return na.array(cs2)
