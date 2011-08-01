@@ -38,7 +38,8 @@ from dedalus.init_cond.api import \
     mcwilliams_spec, \
     MIT_vortices, \
     shearing_wave, \
-    cosmology, \
+    collisionless_cosmo_fields, \
+    collisionless_cosmo_spectra, \
     alfven, \
     zeldovich
 
