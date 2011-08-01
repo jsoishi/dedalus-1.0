@@ -55,7 +55,7 @@ RHS.parameters['Omega_r'] = 0.#8.4e-5
 RHS.parameters['Omega_m'] = 1.#0.276
 RHS.parameters['Omega_l'] = 0.#0.724
 RHS.parameters['H0'] = H0
-spec_delta, spec_u = collisionless_cosmo_spectra(data, icfname, normfname)
+spec_delta, spec_u = cosmo_spectra(data, icfname, normfname)
 collisionless_cosmo_fields(data['delta'], data['u'], spec_delta, spec_u)
 
 dt = 5. # time in Myr
