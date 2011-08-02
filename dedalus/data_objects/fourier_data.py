@@ -247,11 +247,13 @@ class FourierShearRepresentation(FourierRepresentation):
         self.fft = fpack.fft
         self.ifft = fpack.ifft
 
+
     def backward(self):
         """IFFT method to go from kspace to xspace."""
         
         deltay = self.shear_rate * self.sd.time 
-        x = na.linspace(0.,2*na.pi,self.shape[-1],endpoint=False)
+        x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
+        
         if self.dealias: self.dealias()        
         self.data = self.fft(self.data,axis=1)
         self.data *= na.exp(1j*self.k['y']*x*deltay)
@@ -264,9 +266,10 @@ class FourierShearRepresentation(FourierRepresentation):
     def forward(self):
         """FFT method to go from xspace to kspace."""
         
-        deltay = self.shear_rate*self.sd.time 
+        deltay = self.shear_rate * self.sd.time
+        x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
+        
         self.k['x'] = self.kx - deltay*self.k['y']
-        x = na.linspace(0.,2*na.pi,self.shape[-1],endpoint=False)
         if self.ndim == 3:
             self.data = self.ifft(self.data,axis=2)
             z_,y_,x_ = na.ogrid[0:self.data.shape[0],
