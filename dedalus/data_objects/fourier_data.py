@@ -288,8 +288,8 @@ class FourierShearRepresentation(FourierRepresentation):
         if self.dealias: self.dealias()
         self.zero_nyquist()
         
-    def k2(self):
-        pass
+    #def k2(self):
+    #    pass
     
 class SphericalHarmonicRepresentation(FourierRepresentation):
     """Dedalus should eventually support spherical and cylindrical geometries.
