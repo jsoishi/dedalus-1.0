@@ -411,10 +411,11 @@ class ShearHydro(Hydro):
         tmp = na.zeros_like(sampledata.data)
         k2 = sampledata.k2(no_zero=True)
         
-        # Construct k * ugradu + rotation + shear
+        # Construct k * ugradu
         for i in self.dims:
             tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace'] 
 
+        # Add rotation + shear
         tmp += (2. * (1 + S) * Omega * data['u']['x'].k['y'] * data['u']['x']['kspace'] - 
                 2. * Omega * data['u']['y'].k['x'] * data['u']['y']['kspace'])
 
@@ -493,7 +494,7 @@ class MHD(Hydro):
         """
         Compute total pressure term (including magnetic): i k Ptot / rho0
         
-        Ptot / rho0 = i k * ugradu / k^2 - i k * BgradB / (4 pi rho0 k^2)  
+        Ptot / rho0 = i (k * ugradu - k * BgradB / (4 pi rho0)) / k^2  
         ==> pressure term = - k (k * ugradu - k * BgradB / (4 pi rho0)) / k^2
         
         """
@@ -519,7 +520,78 @@ class MHD(Hydro):
             Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             Ptotal[i].zero_nyquist()
     
+class ShearMHD(MHD):
+    """Incompressible magnetohydrodynamics in a shearing box."""
+
+    def RHS(self, data):
+        """
+        Compute right hand side of fluid equations, populating self._RHS with
+        the time derivatives of the fields.
+        
+        u_t + nu k^2 u = -ugradu + BgradB / (4 pi rho0) - i k Ptot / rho0 + rotation + shear
+
+        rotation =  [2 Omega u_y,  0                 ,  0]
+        shear =     [0          ,  -(2 + S) Omega u_x,  0]
+        
+        B_t + eta k^2 B = Bgradu - ugradB + shear
+        
+        shear = [0,  S Omega B_x,  0]
+        
+        """
+        
+        # Place references
+        S = self.parameters['S']
+        Omega = self.parameters['Omega']
+        
+        # Compute terms
+        MHD.RHS(self, data)
+        self._RHS['u']['x']['kspace'] += 2. * Omega * data['u']['y']['kspace']
+        self._RHS['u']['y']['kspace'] += -(2 + S) * Omega * data['u']['x']['kspace']
+        self._RHS['B']['y']['kspace'] += S * Omega * data['B']['x']['kspace']
+        
+        return self._RHS
+        
+    def total_pressure(self, data):
+        """
+        Compute total pressure term (including magnetic): i k Ptot / rho0
+        
+        Ptot / rho0 = i (k * ugradu - k * BgradB / (4 pi rho0) + rotation + shear) / k^2  
+        ==> pressure term = - k (k * ugradu - k * BgradB / (4 pi rho0) + rotation + shear) / k^2
+        
+        rotation = -2 Omega u_y K_x
+        shear = (1 + S) 2 Omega u_x K_y
+        
+        """
+
+        # Place references
+        ugradu = self.aux_fields['ugradu']
+        BgradB = self.aux_fields['BgradB']
+        Ptotal = self.aux_fields['Ptotal']
+        pr4 = 4 * na.pi * self.parameters['rho0']
+        S = self.parameters['S']
+        Omega = self.parameters['Omega']
+        
+
+        # Setup temporary data container
+        sampledata = data['u']['x']
+        tmp = na.zeros_like(sampledata.data)
+        k2 = sampledata.k2(no_zero=True)
+
+        # Construct k * ugradu - k * BgradB / (4 pi rho0)
+        for i in self.dims:
+            tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace']
+            tmp -= data['u'][i].k[self._trans[i]] * BgradB[i]['kspace'] / pr4
             
+        # Add rotation + shear
+        tmp += (2. * (1 + S) * Omega * data['u']['x'].k['y'] * data['u']['x']['kspace'] - 
+                2. * Omega * data['u']['y'].k['x'] * data['u']['y']['kspace'])
+                
+        # Construct full term
+        for i in self.dims:            
+            Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
+            Ptotal[i].zero_nyquist()
+            
+
 class LinearCollisionlessCosmology(Physics):
     """This class implements linear, collisionless cosmology. 
 
