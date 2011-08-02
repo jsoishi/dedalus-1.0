@@ -707,7 +707,6 @@ class BaryonCDMCosmology(Physics):
                              [self.parameters])
         self._RHS = self.create_fields(0.)
 
-        self._last_cs2a_index = 0
         self._cs2_a = []
         self._cs2_values = []
     
@@ -716,18 +715,20 @@ class BaryonCDMCosmology(Physics):
         self._cs2_a = a
     
     def cs2_at(self, a):
-        """look up cs2 in internal table at nearest scale factor
+        """look up cs2 in internal table at nearest scale factor. Just
+        looks through the scale-factor table every time, linearly, to
+        find the correct index.
 
         """
         old_da = None
-        for i in range(len(self._cs2_a) - self._last_cs2a_index):
-            da = abs(a - self._cs2_a[i + self._last_cs2a_index])
+        for i in range(len(self._cs2_a)):
+            da = abs(a - self._cs2_a[i])
             if old_da is None or da < old_da:
                 old_da = da
             else:
-                self._last_cs2a_index = i-1
                 return self._cs2_values[i-1]
-        print "error: scale factor out of range"
+        print "warning: scale factor out of cs2 range; using sound speed at a = ", self._cs2_a[-1]
+        return self._cs2_values[-1]
 
     def RHS(self, data):
         self.d_b_RHS(data)
