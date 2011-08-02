@@ -229,8 +229,8 @@ class FourierShearRepresentation(FourierRepresentation):
 
     """
     def __init__(self, sd, shape, length, **kwargs):    
-        """Shearing box implementation.
-
+        """
+        Shearing box implementation.
 
         Parameters
         ----------
@@ -238,15 +238,19 @@ class FourierShearRepresentation(FourierRepresentation):
             the *dimensional* shear rate in 1/t units
 
         """
+        
         FourierRepresentation.__init__(self, sd, shape, length, **kwargs)
-        self.shear_rate = self.sd.parameters['S']
+        self.shear_rate = self.sd.parameters['S'] * self.sd.parameters['Omega']
         self.kx = self.k['x'].copy()
-        # for now, only numpy's fft is supported
+        
+        # For now, only numpy's fft is supported
         self.fft = fpack.fft
         self.ifft = fpack.ifft
 
     def backward(self):
-        deltay = self.shear_rate*self.sd.time 
+        """IFFT method to go from kspace to xspace."""
+        
+        deltay = self.shear_rate * self.sd.time 
         x = na.linspace(0.,2*na.pi,self.shape[-1],endpoint=False)
         if self.dealias: self.dealias()        
         self.data = self.fft(self.data,axis=1)
@@ -258,6 +262,8 @@ class FourierShearRepresentation(FourierRepresentation):
         self._curr_space = 'xspace'
 
     def forward(self):
+        """FFT method to go from xspace to kspace."""
+        
         deltay = self.shear_rate*self.sd.time 
         self.k['x'] = self.kx - deltay*self.k['y']
         x = na.linspace(0.,2*na.pi,self.shape[-1],endpoint=False)
@@ -278,6 +284,9 @@ class FourierShearRepresentation(FourierRepresentation):
         self._curr_space = 'kspace'
         if self.dealias: self.dealias()
         self.zero_nyquist()
+        
+    def k2(self):
+        pass
     
 class SphericalHarmonicRepresentation(FourierRepresentation):
     """Dedalus should eventually support spherical and cylindrical geometries.
