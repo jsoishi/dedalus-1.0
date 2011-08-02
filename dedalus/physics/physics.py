@@ -441,10 +441,8 @@ class MHD(Hydro):
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1., 'eta': 0.}
-
-        self._setup_aux_fields(0., self._aux_fields)
         self._setup_parameters(params)
-        self._RHS = self.create_fields(0.)
+        self._finalized = False
 
     def RHS(self, data):
         """
@@ -456,6 +454,9 @@ class MHD(Hydro):
         B_t + eta k^2 B = Bgradu - ugradB
 
         """
+        
+        if not self._finalized:
+            self._finalize_init()
         
         # Place references
         u = data['u']
