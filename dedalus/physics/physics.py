@@ -360,7 +360,6 @@ class Hydro(Physics):
         # Construct full term
         for i in self.dims:            
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            #zero_nyquist(pressure[i].data)
             pressure[i].zero_nyquist()
 
 class ShearHydro(Hydro):
@@ -422,7 +421,6 @@ class ShearHydro(Hydro):
         # Construct full term
         for i in self.dims:            
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            #zero_nyquist(pressure[i].data)
             pressure[i].zero_nyquist()
 
 class MHD(Hydro):
@@ -518,7 +516,6 @@ class MHD(Hydro):
         # Construct full term
         for i in self.dims:            
             Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            #zero_nyquist(Ptotal[i].data)
             Ptotal[i].zero_nyquist()
     
             
