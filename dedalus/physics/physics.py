@@ -364,12 +364,28 @@ class Hydro(Physics):
             pressure[i].zero_nyquist()
 
 class ShearHydro(Hydro):
+    """Incompressible hydrodynamics in a shearing box."""
 
     def RHS(self, data):
-        Hydro.RHS(self, data)
+        """
+        Compute right hand side of fluid equations, populating self._RHS with
+        the time derivatives of the fields.
 
-        self._RHS['u']['x']['kspace'] += 2. * self.parameters['Omega'] * data['u']['y']['kspace']
-        self._RHS['u']['y']['kspace'] += -(2 + self.parameters['S']) * self.parameters['Omega'] * data['u']['x']['kspace']
+        u_t + nu k^2 u = -ugradu - i k p / rho0 + rotation + shear
+        
+        rotation =  [2 Omega u_y,  0                 ,  0]
+        shear =     [0          ,  -(2 + S) Omega u_x,  0]
+
+        """
+        
+        # Place references
+        S = self.parameters['S']
+        Omega = self.parameters['Omega']
+        
+        # Compute terms
+        Hydro.RHS(self, data)
+        self._RHS['u']['x']['kspace'] += 2. * Omega * data['u']['y']['kspace']
+        self._RHS['u']['y']['kspace'] += -(2 + S) * Omega * data['u']['x']['kspace']
         
         return self._RHS
 
@@ -380,24 +396,28 @@ class ShearHydro(Hydro):
         p / rho0 = i (k * ugradu + rotation + shear)/ k^2
         ==> pressure term = - k (k * ugradu + rotation + shear) / k^2
         
+        rotation = -2 Omega u_y K_x
+        shear = (1 + S) 2 Omega u_x K_y
+        
         """
         
         # Place references
         ugradu = self.aux_fields['ugradu']
         pressure = self.aux_fields['pressure']
+        S = self.parameters['S']
+        Omega = self.parameters['Omega']
         
         # Setup temporary data container
         sampledata = data['u']['x']
         tmp = na.zeros_like(sampledata.data)
         k2 = sampledata.k2(no_zero=True)
         
-        # Construct k * ugradu
+        # Construct k * ugradu + rotation + shear
         for i in self.dims:
             tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace'] 
 
-        tmp += 2. * self.parameters['S'] * self.parameters['Omega'] * data['u']['x'].k['y'] * data['u']['x']['kspace'] \
-            - 2. * self.parameters['Omega'] * data['u']['y'].k['x'] * data['u']['y']['kspace'] \
-            + 2 * self.parameters['Omega'] * data['u']['x'].k['y'] * data['u']['x']['kspace']
+        tmp += (2. * (1 + S) * Omega * data['u']['x'].k['y'] * data['u']['x']['kspace'] - 
+                2. * Omega * data['u']['y'].k['x'] * data['u']['y']['kspace'])
 
         # Construct full term
         for i in self.dims:            
