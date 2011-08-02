@@ -43,10 +43,10 @@ def pow_spec(data, it, Dplus, spec_delta):
         nk = ((kshell & (power>0)) * na.ones_like(kmag)).sum()
         spec[i] = (power[kshell]).sum()/(Dplus*Dplus)/nk
         s_spec[i] = (s_power[kshell]).sum()/nk
-        outfile = "frames/powspec_%d.png" % it
+    outfile = "frames/lin_powspec_%d.png" % it
     fig = pl.figure()
     pl.loglog(k[1:], spec[1:], 'o-')
-    pl.loglog(k[1:], s_spec[1:], hold=True)
+    #pl.loglog(k[1:], s_spec[1:], hold=True)
     pl.xlabel("$k$")
     pl.ylabel("$\mid \delta_k \mid^2 / D_+^2$")
     fig.savefig(outfile)
@@ -55,13 +55,14 @@ RHS.parameters['Omega_r'] = 0.#8.4e-5
 RHS.parameters['Omega_m'] = 1.#0.276
 RHS.parameters['Omega_l'] = 0.#0.724
 RHS.parameters['H0'] = H0
+
 spec_delta, spec_u = cosmo_spectra(data, icfname, normfname)
 collisionless_cosmo_fields(data['delta'], data['u'], spec_delta, spec_u)
 
-dt = 5. # time in Myr
+dt = 50. # time in Myr
 ti = RK4simplevisc(RHS)
 ti.stop_time(100.*dt)
-ti.set_nsnap(1)
+ti.set_nsnap(100)
 ti.set_dtsnap(100)
 
 an = AnalysisSet(data, ti)

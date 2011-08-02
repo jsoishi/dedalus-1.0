@@ -270,6 +270,7 @@ def collisionless_cosmo_fields(delta, u, spec_delta, spec_u, mean=0., stdev=1.):
     amplitudes given by spec.
 
     """
+    na.random.seed(1)
     shape = spec_delta.shape
     rand = na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape)
     delta['kspace'] = spec_delta * rand
@@ -376,11 +377,11 @@ def cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryo
         spec_delta_b = kk**(nspect/2.)*f_deltabp(kk)
         
         # ... relative velocity between CDM and baryons in the synchronous gauge
-        f_thetab = interp1d(ak[::-1], thetac[::-1], kind='cubic')
+        f_thetab = interp1d(ak[::-1], thetab[::-1], kind='cubic')
         spec_vel_b = spec_vel - 1j * kk**(nspect/2. -1.)*f_thetab(kk)
         spec_u_b = [na.zeros_like(spec_vel_b),]*3
         for i,dim in enumerate(['x','y','z']):
-            spec_u_b[i] = (sampledata.k[dim]/kk) * spec_vel_b
+            spec_u_b[i] = (sampledata.k[dim]/kk) * spec_vel_b #*1/3.
 
         return spec_delta, spec_u, spec_delta_b, spec_u_b
        
