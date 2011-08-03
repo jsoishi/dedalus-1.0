@@ -167,8 +167,9 @@ class RK2simple(TimeStepBase):
 
         for a in self.RHS.aux_eqns.values():
             a.value = a_old + dt * a.RHS(a.value)
-                       
-        data.time += dt
+                     
+        # Update integrator stats
+        data.set_time(data.time + dt)
         self.time += dt
         self.iter += 1
         for k,f in data.fields.iteritems():
@@ -311,7 +312,7 @@ class CrankNicholsonVisc(TimeStepBase):
                                         1. / bottom * deriv[k][i]['kspace'])
 
         # Update data and integrator stats
-        data.time += dt
+        data.set_time(data.time + dt)
         self.time += dt
         self.iter += 1
             
@@ -332,7 +333,7 @@ def linear_step(start, deriv, dt, output):
             output[k][i]['kspace'] = start[k][i]['kspace'] + dt * deriv[k][i]['kspace']
             if output[k][i].dealias: output[k][i].dealias()
             
-    output.time = start.time + dt
+    output.set_time(start.time + dt)
                 
 def integrating_factor_step(start, deriv, dt, output):
     """
@@ -361,6 +362,6 @@ def integrating_factor_step(start, deriv, dt, output):
             output[k][i]['kspace'] = (start[k][i]['kspace'] + deriv[k][i]['kspace'] / IF * (EIF - 1.)) / EIF
             if output[k][i].dealias: output[k][i].dealias()
 
-    output.time = start.time + dt
+    output.set_time(start.time + dt)
     
     

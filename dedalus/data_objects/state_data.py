@@ -58,6 +58,13 @@ class StateData(object):
     def clone(self):
         return self.__class__(self.time, self.shape, self.length, self._field_classes, 
                               params=self.parameters)
+                              
+    def set_time(self, time):
+        self.time = time
+        for k,f in self.fields.iteritems():
+            for i in xrange(f.ncomp):
+                if f[i].__class__.__name__ == 'FourierShearRepresentation':
+                    f[i]._update_k()
         
     def __getitem__(self, item):
         return self.fields[item]

@@ -271,9 +271,7 @@ class FourierShearRepresentation(FourierRepresentation):
         deltay = self.shear_rate * self.sd.time
         x = (na.linspace(0., self.length[-1], self.shape[-1], endpoint=False) +
              na.zeros(self.shape))
-             
-        self.k['x'] = self.kx - deltay * self.k['y']
-        
+
         # Do FFT_Z
         if self.ndim == 3:
             self.data = self.fft(self.data, axis=0)
@@ -291,8 +289,8 @@ class FourierShearRepresentation(FourierRepresentation):
         if self.dealias: self.dealias()
         self.zero_nyquist()
         
-    #def k2(self):
-    #    pass
+    def _update_k(self):
+        self.k['x'] = self.kx - deltay * self.k['y']
     
 class SphericalHarmonicRepresentation(FourierRepresentation):
     """Dedalus should eventually support spherical and cylindrical geometries.
