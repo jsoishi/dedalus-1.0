@@ -715,20 +715,36 @@ class BaryonCDMCosmology(Physics):
         self._cs2_a = a
     
     def cs2_at(self, a):
-        """look up cs2 in internal table at nearest scale factor. Just
-        looks through the scale-factor table every time, linearly, to
-        find the correct index.
+        """look up cs2 in internal table at nearest scale factor. Uses
+        binary search to find the correct index.
 
         """
-        old_da = None
-        for i in range(len(self._cs2_a)):
-            da = abs(a - self._cs2_a[i])
-            if old_da is None or da < old_da:
-                old_da = da
-            else:
-                return self._cs2_values[i-1]
-        print "warning: scale factor out of cs2 range; using sound speed at a = ", self._cs2_a[-1]
-        return self._cs2_values[-1]
+        lower = 0
+        upper = len(self._cs2_a)
+        i = 0
+        while True:
+            if a > self._cs2_a[i]:
+                lower = i
+                i = lower + int(na.ceil((upper - lower)/2.))
+            elif a < self._cs2_a[i]:
+                upper = i
+                i = upper - int(na.ceil((upper - lower)/2.))
+            
+            if i == len(self._cs2_a):
+                print "warning: scale factor out of cs2 range; using sound speed at a = ", self._cs2_a[-1]
+                return self._cs2_values[-1]
+
+            if lower >= upper - 1:    
+                return self._cs2_values[i]
+
+        #for i in range(len(self._cs2_a)):
+        #    da = abs(a - self._cs2_a[i])
+        #    if old_da is None or da < old_da:
+        #        old_da = da
+        #    else:
+        #        return self._cs2_values[i-1]
+        #print "warning: scale factor out of cs2 range; using sound speed at a = ", self._cs2_a[-1]
+        #return self._cs2_values[-1]
 
     def RHS(self, data):
         self.d_b_RHS(data)
