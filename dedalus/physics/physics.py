@@ -460,7 +460,10 @@ class MHD(Hydro):
         
         if not self._finalized:
             self._finalize_init()
-        
+                 
+        self._RHS.set_time(data.time)
+        self.aux_fields.set_time(data.time)
+            
         # Place references
         u = data['u']
         B = data['B']
