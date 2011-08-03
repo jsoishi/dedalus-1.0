@@ -257,17 +257,17 @@ class FourierShearRepresentation(FourierRepresentation):
         if self.dealias: self.dealias()
         
         # Do x fft
-        self.data = self.ifft(self.data, axis=self.ndim)
+        self.data = self.ifft(self.data, axis=-1)
         
         # Phase shift
         self.data *= na.exp(-1j * self.k['y'] * x * deltay)
         
         # Do y fft
-        self.data = self.ifft(self.data, axis=self.ndim - 1)
+        self.data = self.ifft(self.data, axis=-2)
         
         # Do z fft
         if self.ndim == 3:
-            self.data = self.fft(self.data, axis=0)
+            self.data = self.ifft(self.data, axis=0)
         
         self._curr_space = 'xspace'
 
@@ -283,13 +283,13 @@ class FourierShearRepresentation(FourierRepresentation):
             self.data = self.fft(self.data, axis=0)
 
         # Do y fft
-        self.data = self.fft(self.data, axis=self.ndim - 1)
+        self.data = self.fft(self.data, axis=-2)
 
         # Phase shift
         self.data *= na.exp(1j * self.k['y'] * x * deltay)
         
         # Do x fft
-        self.data = self.fft(self.data, axis=self.ndim)
+        self.data = self.fft(self.data, axis=-1)
         
         self._curr_space = 'kspace'
         if self.dealias: self.dealias()
