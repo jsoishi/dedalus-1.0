@@ -125,9 +125,9 @@ def field_snap(data, it, use_extent=False, space='xspace', **kwargs):
     if not os.path.exists('frames'):
         os.mkdir('frames')
     if space == 'kspace':
-        outfile = "frames/k_snap_%04i.png" % it
+        outfile = "frames/k_snap_%07i.png" % it
     else:
-        outfile = "frames/snap_%04i.png" % it
+        outfile = "frames/snap_%07i.png" % it
     fig.savefig(outfile)
     fig.clf()
 
