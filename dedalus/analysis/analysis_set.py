@@ -90,6 +90,7 @@ def field_snap(data, it, use_extent=False, space='xspace', **kwargs):
     
     # Figure setup
     fig = P.figure(1, figsize=(24. * ncol / 3., 24. * nrow / 3.))
+    P.clf()
     grid = AxesGrid(fig, 111,
                     nrows_ncols = (nrow, ncol),
                     axes_pad=0.3,
@@ -174,6 +175,7 @@ def en_spec(data, it, flist=['u']):
         if spec[1:].nonzero()[0].size == 0:
             return
         fig = P.figure(1, figsize=(8, 6))
+        P.clf()
     
         P.semilogy(k[1:], spec[1:], 'o-')
         
@@ -286,6 +288,87 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
     outfile = "frames/phase_amp.png"
     fig.savefig(outfile)
     fig.clf()
+    
+@AnalysisSet.register_task
+def k_plot(data, it, use_extent=False, **kwargs):
+    """
+    Plot k-power for moving k modes (i.e. ShearReps)
+    
+    Inputs:
+        data        Data object
+        it          Iteration number
+
+    """
+    
+    # Determine image grid size
+    nvars = 0
+    for f in data.fields.values():
+        nvars += f.ncomp
+    if nvars == 4:
+        nrow = ncol = 2
+    elif nvars == 9:
+        nrow = ncol = 3
+    else:
+        nrow = na.ceil(nvars / 3.)
+        ncol = na.min([nvars, 3])
+    nrow = na.int(nrow)
+    ncol = na.int(ncol)
+
+    # Figure setup
+    #fig, axs = P.subplots(nrow, ncol, num=1, figsize=(8 * ncol, 6 * nrow))
+    fig = P.figure(1, figsize=(24. * ncol / 3., 24. * nrow / 3.))
+    P.clf()
+    grid = AxesGrid(fig, 111,
+                    nrows_ncols = (nrow, ncol),
+                    aspect=False,
+                    axes_pad=0.3,
+                    cbar_pad=0.,
+                    label_mode="1",
+                    cbar_location="top",
+                    cbar_mode="each")
+                    
+    # Plot field components
+    I = 0
+    z_ = na.zeros(data.shape)
+    ny = data['u']['x'].kny
+    for k,f in data.fields.iteritems():
+        for i in xrange(f.ncomp):
+            x = f[i].k['x'] + z_
+            y = f[i].k['y'] + z_
+            print na.min(x), na.max(x), na.min(y), na.max(y)
+            print f[i].kny
+            if f[i].ndim == 3:
+                plot_array = f[i]['kspace'][0,:,:]
+            else:
+                plot_array = f[i]['kspace']
+            plot_array = na.abs(plot_array)
+            plot_array[plot_array == 0] = 1e-50
+            plot_array = na.log10(plot_array)
+            
+            # Plot
+            im = grid[I].scatter(x, y, c=plot_array)
+            
+            # Nyquist boundary
+            nysquarex = na.array([-ny[-1], -ny[-1], ny[-1], ny[-1], -ny[-1]])
+            nysquarey = na.array([-ny[-2], ny[-2], ny[-2], -ny[-2], -ny[-2]])
+            grid[I].plot(nysquarex, nysquarey, 'k--')
+            
+            # Dealiasing boundary
+            grid[I].plot(2/3. * nysquarex, 2/3. * nysquarey, 'k:')
+            
+            grid[I].axis([-2 * ny[-1], 2 * ny[1], -2 * ny[-2], 2 * ny[-2]])
+
+            grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='white')
+            grid.cbar_axes[I].colorbar(im)
+            I += 1
+    tstr = 't = %5.2f' % data.time
+    grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
+    if not os.path.exists('frames'):
+        os.mkdir('frames')
+    outfile = "frames/k_plot_%07i.png" % it
+    fig.savefig(outfile)
+    fig.clf()
+
     
 def padrange(range, pad=0.05):
     xmin, xmax, ymin, ymax = range
