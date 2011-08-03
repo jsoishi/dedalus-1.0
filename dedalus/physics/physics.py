@@ -311,6 +311,9 @@ class Hydro(Physics):
         if not self._finalized:
             self._finalize_init()
             
+        self._RHS.set_time(data.time)
+        self.aux_fields.set_time(data.time)
+            
         # Place references
         u = data['u']
 
@@ -318,6 +321,7 @@ class Hydro(Physics):
         gradu = self.aux_fields['gradu']
         ugradu = self.aux_fields['ugradu']
         pressure = self.aux_fields['pressure']
+        k2 = data['u']['x'].k2()
         
         # Compute terms
         self.XgradY(u, u, gradu, ugradu)
@@ -329,10 +333,8 @@ class Hydro(Physics):
             self._RHS['u'][i]['kspace'] = -ugradu[i]['kspace'] - pressure[i]['kspace']
             
         # Set integrating factors
-        self._RHS['u'].integrating_factor = self.parameters['nu'] * (self._RHS['u']['x'].k2()) ** self.visc_order
+        self._RHS['u'].integrating_factor = self.parameters['nu'] * k2 ** self.visc_order
             
-        self._RHS.time = data.time        
-        self.aux_fields.time = data.time
         return self._RHS
 
     def pressure(self, data):
@@ -469,6 +471,7 @@ class MHD(Hydro):
         Bgradu = self.aux_fields['Bgradu']
         Ptotal = self.aux_fields['Ptotal']
         pr4 = 4 * na.pi * self.parameters['rho0']
+        k2 = data['u']['x'].k2()
         
         # Compute terms
         self.XlistgradY([u, B], u, mathtmp, [ugradu, Bgradu])
@@ -484,8 +487,8 @@ class MHD(Hydro):
             self._RHS['B'][i]['kspace'] = Bgradu[i]['kspace'] - ugradB[i]['kspace']
 
         # Set integrating factors
-        self._RHS['u'].integrating_factor = self.parameters['nu'] * (self._RHS['u']['x'].k2()) ** self.visc_order
-        self._RHS['B'].integrating_factor = self.parameters['eta'] * (self._RHS['B']['x'].k2()) ** self.visc_order
+        self._RHS['u'].integrating_factor = self.parameters['nu'] * k2 ** self.visc_order
+        self._RHS['B'].integrating_factor = self.parameters['eta'] * k2 ** self.visc_order
 
         self._RHS.time = data.time        
         return self._RHS

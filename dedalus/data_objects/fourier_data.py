@@ -254,36 +254,39 @@ class FourierShearRepresentation(FourierRepresentation):
         deltay = self.shear_rate * self.sd.time 
         x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
         
-        if self.dealias: self.dealias()        
+        if self.dealias: self.dealias()
+        
         self.data = self.fft(self.data,axis=1)
         self.data *= na.exp(1j*self.k['y']*x*deltay)
         if self.ndim == 3:
             self.data = self.fft(self.data,axis=2)
 
         self.data = self.fft(self.data,axis=0)
+        
         self._curr_space = 'xspace'
 
     def forward(self):
         """FFT method to go from xspace to kspace."""
         
         deltay = self.shear_rate * self.sd.time
-        x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
+        x = (na.linspace(0., self.length[-1], self.shape[-1], endpoint=False) +
+             na.zeros(self.shape))
+             
+        self.k['x'] = self.kx - deltay * self.k['y']
         
-        self.k['x'] = self.kx - deltay*self.k['y']
+        # Do FFT_Z
         if self.ndim == 3:
-            self.data = self.ifft(self.data,axis=2)
-            z_,y_,x_ = na.ogrid[0:self.data.shape[0],
-                                0:self.data.shape[1],
-                                0:self.data.shape[2]]
-        elif self.ndim == 2:
-            z_ = 0.
-            y_,x_ = na.ogrid[0:self.data.shape[0],
-                             0:self.data.shape[1]]
+            self.data = self.fft(self.data, axis=0)
 
-        self.data = self.ifft(self.data,axis=0)
+        # Do FFT_Y
+        self.data = self.fft(self.data, axis=self.ndim - 1)
 
-        self.data *= na.exp(-1j*self.k['y']*(0.*z_ +0.*y_+x)*deltay)
-        self.data = self.ifft(self.data,axis=1)
+        # Phase shift
+        self.data *= na.exp(1j * self.k['y'] * x * deltay)
+        
+        # Do FFT_X
+        self.data = self.fft(self.data, axis=self.ndim)
+        
         self._curr_space = 'kspace'
         if self.dealias: self.dealias()
         self.zero_nyquist()
