@@ -357,11 +357,15 @@ def k_plot(data, it, use_extent=False, **kwargs):
             
             grid[I].axis([-2 * ny[-1], 2 * ny[1], -2 * ny[-2], 2 * ny[-2]])
 
-            grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='white')
+            grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='black')
             grid.cbar_axes[I].colorbar(im)
             I += 1
     tstr = 't = %5.2f' % data.time
     grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
+    
+    grid[0].set_xlabel('kx')
+    grid[0].set_ylabel('ky')
+    
     if not os.path.exists('frames'):
         os.mkdir('frames')
     outfile = "frames/k_plot_%07i.png" % it
