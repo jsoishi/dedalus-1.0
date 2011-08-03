@@ -335,8 +335,7 @@ def k_plot(data, it, use_extent=False, **kwargs):
         for i in xrange(f.ncomp):
             x = f[i].k['x'] + z_
             y = f[i].k['y'] + z_
-            print na.min(x), na.max(x), na.min(y), na.max(y)
-            print f[i].kny
+
             if f[i].ndim == 3:
                 plot_array = f[i]['kspace'][0,:,:]
             else:
