@@ -256,12 +256,18 @@ class FourierShearRepresentation(FourierRepresentation):
         
         if self.dealias: self.dealias()
         
-        self.data = self.fft(self.data,axis=1)
-        self.data *= na.exp(1j*self.k['y']*x*deltay)
+        # Do x fft
+        self.data = self.ifft(self.data, axis=self.ndim)
+        
+        # Phase shift
+        self.data *= na.exp(-1j * self.k['y'] * x * deltay)
+        
+        # Do y fft
+        self.data = self.ifft(self.data, axis=self.ndim - 1)
+        
+        # Do z fft
         if self.ndim == 3:
-            self.data = self.fft(self.data,axis=2)
-
-        self.data = self.fft(self.data,axis=0)
+            self.data = self.fft(self.data, axis=0)
         
         self._curr_space = 'xspace'
 
@@ -272,17 +278,17 @@ class FourierShearRepresentation(FourierRepresentation):
         x = (na.linspace(0., self.length[-1], self.shape[-1], endpoint=False) +
              na.zeros(self.shape))
 
-        # Do FFT_Z
+        # Do z fft
         if self.ndim == 3:
             self.data = self.fft(self.data, axis=0)
 
-        # Do FFT_Y
+        # Do y fft
         self.data = self.fft(self.data, axis=self.ndim - 1)
 
         # Phase shift
         self.data *= na.exp(1j * self.k['y'] * x * deltay)
         
-        # Do FFT_X
+        # Do x fft
         self.data = self.fft(self.data, axis=self.ndim)
         
         self._curr_space = 'kspace'
@@ -290,7 +296,9 @@ class FourierShearRepresentation(FourierRepresentation):
         self.zero_nyquist()
         
     def _update_k(self):
-        self.k['x'] = self.kx - deltay * self.k['y']
+        """Evolve modes due to shear."""
+
+        self.k['x'] = self.kx - self.shear_rate * self.sd.time * self.k['y']
     
 class SphericalHarmonicRepresentation(FourierRepresentation):
     """Dedalus should eventually support spherical and cylindrical geometries.
