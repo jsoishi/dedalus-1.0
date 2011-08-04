@@ -290,7 +290,7 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
     fig.clf()
     
 @AnalysisSet.register_task
-def k_plot(data, it, use_extent=False, **kwargs):
+def k_plot(data, it):
     """
     Plot k-power for moving k modes (i.e. ShearReps)
     
@@ -315,7 +315,6 @@ def k_plot(data, it, use_extent=False, **kwargs):
     ncol = na.int(ncol)
 
     # Figure setup
-    #fig, axs = P.subplots(nrow, ncol, num=1, figsize=(8 * ncol, 6 * nrow))
     fig = P.figure(1, figsize=(24. * ncol / 3., 24. * nrow / 3.))
     P.clf()
     grid = AxesGrid(fig, 111,

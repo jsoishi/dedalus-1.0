@@ -299,9 +299,9 @@ class FourierShearRepresentation(FourierRepresentation):
         """Evolve modes due to shear."""
 
         self.k['x'] = self.kx - self.shear_rate * self.sd.time * self.k['y']
-        while self.k['x'].min < -self.kny[-1]:
+        while self.k['x'].min() < -self.kny[-1]:
             self.k['x'][self.k['x'] < -self.kny[-1]] += 2 * self.kny[-1]
-        while self.k['x'].max >= self.kny[-1]:
+        while self.k['x'].max() >= self.kny[-1]:
             self.k['x'][self.k['x'] >= self.kny[-1]] -= 2 * self.kny[-1]
             
             
