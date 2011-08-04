@@ -122,7 +122,7 @@ class FourierRepresentation(Representation):
         if dealiasing == '2/3':
             self.dealias = self.dealias_23
         else:
-            self.dealias = None
+            self.dealias = self.zero_nyquist
 
     def fwd_fftw(self):
         self.fplan()
@@ -144,14 +144,14 @@ class FourierRepresentation(Representation):
         
         self.fft()
         self._curr_space = 'kspace'
-        if self.dealias: self.dealias()
+        self.dealias()
         self.zero_nyquist()
         #self.zero_under_eps()
 
     def backward(self):
         """IFFT method to go from kspace to xspace."""
         
-        if self.dealias: self.dealias()
+        self.dealias()
         self.ifft()
         self._curr_space = 'xspace'
 
@@ -254,7 +254,7 @@ class FourierShearRepresentation(FourierRepresentation):
         deltay = self.shear_rate * self.sd.time 
         x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
         
-        if self.dealias: self.dealias()
+        self.dealias()
         
         # Do x fft
         self.data = self.ifft(self.data, axis=-1)
@@ -292,7 +292,7 @@ class FourierShearRepresentation(FourierRepresentation):
         self.data = self.fft(self.data, axis=-1)
         
         self._curr_space = 'kspace'
-        if self.dealias: self.dealias()
+        self.dealias()
         self.zero_nyquist()
         
     def _update_k(self):
