@@ -159,8 +159,8 @@ class FourierRepresentation(Representation):
         """Orszag 2/3 dealias rule"""
         
         # Zeroing mask   
-        dmask = ((na.abs(self.k['x']) > 2/3. * self.kny[-1]) | 
-                 (na.abs(self.k['y']) > 2/3. * self.kny[-2]))
+        dmask = ((na.abs(self.k['x']) >= 2/3. * self.kny[-1]) | 
+                 (na.abs(self.k['y']) >= 2/3. * self.kny[-2]))
 
         if self.ndim == 3:
             dmask = dmask | (na.abs(self.k['z']) >= 2/3. * self.kny[-3])
