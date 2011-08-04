@@ -24,6 +24,11 @@ import numpy as na
 import numpy.fft as fpack
 import fftw3
 
+try: 
+    from mpi4py import MPI
+except:
+    print "mpi4py not found. Parallelization will not work."
+
 class Representation(object):
     """a representation of a field. it stores data and provides
     spatial derivatives.
@@ -45,6 +50,7 @@ class FourierRepresentation(Representation):
                  dealiasing='2/3'):
         """
         Inputs:
+            sd          state data object
             shape       The shape of the data, tuple of ints
             length      The length of the data, tuple of floats (default: 2 pi)
             
@@ -59,18 +65,7 @@ class FourierRepresentation(Representation):
         self.trans = {'x': 0, 'y': 1, 'z': 2,
                       0:'x', 1:'y', 2:'z'} # for vector fields
         
-        # Get Nyquist wavenumbers
-        self.kny = na.pi * na.array(self.shape) / na.array(self.length)
-
-        # Setup wavenumbers
-        self.k = []
-        for i,S in enumerate(self.shape):
-            kshape = i * (1,) + (S,) + (self.ndim - i - 1) * (1,)
-            ki = fpack.fftfreq(S) * 2. * self.kny[i]
-            ki.resize(kshape)
-            self.k.append(ki)
-        self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
-
+        self._setup_k()
         self.set_fft(method)
         self.set_dealiasing(dealiasing)
 
@@ -103,11 +98,19 @@ class FourierRepresentation(Representation):
 
         self._curr_space = space
 
-    def initialize(self, data, space):
-        """should provide some way to initialize data
-        """
-        pass
-        
+    def _setup_k(self):
+        # Get Nyquist wavenumbers
+        self.kny = na.pi * na.array(self.shape) / na.array(self.length)
+
+        # Setup wavenumbers
+        self.k = []
+        for i,S in enumerate(self.shape):
+            kshape = i * (1,) + (S,) + (self.ndim - i - 1) * (1,)
+            ki = fpack.fftfreq(S) * 2. * self.kny[i]
+            ki.resize(kshape)
+            self.k.append(ki)
+        self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
+
     def set_fft(self, method):
         if method == 'fftw':
             self.fplan = fftw3.Plan(self.data, direction='forward', flags=['measure'])
@@ -304,8 +307,43 @@ class FourierShearRepresentation(FourierRepresentation):
         while self.k['x'].max() >= self.kny[-1]:
             self.k['x'][self.k['x'] >= self.kny[-1]] -= 2 * self.kny[-1]
             
-            
-    
+class ParallelFourierRepresentation(FourierRepresentation):
+    def __init__(self, sd, shape, length, comm=None, dtype='complex128', method='fftw',
+                 dealiasing='2/3'):
+        """
+        Inputs:
+            sd          state data object
+            shape       The shape of the data, tuple of ints
+            length      The length of the data, tuple of floats (default: 2 pi)
+            comm        MPI communicator (defaults to COMM_WORLD)
+        """
+        if comm == None:
+            comm = MPI.COMM_WORLD
+        self.comm = comm
+
+        self.offset = na.array([0, 0, comm.Get_rank() * shape[2]])
+        FourierRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
+
+    def _setup_k(self):
+        nproc = self.comm.Get_size()
+        myproc = self.comm.Get_rank()
+
+        global_shape = na.array(self.shape)*na.array([nproc, 1, 1])
+        global_length = na.array(self.length)*na.array([nproc, 1, 1])
+        # Get Nyquist wavenumbers
+        self.kny = na.pi * na.array(self.shape) / na.array(self.length)
+
+        # Setup wavenumbers
+        self.k = []
+        for i,S in enumerate(global_shape):
+            kshape = i * (1,) + (S,) + (self.ndim - i - 1) * (1,)
+            ki = fpack.fftfreq(S) * 2. * self.kny[i]
+            ki.resize(kshape)
+            self.k.append(ki)
+        self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
+        self.k['z'] = self.k['z'][myproc*self.shape[0]:(myproc+1)*self.shape[0]]
+
+
 class SphericalHarmonicRepresentation(FourierRepresentation):
     """Dedalus should eventually support spherical and cylindrical geometries.
 
