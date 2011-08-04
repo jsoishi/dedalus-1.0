@@ -121,7 +121,7 @@ class FourierRepresentation(Representation):
     def set_dealiasing(self, dealiasing):
         if dealiasing == '2/3':
             self.dealias = self.dealias_23
-        if dealiasing == '2/3spherical':
+        elif dealiasing == '2/3spherical':
             self.dealias = self.dealias_spherical_23
         else:
             self.dealias = self.zero_nyquist
@@ -147,7 +147,6 @@ class FourierRepresentation(Representation):
         self.fft()
         self._curr_space = 'kspace'
         self.dealias()
-        self.zero_nyquist()
         #self.zero_under_eps()
 
     def backward(self):
@@ -295,7 +294,6 @@ class FourierShearRepresentation(FourierRepresentation):
         
         self._curr_space = 'kspace'
         self.dealias()
-        self.zero_nyquist()
         
     def _update_k(self):
         """Evolve modes due to shear."""
