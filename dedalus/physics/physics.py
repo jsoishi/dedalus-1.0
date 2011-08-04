@@ -362,7 +362,7 @@ class Hydro(Physics):
         # Construct full term
         for i in self.dims:            
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            pressure[i].zero_nyquist()
+            #pressure[i].zero_nyquist()
 
 class ShearHydro(Hydro):
     """Incompressible hydrodynamics in a shearing box."""
@@ -424,7 +424,7 @@ class ShearHydro(Hydro):
         # Construct full term
         for i in self.dims:            
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            pressure[i].zero_nyquist()
+            #pressure[i].zero_nyquist()
 
 class MHD(Hydro):
     """Incompressible magnetohydrodynamics."""
@@ -525,7 +525,7 @@ class MHD(Hydro):
         # Construct full term
         for i in self.dims:            
             Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            Ptotal[i].zero_nyquist()
+            #Ptotal[i].zero_nyquist()
     
 class ShearMHD(MHD):
     """Incompressible magnetohydrodynamics in a shearing box."""
@@ -596,7 +596,7 @@ class ShearMHD(MHD):
         # Construct full term
         for i in self.dims:            
             Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            Ptotal[i].zero_nyquist()
+            #Ptotal[i].zero_nyquist()
             
 
 class LinearCollisionlessCosmology(Physics):
