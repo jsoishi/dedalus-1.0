@@ -40,7 +40,7 @@ def pow_spec(data, it, flist=['delta_c', 'delta_b']):
             k_rad = (kbottom[i] + ktop[i])/2
             kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
             nk = ((kshell & (power>0)) * na.ones_like(kmag)).sum()
-            spec[f][i] = (power[kshell]).sum()/(4*na.pi*k_rad**2)
+            spec[f][i] = (power[kshell]).sum()/nk
     return k, spec
 
 def rel_matter_spec(data, it, Dplus, a, flist=['delta_c', 'delta_b']):
@@ -100,7 +100,7 @@ def read_cs2(thermo_fname):
 
 RHS.parameters['Omega_r'] = 8.4e-5
 RHS.parameters['Omega_m'] = 0.276
-RHS.parameters['Omega_b'] = 0.050
+RHS.parameters['Omega_b'] = 0.045
 RHS.parameters['Omega_c'] = RHS.parameters['Omega_m'] - RHS.parameters['Omega_b']
 RHS.parameters['Omega_l'] = 0.724
 RHS.parameters['H0'] = H0

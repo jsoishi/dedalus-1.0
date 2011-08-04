@@ -1,5 +1,5 @@
 omega_m			= 0.276			# Omega all matter today
-omega_b			= 0.050			# Omega baryonic matter today
+omega_b			= 0.045 		# Omega baryonic matter today
 omega_L			= 0.724			# Omega cosmological constant today
 H0			= 70.3			# Hubble constant today
 Tcmb			= 2.726			# CMB temperature today (in K)
