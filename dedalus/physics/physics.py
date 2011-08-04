@@ -286,7 +286,7 @@ class Hydro(Physics):
         # Setup data fields
         self.fields = [('u', 'VectorField')]
         self._aux_fields = [('pressure', 'VectorField'),
-                            ('gradu', 'TensorField'),
+                            ('mathtmp', 'ScalarField'),
                             ('ugradu', 'VectorField')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
@@ -317,15 +317,15 @@ class Hydro(Physics):
         # Place references
         u = data['u']
 
-        #mathtmp = self.aux_fields['mathtmp']
-        gradu = self.aux_fields['gradu']
+        mathtmp = self.aux_fields['mathtmp']
+        #gradu = self.aux_fields['gradu']
         ugradu = self.aux_fields['ugradu']
         pressure = self.aux_fields['pressure']
         k2 = data['u']['x'].k2()
         
         # Compute terms
-        self.XgradY(u, u, gradu, ugradu)
-        #self.XlistgradY([u], u, mathtmp, [ugradu]) 
+        #self.XgradY(u, u, gradu, ugradu)
+        self.XlistgradY([u], u, mathtmp, [ugradu]) 
         self.pressure(data)
         
         # Construct time derivatives

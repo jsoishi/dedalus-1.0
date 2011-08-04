@@ -145,31 +145,21 @@ class RK2simple(TimeStepBase):
         
         # First step
         self.field_dt = self.RHS.RHS(data)
-        
-        for k,f in data.fields.iteritems():
-            for i in xrange(f.ncomp):
-                self.tmp_fields[k][i]['kspace'] = data[k][i]['kspace'] + dt / 2. * self.field_dt[k][i]['kspace']
-        
+        linear_step(data, self.field_dt, dt / 2., self.tmp_fields)
+
         for a in self.RHS.aux_eqns.values():
             a_old = a.value # OK if we only have one aux eqn...
             # need to update actual value so RHS can use it
             a.value = a.value + dt / 2. * a.RHS(a.value)
-                        
-        self.tmp_fields.set_time(data.time + dt / 2.)
 
         # Second step
         self.field_dt = self.RHS.RHS(self.tmp_fields)
-
-        for k,f in data.fields.iteritems():
-            for i in xrange(f.ncomp):
-                data[k][i]['kspace'] = data[k][i]['kspace'] + dt * self.field_dt[k][i]['kspace']
-                data[k][i].dealias()
+        linear_step(data, self.field_dt, dt, data)
 
         for a in self.RHS.aux_eqns.values():
             a.value = a_old + dt * a.RHS(a.value)
                      
         # Update integrator stats
-        data.set_time(data.time + dt)
         self.time += dt
         self.iter += 1
         for k,f in data.fields.iteritems():
