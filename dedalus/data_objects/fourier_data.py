@@ -121,6 +121,8 @@ class FourierRepresentation(Representation):
     def set_dealiasing(self, dealiasing):
         if dealiasing == '2/3':
             self.dealias = self.dealias_23
+        if dealiasing == '2/3spherical':
+            self.dealias = self.dealias_spherical_23
         else:
             self.dealias = self.zero_nyquist
 
