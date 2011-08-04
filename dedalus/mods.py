@@ -50,6 +50,7 @@ from dedalus.physics.api import \
     MHD, \
     LinearCollisionlessCosmology, \
     CollisionlessCosmology, \
+    LinearBaryonCDMCosmology, \
     BaryonCDMCosmology
 
 from dedalus.time_stepping.api import \
