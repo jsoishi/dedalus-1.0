@@ -23,8 +23,8 @@ a_i = 0.002 # initial scale factor
 t0 = (2./3.)/H0 # present age of E-dS universe
 t_ini = (a_i**(3./2.)) * t0 # time at which a = a_i
 
-def pow_spec(data, it, Dplus, spec_delta):
-    delta = data['delta']
+def pow_spec(data, it, Dplus, spec_delta, a):
+    delta = data['u']['x']
     
     power = na.abs(delta['kspace'])**2
 
@@ -43,7 +43,7 @@ def pow_spec(data, it, Dplus, spec_delta):
         nk = ((kshell & (power>0)) * na.ones_like(kmag)).sum()
         spec[i] = (power[kshell]).sum()/(Dplus*Dplus)/nk
         s_spec[i] = (s_power[kshell]).sum()/nk
-    outfile = "frames/lin_powspec_%d.png" % it
+    outfile = "frames/powspec_a%05f.png" % a
     fig = pl.figure()
     pl.loglog(k[1:], spec[1:], 'o-')
     #pl.loglog(k[1:], s_spec[1:], hold=True)
@@ -59,7 +59,7 @@ RHS.parameters['H0'] = H0
 spec_delta, spec_u = cosmo_spectra(data, icfname, normfname)
 collisionless_cosmo_fields(data['delta'], data['u'], spec_delta, spec_u)
 
-dt = 50. # time in Myr
+dt = 10. # time in Myr
 ti = RK4simplevisc(RHS)
 ti.stop_time(100.*dt)
 ti.set_nsnap(100)
@@ -71,13 +71,19 @@ an.add("field_snap", 20)
 an.add("en_spec", 20)
 i=0
 an.run()
+outfile = open('ugrowth.dat','w')
 while ti.ok:
     Dplus = ((data.time + t_ini)/t_ini) ** (2./3.)
+    adot = RHS.aux_eqns['a'].RHS(RHS.aux_eqns['a'].value)
     print 'step: ', i, ' a = ', RHS.aux_eqns['a'].value
-    if i % 20 == 0:
-        pow_spec(data, i, Dplus, spec_delta)
+    if i % 1 == 0:
+        pow_spec(data, i, adot, spec_delta, RHS.aux_eqns['a'].value)
     ti.advance(data, dt)
     i = i + 1
     an.run()
-pow_spec(data, i, Dplus, spec_delta)
+    u = data['u'][0]['kspace'][9,9,9].real
+    print u
+    outfile.write("%10.5e\t%10.5e\t%10.5e\n" %(ti.time, adot, u))
+outfile.close()
+pow_spec(data, i, Dplus, spec_delta, RHS.aux_eqns['a'].value)
     

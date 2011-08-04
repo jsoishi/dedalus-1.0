@@ -227,11 +227,11 @@ def read_linger_ic_data(fname, ak, deltacp, deltabp, phi, thetac, thetab):
         deltacp.append(float(values[6]))
         deltabp.append(float(values[7]))
         phi.append(float(values[5]) + float(values[11])) # eta + etatophi
-        thetac.append(-float(values[11])*(ak[i]**2) / float(values[20]))
-        thetab.append(float(values[12]))
+        thetac.append(-float(values[11]) / float(values[20]))
+        thetab.append(float(values[12])+thetac[i])
     infile.close()
 
-def read_linger_norm_data(fname, ak_trans, Ttot0, dTvc):
+def read_linger_norm_data(fname, ak_trans, Ttot0, dTvc, dTvb):
     """read certain values from a transfer-mode linger++ output file
 
     """
@@ -241,6 +241,7 @@ def read_linger_norm_data(fname, ak_trans, Ttot0, dTvc):
         ak_trans.append(float(values[0]))
         Ttot0.append(float(values[6]))
         dTvc.append(float(values[4]))
+        dTvb.append(float(values[5]))
     infile.close()
 
 def sig2_integrand(Ttot0, ak, nspect):
@@ -272,7 +273,7 @@ def collisionless_cosmo_fields(delta, u, spec_delta, spec_u, mean=0., stdev=1.):
     """
     na.random.seed(1)
     shape = spec_delta.shape
-    rand = na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape)
+    rand = (na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape))/na.sqrt(2)
     delta['kspace'] = spec_delta * rand
     hermitianize.enforce_hermitian(delta['kspace'])
     delta.zero_nyquist()
@@ -311,7 +312,7 @@ def cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryo
     Time:   Myr (linger++ uses Mpc/c)
 
     """
-    Myr_per_Mpc = 0.3063915366 # conversion factor for time units
+    Myr_per_Mpc = 0.3063915366 # conversion factor for (inverse) time units
 
     ak = []
     deltacp = []
@@ -321,22 +322,24 @@ def cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryo
     thetab = []
     Ttot0 = []
     dTvc = []
-    ak_trans = [] # the k-values that go with Ttot0
+    dTvb = []
+    ak_trans = [] # the k-values that go with Ttot0 (transfer-mode output) 
     
     read_linger_ic_data(ic_fname, ak, deltacp, deltabp, phi, thetac, thetab)
-    read_linger_norm_data(norm_fname, ak_trans, Ttot0, dTvc)
+    read_linger_norm_data(norm_fname, ak_trans, Ttot0, dTvc, dTvb)
     ak = na.array(ak)
     deltacp = na.array(deltacp)/ak**2
     phi = na.array(phi)
-    thetac = na.array(thetac)/ak**2
-    ak_trans = na.array(ak_trans) * .703 # should take h from input
+    thetac = na.array(thetac)
+    ak_trans = na.array(ak_trans) #* .703 # should take h from input
     Ttot0 = na.array(Ttot0)/ak_trans**2    
-    #thetac = -na.array(dTvc) * (.703/299792.458) #* (ak_trans**2)
+    thetac2 = -na.array(dTvc) * (.703/299792.458)
         
     # ... normalize
     ampl = get_normalization(Ttot0, ak_trans, sigma_8, nspect)
     deltacp = deltacp*ampl
     thetac = thetac*ampl*Myr_per_Mpc
+    thetac2 = thetac2*ampl*Myr_per_Mpc
     # ... get sample data object for shape and k-values
     sampledata = data.fields.values()[0][0]
     shape = sampledata.shape
@@ -354,34 +357,36 @@ def cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryo
     f_deltacp = interp1d(ak[::-1], deltacp[::-1], kind='cubic')
     spec_delta = kk**(nspect/2.)*f_deltacp(kk)
     
-    #f_thetac = interp1d(ak_trans, thetac, kind='cubic') # if thetac comes from dTvc
+    f_thetac2 = interp1d(ak_trans, thetac2, kind='cubic') # if thetac comes from dTvc
     f_thetac = interp1d(ak[::-1], thetac[::-1], kind='cubic')
     spec_vel = -1j*kk**(nspect/2. -1.)*f_thetac(kk)
-    spec_vel[0,0,0] = 0
-
+    spec_vel2 = -1j*kk**(nspect/2. -1.)*f_thetac2(kk)
+    spec_vel[0,0,0] = 0.
     spec_u = [na.zeros_like(spec_vel),]*3
     for i,dim in enumerate(['x','y','z']):
-        spec_u[i] = (sampledata.k[dim]/kk) * spec_vel #*1/3.
+        spec_u[i] = (sampledata.k[dim]/kk) * spec_vel
 
     if baryons:
-        deltabp = na.array(deltabp)
-        thetab = na.array(thetab)
-        
+        deltabp = na.array(deltabp)/ak**2
+        thetab2 = na.array(thetab)
+        thetab = -na.array(dTvb)*(.703/299792.458)#*(ak_trans**2)
+
         deltabp = deltabp*ampl
+        thetab2 = thetab2*ampl*Myr_per_Mpc
         thetab = thetab*ampl*Myr_per_Mpc
         
-        deltabp = na.array(deltabp)/ak**2
-        thetab = na.array(thetab)/ak**2
-
         f_deltabp = interp1d(ak[::-1], deltabp[::-1], kind='cubic')
         spec_delta_b = kk**(nspect/2.)*f_deltabp(kk)
         
         # ... relative velocity between CDM and baryons in the synchronous gauge
-        f_thetab = interp1d(ak[::-1], thetab[::-1], kind='cubic')
-        spec_vel_b = spec_vel - 1j * kk**(nspect/2. -1.)*f_thetab(kk)
+        f_thetab2 = interp1d(ak[::-1], thetab2[::-1], kind='cubic')
+        f_thetab = interp1d(ak_trans, thetab, kind='cubic')
+        spec_vel_b =  -(1j * kk**(nspect/2. - 1.)*f_thetab(kk))
+        spec_vel_b2 = -(1j * kk**(nspect/2. - 1.)*f_thetab2(kk))
+        print spec_vel_b[0,0,:]/spec_vel_b2[0,0,:]
         spec_u_b = [na.zeros_like(spec_vel_b),]*3
         for i,dim in enumerate(['x','y','z']):
-            spec_u_b[i] = (sampledata.k[dim]/kk) * spec_vel_b #*1/3.
+            spec_u_b[i] = (sampledata.k[dim]/kk) * spec_vel_b2
 
         return spec_delta, spec_u, spec_delta_b, spec_u_b
        
