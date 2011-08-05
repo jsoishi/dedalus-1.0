@@ -228,7 +228,7 @@ def read_linger_ic_data(fname, ak, deltacp, deltabp, phi, thetac, thetab):
         deltabp.append(float(values[7]))
         phi.append(float(values[5]) + float(values[11])) # eta + etatophi
         thetac.append(-float(values[11]) / float(values[20]))
-        thetab.append(float(values[12])+thetac[i])
+        thetab.append(float(values[12])/ak[i]**2 + thetac[i])
     infile.close()
 
 def read_linger_norm_data(fname, ak_trans, Ttot0, dTvc, dTvb):
@@ -331,10 +331,10 @@ def cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryo
     deltacp = na.array(deltacp)/ak**2
     phi = na.array(phi)
     thetac = na.array(thetac)
-    ak_trans = na.array(ak_trans) #* .703 # should take h from input
-    Ttot0 = na.array(Ttot0)/ak_trans**2    
+    ak_trans = na.array(ak_trans) * .703 # should take h from input
+    Ttot0 = na.array(Ttot0)/ak_trans**2
     thetac2 = -na.array(dTvc) * (.703/299792.458)
-        
+
     # ... normalize
     ampl = get_normalization(Ttot0, ak_trans, sigma_8, nspect)
     deltacp = deltacp*ampl
@@ -361,10 +361,11 @@ def cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryo
     f_thetac = interp1d(ak[::-1], thetac[::-1], kind='cubic')
     spec_vel = -1j*kk**(nspect/2. -1.)*f_thetac(kk)
     spec_vel2 = -1j*kk**(nspect/2. -1.)*f_thetac2(kk)
+    
     spec_vel[0,0,0] = 0.
     spec_u = [na.zeros_like(spec_vel),]*3
     for i,dim in enumerate(['x','y','z']):
-        spec_u[i] = (sampledata.k[dim]/kk) * spec_vel
+        spec_u[i] = (sampledata.k[dim]/kk) * spec_vel2
 
     if baryons:
         deltabp = na.array(deltabp)/ak**2
@@ -386,7 +387,7 @@ def cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryo
         print spec_vel_b[0,0,:]/spec_vel_b2[0,0,:]
         spec_u_b = [na.zeros_like(spec_vel_b),]*3
         for i,dim in enumerate(['x','y','z']):
-            spec_u_b[i] = (sampledata.k[dim]/kk) * spec_vel_b2
+            spec_u_b[i] = (sampledata.k[dim]/kk) * spec_vel_b
 
         return spec_delta, spec_u, spec_delta_b, spec_u_b
        

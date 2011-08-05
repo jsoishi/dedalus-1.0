@@ -118,7 +118,7 @@ ti.set_dtsnap(10000)
 
 an = AnalysisSet(data, ti)
 an.add("field_snap", 1)
-an.add("en_spec", 100, {'flist':['u_c','u_b']})
+#an.add("en_spec", 100, {'flist':['u_c','u_b']})
 i=0
 an.run()
 outfile = open('ugrowth.dat', 'w')
