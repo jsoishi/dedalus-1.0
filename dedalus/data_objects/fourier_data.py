@@ -308,7 +308,7 @@ class FourierShearRepresentation(FourierRepresentation):
             self.k['x'][self.k['x'] >= self.kny[-1]] -= 2 * self.kny[-1]
             
 class ParallelFourierRepresentation(FourierRepresentation):
-    def __init__(self, sd, shape, length, comm=None, dtype='complex128', method='fftw',
+    def __init__(self, sd, shape, length, comm=None, dtype='complex128', method='numpy',
                  dealiasing='2/3'):
         """
         Inputs:
@@ -343,6 +343,8 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.k['z'] = self.k['z'][self.myproc*self.shape[0]:(self.myproc+1)*self.shape[0]]
 
     def fwd_np(self):
+        """xspace to kspace"""
+    
         # do x-y plane FFTs along each of the z
         self.data = fpack.fftn(self.data, axes=(1,2))
         
@@ -358,8 +360,29 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.data = fftpack.fftn(self.data, axes=(0,))
 
     def rev_np(self):
-        self.data = fpack.ifftn(self.data)
-        self.data.imag = 0
+        """kspace to xspace
+        
+        """
+        
+        # xy fft
+        self.data = fpack.ifftn(self.data, axes=(1,2))
+
+        # Transpose
+        sy = self.shape[1] / self.nproc
+        sendbuf = []
+        for i in xrange(self.nproc):
+            sendbuf.append(self.data[:, i * sy:(i + 1) * sy, :])
+            
+        sendbuf = na.array(sendbuf)
+        recvbuf = na.empty_like(sendbuf)
+        
+        self.comm.Alltoall([sendbuf,MPI.DOUBLE_COMPLEX], [recvbuf,MPI.DOUBLE_COMPLEX])
+        
+        recvbuf = na.concatenate(recvbuf, axis=0)
+        print recvbuf.shape
+        
+        # z fft
+        self.data = fpack.ifftn(recvbuf, axes=(0,))
 
 
 
