@@ -321,15 +321,14 @@ class ParallelFourierRepresentation(FourierRepresentation):
             comm = MPI.COMM_WORLD
         self.comm = comm
 
-        self.offset = na.array([0, 0, comm.Get_rank() * shape[2]])
+        self.nproc = comm.Get_size()
+        self.myproc = comm.Get_rank()
+        self.offset = na.array([0, 0, self.myproc * shape[2]])
         FourierRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
 
     def _setup_k(self):
-        nproc = self.comm.Get_size()
-        myproc = self.comm.Get_rank()
-
-        global_shape = na.array(self.shape)*na.array([nproc, 1, 1])
-        global_length = na.array(self.length)*na.array([nproc, 1, 1])
+        global_shape = na.array(self.shape)*na.array([self.nproc, 1, 1])
+        global_length = na.array(self.length)*na.array([self.nproc, 1, 1])
         # Get Nyquist wavenumbers
         self.kny = na.pi * na.array(self.shape) / na.array(self.length)
 
@@ -341,7 +340,27 @@ class ParallelFourierRepresentation(FourierRepresentation):
             ki.resize(kshape)
             self.k.append(ki)
         self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
-        self.k['z'] = self.k['z'][myproc*self.shape[0]:(myproc+1)*self.shape[0]]
+        self.k['z'] = self.k['z'][self.myproc*self.shape[0]:(self.myproc+1)*self.shape[0]]
+
+    def fwd_np(self):
+        # do x-y plane FFTs along each of the z
+        self.data = fpack.fftn(self.data, axes=(1,2))
+        
+        # do transpose
+        nz_local = self.nproc*self.shape[0]
+        for i in xrange(self.nproc):
+            to_go = self.data[:,i*nz_local:(i+1)*nz_local,:]
+            self.comm.Alltoall(to_go,incoming )
+
+        
+
+        # do z pencil FFTs along each point in x-y
+        self.data = fftpack.fftn(self.data, axes=(0,))
+
+    def rev_np(self):
+        self.data = fpack.ifftn(self.data)
+        self.data.imag = 0
+
 
 
 class SphericalHarmonicRepresentation(FourierRepresentation):
