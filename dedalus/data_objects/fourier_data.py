@@ -309,7 +309,7 @@ class FourierShearRepresentation(FourierRepresentation):
             
 class ParallelFourierRepresentation(FourierRepresentation):
     def __init__(self, sd, shape, length, comm=None, dtype='complex128', method='numpy',
-                 dealiasing='2/3'):
+                 dealiasing=''):
         """
         Inputs:
             sd          state data object
@@ -344,20 +344,34 @@ class ParallelFourierRepresentation(FourierRepresentation):
 
     def fwd_np(self):
         """xspace to kspace"""
+        
+        # z fft
+        self.data = fpack.fftn(self.data, axes=(0,))
+        f = open('fwddump_%i' %self.myproc, 'w')
+        f.write(str(self.data[1,1,:]))
+        f.close()
     
-        # do x-y plane FFTs along each of the z
-        self.data = fpack.fftn(self.data, axes=(1,2))
-        
-        # do transpose
-        nz_local = self.nproc*self.shape[0]
+        # Transpose
+        sz = self.shape[0] / self.nproc
+        sendbuf = []
         for i in xrange(self.nproc):
-            to_go = self.data[:,i*nz_local:(i+1)*nz_local,:]
-            self.comm.Alltoall(to_go,incoming )
-
+            sendbuf.append(self.data[i * sz:(i + 1) * sz, :, :])
+            
+        sendbuf = na.array(sendbuf)
+        recvbuf = na.zeros_like(sendbuf)
+        print 'For send buffer shape: ', sendbuf.shape
         
-
-        # do z pencil FFTs along each point in x-y
-        self.data = fftpack.fftn(self.data, axes=(0,))
+        self.comm.Alltoall([sendbuf,MPI.COMPLEX], [recvbuf,MPI.COMPLEX])
+        print 'For receive buffer shape: ', recvbuf.shape
+        recvbuf = na.concatenate(recvbuf, axis=1)
+        print 'For receive buffer reshape: ', recvbuf.shape
+        
+        # xy fft
+        self.data = fpack.fftn(recvbuf, axes=(1,2))
+        #self.data = recvbuf
+        
+        self.shape = self.data.shape
+        self.length = (self.length[0] / self.nproc, self.length[1] * self.nproc, self.length[2])
 
     def rev_np(self):
         """kspace to xspace
@@ -374,17 +388,23 @@ class ParallelFourierRepresentation(FourierRepresentation):
             sendbuf.append(self.data[:, i * sy:(i + 1) * sy, :])
             
         sendbuf = na.array(sendbuf)
-        recvbuf = na.empty_like(sendbuf)
+        recvbuf = na.zeros_like(sendbuf)
+        print 'Rev send buffer shape: ', sendbuf.shape
         
-        self.comm.Alltoall([sendbuf,MPI.DOUBLE_COMPLEX], [recvbuf,MPI.DOUBLE_COMPLEX])
-        
+        self.comm.Alltoall([sendbuf,MPI.COMPLEX], [recvbuf,MPI.COMPLEX])
+        print 'Rev receive buffer shape: ', recvbuf.shape
         recvbuf = na.concatenate(recvbuf, axis=0)
-        print recvbuf.shape
+        print 'Rev receive buffer reshape: ', recvbuf.shape
+        
+        f = open('revdump_%i' %self.myproc, 'w')
+        f.write(str(self.data[1,1,:]))
+        f.close()
         
         # z fft
         self.data = fpack.ifftn(recvbuf, axes=(0,))
 
-
+        self.shape = self.data.shape
+        self.length = (self.length[0] * self.nproc, self.length[1] / self.nproc, self.length[2])
 
 class SphericalHarmonicRepresentation(FourierRepresentation):
     """Dedalus should eventually support spherical and cylindrical geometries.
