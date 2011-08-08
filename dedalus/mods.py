@@ -52,8 +52,7 @@ from dedalus.physics.api import \
     LinearCollisionlessCosmology, \
     CollisionlessCosmology, \
     LinearBaryonCDMCosmology, \
-    BaryonCDMCosmology
-    ShearMHD, \
+    BaryonCDMCosmology, \
     LinearCollisionlessCosmology,\
     CollisionlessCosmology
 
