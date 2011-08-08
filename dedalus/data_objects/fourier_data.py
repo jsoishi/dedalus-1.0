@@ -26,6 +26,7 @@ import fftw3
 
 try: 
     from mpi4py import MPI
+    comm = MPI.COMM_WORLD
 except:
     print "mpi4py not found. Parallelization will not work."
 
@@ -308,18 +309,17 @@ class FourierShearRepresentation(FourierRepresentation):
             self.k['x'][self.k['x'] >= self.kny[-1]] -= 2 * self.kny[-1]
             
 class ParallelFourierRepresentation(FourierRepresentation):
-    def __init__(self, sd, shape, length, comm=None, dtype='complex128', method='numpy',
+    def __init__(self, sd, shape, length, dtype='complex128', method='numpy',
                  dealiasing='2/3'):
         """
         Inputs:
             sd          state data object
             shape       The shape of the data, tuple of ints
             length      The length of the data, tuple of floats (default: 2 pi)
-            comm        MPI communicator (defaults to COMM_WORLD)
         """
-        if comm == None:
-            comm = MPI.COMM_WORLD
         self.comm = comm
+        if not comm:
+            raise ValueError("mpi4py cannot be loaded. A parallel run cannot be initialized.")
 
         self.nproc = comm.Get_size()
         self.myproc = comm.Get_rank()
