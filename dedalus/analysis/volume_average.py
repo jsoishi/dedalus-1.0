@@ -67,7 +67,7 @@ def ekin(data):
 def emag(data):
     en = na.zeros(data['B']['x'].data.shape)
     for i in xrange(data['B'].ncomp):
-        en += 0.5 * np.abs(data['u'][i]['kspace']) ** 2
+        en += 0.5 * na.abs(data['u'][i]['kspace']) ** 2
 
     return en.sum()
 

@@ -23,6 +23,7 @@ License:
 """
 import weakref
 import h5py
+import numpy as na
 
 def create_field_classes(representation, shape, length):
     """utility function to bind representation and shape to tensor,
@@ -124,8 +125,14 @@ class VectorFieldBase(BaseField):
     state data will be composed of vectors and scalars
     """
     
-    def div_free(self):
+    def div_free(self, verbose=False):
         """Project off compressible parts of the field."""
+        
+        if verbose:
+            power0 = 0
+            for i in xrange(self.ncomp):
+                power0 += 0.5 * na.sum(na.abs(self[i]['kspace']) ** 2)
+            print 'Pre-projection power: ', power0
     
         kV = 0
         for i in xrange(self.ncomp):
@@ -135,6 +142,13 @@ class VectorFieldBase(BaseField):
         
         for i in xrange(self.ncomp):
             self[i]['kspace'] -= self[i].k[self.trans[i]] * kV / k2
+            
+        if verbose:
+            power1 = 0
+            for i in xrange(self.ncomp):
+                power1 += 0.5 * na.sum(na.abs(self[i]['kspace']) ** 2)
+            print 'Post-projection power: ', power1
+            print 'Power projected off: ', power1 - power0
     
 class ScalarFieldBase(BaseField):
     """Scalar class; always has one component."""
