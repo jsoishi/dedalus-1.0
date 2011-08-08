@@ -18,8 +18,8 @@ shape = (32,32,32)
 L = (1000,)*3
 RHS = BaryonCDMCosmology(shape, FourierRepresentation, length=L)
 data = RHS.create_fields(0.)
-H0 = 7.185e-5 # 70.3 km/s/Mpc in Myr
-a_i = 0.002 # initial scale factor
+H0 = 7.185e-5 # 70.3 km/s/Mpc in Myr^-1
+a_i = 0.00778851#0.011681 # initial scale factor
 t0 = (2./3.)/H0 # present age of E-dS universe (although we're using LCDM)
 t_ini = (a_i**(3./2.)) * t0 # time at which a = a_i in E-dS
 
@@ -33,7 +33,7 @@ def pow_spec(data, it, flist=['delta_c', 'delta_b']):
     spec = {}
     for f in flist:
         spec[f] = na.zeros_like(k)
-        power = na.zeros_like(sampledata['kspace'])
+        power = na.zeros(sampledata['kspace'].shape)
         for i in xrange(data[f].ncomp):
             power += na.abs(data[f][i]['kspace'])**2
         for i in xrange(k.size):
@@ -74,6 +74,12 @@ def iso_vel_spec(data, it, Dplus, a, flist=['u_c','u_b']):
     k, spec = pow_spec(data, it, flist=flist)
     spec_uc = spec['u_c']
     spec_ub = spec['u_b']
+
+    f = open('frames/udata_a%05f.txt' % a, 'w')
+    for ak, c, b in zip(k, spec_uc, spec_ub):
+        f.write('%08e\t%08e\t%08e\n' % (ak, c, b))
+    f.close()
+
 
     outfile = "bcdm/reluspec_a%05f.png" % a
     fig = pl.figure()

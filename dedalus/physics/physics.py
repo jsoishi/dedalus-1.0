@@ -858,7 +858,7 @@ class BaryonCDMCosmology(Physics):
         self._setup_parameters(params)
         self._setup_aux_fields(0., self._aux_fields)
         aux_eqn_rhs = a_friedmann
-        self._setup_aux_eqns(['a'], [aux_eqn_rhs], [0.002],
+        self._setup_aux_eqns(['a'], [aux_eqn_rhs], [0.00778851],
                              [self.parameters])
         self._RHS = self.create_fields(0.)
 
