@@ -744,6 +744,344 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
             self._RHS['u'][i]['kspace'] = -(gradphi[i]['kspace'] +
                                             adot * data['u'][i]['kspace'] +
                                             ugradu[i]['kspace']) / a
+
+class LinearBaryonCDMCosmology(Physics):
+    """This class implements linear cosmology for coupled baryon and CDM fluids.
+
+    parameters
+    ----------
+    Omega_r - energy density in radiation
+    Omega_m - energy density in matter
+    Omega_b - energy density in baryons
+    Omega_c - energy density in CDM
+    Omega_l - energy density in dark energy (cosmological constant)
+    H0      - hubble constant now
+
+    solves
+    ------
+    d_t d_c = -div(v_c) / a
+    d_t v_c = -grad(Phi) / a - H v_c
+    
+    d_t d_b = -div(v_b) / a
+    d_t v_b = -grad(Phi) / a - H v_b 
+              - c_s^2 grad(d_b) / a
+    
+    laplacian(Phi) = 3/2 H^2 (Omega_c * d_c + Omega_b * d_b)/Omega_m
+    """
+
+    def __init__(self, *args, **kwargs):
+        Physics.__init__(self, *args, **kwargs)
+        self.fields = [('delta_b', 'ScalarField'),
+                       ('u_b', 'VectorField'),
+                       ('delta_c', 'ScalarField'),
+                       ('u_c', 'VectorField')]
+        self._aux_fields = [('gradphi', 'VectorField')]
+        self._aux_fields.append(('graddelta_b', 'VectorField'))
+        self._aux_fields.append(('graddelta_c', 'VectorField'))
+        self._aux_fields.append(('divu_b', 'ScalarField'))
+        self._aux_fields.append(('divu_c', 'ScalarField'))
+        self._aux_fields.append(('gradu_b', 'TensorField'))
+        self._aux_fields.append(('gradu_c', 'TensorField'))
+        self._setup_aux_fields(0., self._aux_fields)
+
+        self._trans = {0: 'x', 1: 'y', 2: 'z'}
+        params = {'Omega_r': 0.,
+                  'Omega_m': 0.,
+                  'Omega_b': 0.,
+                  'Omega_c': 0.,
+                  'Omega_l': 0.,
+                  'H0': 7.185e-5} # 70.3 km/s/Mpc in Myr^-1
+        self._setup_parameters(params)
+        self._setup_aux_fields(0., self._aux_fields)
+        aux_eqn_rhs = a_friedmann
+        self._setup_aux_eqns(['a'], [aux_eqn_rhs], [0.002],
+                             [self.parameters])
+        self._RHS = self.create_fields(0.)
+
+        self._cs2_a = []
+        self._cs2_values = []
+    
+    def init_cs2(self, a, cs2):
+        self._cs2_values = cs2
+        self._cs2_a = a
+    
+    def cs2_at(self, a):
+        """look up cs2 in internal table at nearest scale factor. Uses
+        binary search to find the correct index.
+
+        """
+        lower = 0
+        upper = len(self._cs2_a)
+        i = 0
+        while True:
+            if a > self._cs2_a[i]:
+                lower = i
+                i = lower + int(na.ceil((upper - lower)/2.))
+            elif a < self._cs2_a[i]:
+                upper = i
+                i = upper - int(na.ceil((upper - lower)/2.))
+            
+            if i == len(self._cs2_a):
+                print "warning: scale factor out of cs2 range; using sound speed at a = ", self._cs2_a[-1]
+                return self._cs2_values[-1]
+
+            if lower >= upper - 1:    
+                return self._cs2_values[i]
+
+    def RHS(self, data):
+        self.d_b_RHS(data)
+        self.d_c_RHS(data)
+        self.v_b_RHS(data)
+        self.v_c_RHS(data)
+        self._RHS.time = data.time
+        return self._RHS
+
+    def d_b_RHS(self, data):
+        a = self.aux_eqns['a'].value
+        u = data['u_b']
+        delta = data['delta_b']
+        divu = self.aux_fields['divu_b']
+
+        self.divX(u, divu)
+
+        self._RHS['delta_b']['kspace'] = -(divu['kspace']) / a
+        
+    def d_c_RHS(self, data):
+        a = self.aux_eqns['a'].value
+        u = data['u_c']
+        delta = data['delta_c']
+        divu = self.aux_fields['divu_c']
+
+        self.divX(u, divu)
+
+        self._RHS['delta_c']['kspace'] = -(divu['kspace']) / a
+
+    def grad_phi(self, data):
+        a = self.aux_eqns['a'].value
+        H = self.aux_eqns['a'].RHS(a) / a
+        
+        sampledata = data['delta_c']
+        
+        gradphi = self.aux_fields['gradphi']
+        tmp = (-3./2. * H*H * 
+                ((self.parameters['Omega_c'] * data['delta_c']['kspace'] + 
+                  self.parameters['Omega_b'] * data['delta_b']['kspace']) /
+                 self.parameters['Omega_m']) / 
+                sampledata.k2(no_zero=True))
+
+        for i in self.dims:
+            gradphi[i]['kspace'] = 1j * a*a * sampledata.k[self._trans[i]] * tmp
+
+    def v_b_RHS(self, data):
+        # needs pressure term
+        self.grad_phi(data)
+        gradphi = self.aux_fields['gradphi']
+        
+        a = self.aux_eqns['a'].value
+        adot = self.aux_eqns['a'].RHS(a)
+
+        u = data['u_b']
+        graddelta = self.aux_fields['graddelta_b'] # calculated in d_b_RHS
+        cs2 = self.cs2_at(a)
+        for i in self.dims:
+            self._RHS['u_b'][i]['kspace'] = -(gradphi[i]['kspace'] +
+                                             adot * u[i]['kspace'] +
+                                             cs2 * graddelta[i]['kspace']) / a
+
+    def v_c_RHS(self, data):
+        self.grad_phi(data)
+        gradphi = self.aux_fields['gradphi']
+        
+        a = self.aux_eqns['a'].value
+        adot = self.aux_eqns['a'].RHS(a)
+
+        u = data['u_c']
+        for i in self.dims:
+            self._RHS['u_c'][i]['kspace'] = -(gradphi[i]['kspace'] +
+                                             adot * u[i]['kspace']) / a
+
+class BaryonCDMCosmology(Physics):
+    """This class implements cosmology for coupled baryon and CDM fluids.
+
+    parameters
+    ----------
+    Omega_r - energy density in radiation
+    Omega_m - energy density in matter
+    Omega_b - energy density in baryons
+    Omega_c - energy density in CDM
+    Omega_l - energy density in dark energy (cosmological constant)
+    H0      - hubble constant now
+
+    solves
+    ------
+    d_t d_c = -(1 + d_c) div(v_c) / a - v_c dot grad(d_c) / a
+    d_t v_c = -grad(Phi) / a - H v_c -(v_c dot grad) v_c / a
+    
+    d_t d_b = -(1 + d_b) div(v_b) / a - v_b dot grad(d_b) / a
+    d_t v_b = -grad(Phi) / a - H v_b -(v_b dot grad) v_b / a 
+              - c_s^2 grad(d_b) / a
+    
+    laplacian(Phi) = 3/2 H^2 (Omega_c * d_c + Omega_b * d_b)/Omega_m
+    """
+
+    def __init__(self, *args, **kwargs):
+        Physics.__init__(self, *args, **kwargs)
+        self.fields = [('delta_b', 'ScalarField'),
+                       ('u_b', 'VectorField'),
+                       ('delta_c', 'ScalarField'),
+                       ('u_c', 'VectorField')]
+        self._aux_fields = [('gradphi', 'VectorField')]
+        self._aux_fields.append(('graddelta_b', 'VectorField'))
+        self._aux_fields.append(('graddelta_c', 'VectorField'))
+        self._aux_fields.append(('ugraddelta_b', 'ScalarField'))
+        self._aux_fields.append(('ugraddelta_c', 'ScalarField'))
+        self._aux_fields.append(('divu_b', 'ScalarField'))
+        self._aux_fields.append(('divu_c', 'ScalarField'))
+        self._aux_fields.append(('deltadivu_b', 'ScalarField'))
+        self._aux_fields.append(('deltadivu_c', 'ScalarField'))
+        self._aux_fields.append(('gradu_b', 'TensorField'))
+        self._aux_fields.append(('gradu_c', 'TensorField'))
+        self._aux_fields.append(('ugradu_b', 'VectorField'))
+        self._aux_fields.append(('ugradu_c', 'VectorField'))
+        self._setup_aux_fields(0., self._aux_fields)
+
+        self._trans = {0: 'x', 1: 'y', 2: 'z'}
+        params = {'Omega_r': 0.,
+                  'Omega_m': 0.,
+                  'Omega_b': 0.,
+                  'Omega_c': 0.,
+                  'Omega_l': 0.,
+                  'H0': 7.185e-5} # 70.3 km/s/Mpc in Myr^-1
+        self._setup_parameters(params)
+        self._setup_aux_fields(0., self._aux_fields)
+        aux_eqn_rhs = a_friedmann
+        self._setup_aux_eqns(['a'], [aux_eqn_rhs], [0.002],
+                             [self.parameters])
+        self._RHS = self.create_fields(0.)
+
+        self._cs2_a = []
+        self._cs2_values = []
+    
+    def init_cs2(self, a, cs2):
+        self._cs2_values = cs2
+        self._cs2_a = a
+    
+    def cs2_at(self, a):
+        """look up cs2 in internal table at nearest scale factor. Uses
+        binary search to find the correct index.
+
+        """
+        lower = 0
+        upper = len(self._cs2_a)
+        i = 0
+        while True:
+            if a > self._cs2_a[i]:
+                lower = i
+                i = lower + int(na.ceil((upper - lower)/2.))
+            elif a < self._cs2_a[i]:
+                upper = i
+                i = upper - int(na.ceil((upper - lower)/2.))
+            
+            if i == len(self._cs2_a):
+                print "warning: scale factor out of cs2 range; using sound speed at a = ", self._cs2_a[-1]
+                return self._cs2_values[-1]
+
+            if lower >= upper - 1:    
+                return self._cs2_values[i]
+
+    def RHS(self, data):
+        self.d_b_RHS(data)
+        self.d_c_RHS(data)
+        self.v_b_RHS(data)
+        self.v_c_RHS(data)
+        self._RHS.time = data.time
+        return self._RHS
+
+    def d_b_RHS(self, data):
+        a = self.aux_eqns['a'].value
+        u = data['u_b']
+        delta = data['delta_b']
+        divu = self.aux_fields['divu_b']
+        graddelta = self.aux_fields['graddelta_b']
+        ugraddelta = self.aux_fields['ugraddelta_b']
+        deltadivu = self.aux_fields['deltadivu_b']
+
+        self.divX(u, divu)
+        self.XgradY(u, delta, graddelta, ugraddelta)
+        deltadivu['xspace'] = divu['xspace'] * delta['xspace']
+
+        self._RHS['delta_b']['kspace'] = -(divu['kspace'] +
+                                           deltadivu['kspace'] + 
+                                           ugraddelta['kspace']) / a
+        
+    def d_c_RHS(self, data):
+        a = self.aux_eqns['a'].value
+        u = data['u_c']
+        delta = data['delta_c']
+        divu = self.aux_fields['divu_c']
+        graddelta = self.aux_fields['graddelta_c']
+        ugraddelta = self.aux_fields['ugraddelta_c']
+        deltadivu = self.aux_fields['deltadivu_c']
+
+        self.divX(u, divu)
+        self.XgradY(u, delta, graddelta, ugraddelta)
+        deltadivu['xspace'] = divu['xspace'] * delta['xspace']
+
+        self._RHS['delta_c']['kspace'] = -(divu['kspace'] +
+                                           deltadivu['kspace'] + 
+                                           ugraddelta['kspace']) / a
+
+    def grad_phi(self, data):
+        a = self.aux_eqns['a'].value
+        H = self.aux_eqns['a'].RHS(a) / a
+        
+        sampledata = data['delta_c']
+        
+        gradphi = self.aux_fields['gradphi']
+        tmp = (-3./2. * H*H * 
+                ((self.parameters['Omega_c'] * data['delta_c']['kspace'] + 
+                  self.parameters['Omega_b'] * data['delta_b']['kspace']) /
+                 self.parameters['Omega_m']) / 
+                sampledata.k2(no_zero=True))
+
+        for i in self.dims:
+            gradphi[i]['kspace'] = 1j * a*a * sampledata.k[self._trans[i]] * tmp
+
+    def v_b_RHS(self, data):
+        # needs pressure term
+        self.grad_phi(data)
+        gradphi = self.aux_fields['gradphi']
+        
+        a = self.aux_eqns['a'].value
+        adot = self.aux_eqns['a'].RHS(a)
+
+        u = data['u_b']
+        gradu = self.aux_fields['gradu_b']
+        ugradu = self.aux_fields['ugradu_b']
+        self.XgradY(u, u, gradu, ugradu)
+        graddelta = self.aux_fields['graddelta_b'] # calculated in d_b_RHS
+        cs2 = self.cs2_at(a)
+        for i in self.dims:
+            self._RHS['u_b'][i]['kspace'] = -(gradphi[i]['kspace'] +
+                                             adot * u[i]['kspace'] +
+                                             ugradu[i]['kspace'] + 
+                                             cs2 * graddelta[i]['kspace']) / a
+
+    def v_c_RHS(self, data):
+        self.grad_phi(data)
+        gradphi = self.aux_fields['gradphi']
+        
+        a = self.aux_eqns['a'].value
+        adot = self.aux_eqns['a'].RHS(a)
+
+        u = data['u_c']
+        gradu = self.aux_fields['gradu_c']
+        ugradu = self.aux_fields['ugradu_c']
+        self.XgradY(u, u, gradu, ugradu)
+        for i in self.dims:
+            self._RHS['u_c'][i]['kspace'] = -(gradphi[i]['kspace'] +
+                                             adot * u[i]['kspace'] +
+                                             ugradu[i]['kspace']) / a
         
 if __name__ == "__main__":
     import pylab as P
