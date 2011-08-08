@@ -291,7 +291,7 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
     fig.clf()
     
 @AnalysisSet.register_task
-def k_plot(data, it):
+def k_plot(data, it, zcut=0):
     """
     Plot k-power for moving k modes (i.e. ShearReps)
     
@@ -299,6 +299,8 @@ def k_plot(data, it):
         data        Data object
         it          Iteration number
 
+    Keywords:
+        zcut        kz index for the kx,ky plane being plotted
 
     """
     
@@ -333,16 +335,17 @@ def k_plot(data, it):
             y = f[j].k['y'][0] + z_
 
             if f[i].ndim == 3:
-                plot_array = f[i]['kspace'][0]
+                plot_array = f[i]['kspace'][zcut]
             else:
                 plot_array = f[i]['kspace']
                 
             plot_array = na.abs(plot_array)
-            plot_array[plot_array == 0] = 1e-50
+            plot_array[plot_array == 0] = 1e-40
             plot_array = na.log10(plot_array)
             
             # Plot
-            im = grid[I].scatter(x, y, c=plot_array, linewidth=0)
+            im = grid[I].scatter(x, y, c=plot_array, linewidth=0, 
+                                 vmax = na.max([plot_array.max(), -39]))
             
             # Nyquist boundary
             nysquarex = na.array([-ny[-1], -ny[-1], ny[-1], ny[-1], -ny[-1]])
@@ -354,12 +357,12 @@ def k_plot(data, it):
             
             # Plot range and labels
             grid[I].axis(padrange([-ny[-1], ny[1], -ny[-2], ny[-2]], 0.2))
-            grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='black')
+            grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24, color='black')
             grid.cbar_axes[I].colorbar(im)
             
     # Time label
     tstr = 't = %6.3f' % data.time
-    grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
+    grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes, size=24, color='black')
     
     grid[0].set_xlabel('kx')
     grid[0].set_ylabel('ky')
