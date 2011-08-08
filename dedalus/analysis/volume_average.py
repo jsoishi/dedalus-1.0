@@ -58,10 +58,19 @@ class VolumeAverageSet(object):
 @VolumeAverageSet.register_task
 def ekin(data):
     en = na.zeros(data['u']['x'].data.shape)
-    for i in xrange(data['u'].ndim):
+    for i in xrange(data['u'].ncomp):
         en += 0.5*(data['u'][i]['kspace']*data['u'][i]['kspace'].conj()).real
 
     return en.sum()
+    
+@VolumeAverageSet.register_task
+def emag(data):
+    en = na.zeros(data['B']['x'].data.shape)
+    for i in xrange(data['B'].ncomp):
+        en += 0.5 * np.abs(data['u'][i]['kspace']) ** 2
+
+    return en.sum()
+
 
 @VolumeAverageSet.register_task
 def enstrophy(data):
