@@ -347,7 +347,7 @@ class ParallelFourierRepresentation(FourierRepresentation):
         """
         if space != self._curr_space:
             self.shape = self._shape[space]
-            self.data = na.empty(self.shape, dtype=self.data.dtype)
+            self.data.shape = self.shape
 
         if data.size < self.data.size:
             sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
