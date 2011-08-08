@@ -299,28 +299,20 @@ def k_plot(data, it):
         data        Data object
         it          Iteration number
 
+
     """
     
     # Determine image grid size
-    nvars = 0
-    for f in data.fields.values():
-        nvars += f.ncomp
-    if nvars == 4:
-        nrow = ncol = 2
-    elif nvars == 9:
-        nrow = ncol = 3
-    else:
-        nrow = na.ceil(nvars / 3.)
-        ncol = na.min([nvars, 3])
-    nrow = na.int(nrow)
-    ncol = na.int(ncol)
-
+    nrow = len(data.fields.keys())
+    ncol = na.max([f.ncomp for f in data.fields.values()])
+    
     # Figure setup
-    fig = P.figure(1, figsize=(24. * ncol / 3., 24. * nrow / 3.))
+    fig = P.figure(1, figsize=(8 * ncol, 8 * nrow))
     
     grid = AxesGrid(fig, 111,
                     nrows_ncols = (nrow, ncol),
                     aspect=False,
+                    share_all=True,
                     axes_pad=0.3,
                     cbar_pad=0.,
                     label_mode="1",
@@ -328,24 +320,29 @@ def k_plot(data, it):
                     cbar_mode="each")
                     
     # Plot field components
-    I = 0
+    i = -1
     z_ = na.zeros(data.shape[-2:])
     ny = data['u']['x'].kny
+    
     for k,f in data.fields.iteritems():
-        for i in xrange(f.ncomp):
-            x = f[i].k['x'][0] + z_
-            y = f[i].k['y'][0] + z_
+        i += 1
+        for j in xrange(f.ncomp):
+            I = i * ncol + j
+        
+            x = f[j].k['x'][0] + z_
+            y = f[j].k['y'][0] + z_
 
             if f[i].ndim == 3:
                 plot_array = f[i]['kspace'][0]
             else:
                 plot_array = f[i]['kspace']
+                
             plot_array = na.abs(plot_array)
             plot_array[plot_array == 0] = 1e-50
             plot_array = na.log10(plot_array)
             
             # Plot
-            im = grid[I].scatter(x, y, c=plot_array)
+            im = grid[I].scatter(x, y, c=plot_array, linewidth=0)
             
             # Nyquist boundary
             nysquarex = na.array([-ny[-1], -ny[-1], ny[-1], ny[-1], -ny[-1]])
@@ -355,12 +352,13 @@ def k_plot(data, it):
             # Dealiasing boundary
             grid[I].plot(2/3. * nysquarex, 2/3. * nysquarey, 'k:')
             
-            grid[I].axis([-2 * ny[-1], 2 * ny[1], -2 * ny[-2], 2 * ny[-2]])
-
+            # Plot range and labels
+            grid[I].axis(padrange([-ny[-1], ny[1], -ny[-2], ny[-2]], 0.2))
             grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='black')
             grid.cbar_axes[I].colorbar(im)
-            I += 1
-    tstr = 't = %5.2f' % data.time
+            
+    # Time label
+    tstr = 't = %6.3f' % data.time
     grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
     
     grid[0].set_xlabel('kx')
