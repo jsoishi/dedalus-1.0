@@ -70,26 +70,20 @@ def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', **kw
     """
     
     # Determine image grid size
-    nvars = 0
-    for f in data.fields.values():
-        nvars += f.ncomp
-    if nvars == 4:
-        nrow = ncol = 2
-    elif nvars == 9:
-        nrow = ncol = 3
-    else:
-        nrow = na.ceil(nvars / 3.)
-        ncol = na.min([nvars, 3])
-    nrow = na.int(nrow)
-    ncol = na.int(ncol)
+    nrow = len(data.fields.keys())
+    ncol = na.max([f.ncomp for f in data.fields.values()])
+    
+    # Figure setup
+    fig = P.figure(4, figsize=(8 * ncol, 8 * nrow))
 
     if use_extent:
-        extent = [0.,data.length[-1], 0., data.length[-2]]
+        extent = [0., data.length[-1], 0., data.length[-2]]
     else:
         extent = None
     
     # Figure setup
-    fig = P.figure(1, figsize=(24. * ncol / 3., 24. * nrow / 3.))
+    fig = P.figure(1, figsize=(8 * ncol, 8 * nrow))
+    
     grid = AxesGrid(fig, 111,
                     nrows_ncols = (nrow, ncol),
                     axes_pad=0.3,
@@ -100,30 +94,35 @@ def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', **kw
                     cbar_mode="each")
                     
     # Plot field components
-    I = 0
+    i = -1
     for k,f in data.fields.iteritems():
-        for i in xrange(f.ncomp):
-            if f[i].ndim == 3:
+        i += 1
+        for j in xrange(f.ncomp):
+            I = i * ncol + j
+        
+            if f[j].ndim == 3:
                 if plot_slice == None:
-                    # Default to center xy plane
-                    plot_slice = [f[i].shape[0] / 2, slice(None), slice(None)]
-                plot_array = f[i][space][plot_slice]
+                    # Default to bottom xy plane
+                    plot_slice = [0, slice(None), slice(None)]
+                plot_array = f[j][space][plot_slice]
             else:
-                plot_array = f[i][space]
+                plot_array = f[j][space]
                 
             if space == 'kspace':
                 plot_array = na.abs(plot_array)
                 plot_array[plot_array == 0] = na.nan
                 plot_array = na.log10(plot_array)
+
             else:
                 plot_array = plot_array.real
 
+            # Plot
             im = grid[I].imshow(plot_array, extent=extent, origin='lower', 
                                 interpolation='nearest', **kwargs)
-            grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='white')
+            grid[I].text(0.05, 0.95, k + str(j), transform=grid[I].transAxes, size=24, color='white')
             grid.cbar_axes[I].colorbar(im)
-            I += 1
             
+    # Time label     
     tstr = 't = %5.2f' % data.time
     grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
     
@@ -324,10 +323,10 @@ def k_plot(data, it, zcut=0):
             x = f[j].k['x'][0] + z_
             y = f[j].k['y'][0] + z_
 
-            if f[i].ndim == 3:
-                plot_array = f[i]['kspace'][zcut]
+            if f[j].ndim == 3:
+                plot_array = f[j]['kspace'][zcut]
             else:
-                plot_array = f[i]['kspace']
+                plot_array = f[j]['kspace']
                 
             plot_array = na.abs(plot_array)
             plot_array[plot_array == 0] = 1e-40
@@ -335,7 +334,7 @@ def k_plot(data, it, zcut=0):
             
             # Plot
             im = grid[I].scatter(x, y, c=plot_array, linewidth=0, 
-                                 vmax = na.max([plot_array.max(), -39]))
+                                 vmax=na.max([plot_array.max(), -39]))
             
             # Nyquist boundary
             nysquarex = na.array([-ny[-1], -ny[-1], ny[-1], ny[-1], -ny[-1]])
@@ -347,7 +346,7 @@ def k_plot(data, it, zcut=0):
             
             # Plot range and labels
             grid[I].axis(padrange([-ny[-1], ny[1], -ny[-2], ny[-2]], 0.2))
-            grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24, color='black')
+            grid[I].text(0.05, 0.95, k + str(j), transform=grid[I].transAxes, size=24, color='black')
             grid.cbar_axes[I].colorbar(im)
             
     # Time label
