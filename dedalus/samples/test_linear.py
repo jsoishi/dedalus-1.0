@@ -20,7 +20,9 @@ RHS.parameters['Omega_r'] = 8.4e-5
 RHS.parameters['Omega_m'] = 0.276
 RHS.parameters['Omega_l'] = 0.724
 RHS.parameters['H0'] = 7.185e-5 # 70.3 km/s/Mpc in Myr
-cosmology(data, icfname, normfname)
+
+spec_delta, spec_u = cosmo_spectra(data, icfname, normfname)
+collisionless_cosmo_fields(data['delta'], data['u'], spec_delta, spec_u)
 
 ti = RK4simplevisc(RHS)
 ti.stop_time(1000)

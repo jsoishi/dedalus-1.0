@@ -38,7 +38,9 @@ from dedalus.init_cond.api import \
     mcwilliams_spec, \
     MIT_vortices, \
     shearing_wave, \
-    cosmology, \
+    collisionless_cosmo_fields, \
+    cosmo_fields, \
+    cosmo_spectra, \
     alfven, \
     zeldovich
 
@@ -46,6 +48,11 @@ from dedalus.physics.api import \
     Hydro, \
     ShearHydro, \
     MHD, \
+    ShearMHD, \
+    LinearCollisionlessCosmology, \
+    CollisionlessCosmology, \
+    LinearBaryonCDMCosmology, \
+    BaryonCDMCosmology
     ShearMHD, \
     LinearCollisionlessCosmology,\
     CollisionlessCosmology

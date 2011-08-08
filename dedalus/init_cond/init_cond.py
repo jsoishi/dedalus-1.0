@@ -215,7 +215,7 @@ def zeldovich(data, ampl, a_ini, a_cross):
     data['u'][0]['kspace'][0,0,1] = ampl * 1j / 2
     data['u'][0]['kspace'][0,0,-1] = -data['u'][0]['kspace'][0,0,1]
 
-def read_linger_ic_data(fname, ak, deltacp, phi, thetac):
+def read_linger_ic_data(fname, ak, deltacp, deltabp, phi, thetac, thetab):
     """read certain values from a linger output file
 
     """
@@ -225,20 +225,26 @@ def read_linger_ic_data(fname, ak, deltacp, phi, thetac):
         values = line.split()
         ak.append(float(values[1]))
         deltacp.append(float(values[6]))
+        deltabp.append(float(values[7]))
         phi.append(float(values[5]) + float(values[11])) # eta + etatophi
-        thetac.append(-float(values[11])*(ak[i]**2) / float(values[20]))
+        thetac.append(-float(values[11]) / float(values[20]))
+        thetab.append(float(values[12])/ak[i]**2 + thetac[i])
     infile.close()
 
-def read_linger_norm_data(fname, ak_trans, Ttot0, dTvc):
-    """read certain values from a transfer-mode linger++ output file
+def read_linger_transfer_data(fname, ak_trans, Ttot, Tdc, Tdb, dTvc, dTvb, Ttot0):
+    """read values from a transfer-mode linger++ output file
 
     """
     infile = open(fname)
     for i,line in enumerate(infile):
         values = line.split()
         ak_trans.append(float(values[0]))
-        Ttot0.append(float(values[6]))
+        Ttot.append(float(values[1]))
+        Tdc.append(float(values[2]))
+        Tdb.append(float(values[3]))
         dTvc.append(float(values[4]))
+        dTvb.append(float(values[5]))
+        Ttot0.append(float(values[6]))
     infile.close()
 
 def sig2_integrand(Ttot0, ak, nspect):
@@ -263,12 +269,13 @@ def get_normalization(Ttot0, ak, sigma_8, nspect):
     return ampl
 
 def collisionless_cosmo_fields(delta, u, spec_delta, spec_u, mean=0., stdev=1.):
-    """fill 3-d k-space fields with values sampled from gaussians with
+    """create realization of cosmological initial conditions by
+    filling 3-d k-space fields with values sampled from gaussians with
     amplitudes given by spec.
 
     """
     shape = spec_delta.shape
-    rand = na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape)
+    rand = (na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape))/na.sqrt(2)
     delta['kspace'] = spec_delta * rand
     hermitianize.enforce_hermitian(delta['kspace'])
     delta.zero_nyquist()
@@ -279,69 +286,102 @@ def collisionless_cosmo_fields(delta, u, spec_delta, spec_u, mean=0., stdev=1.):
         hermitianize.enforce_hermitian(u[i]['kspace'])
         u[i].zero_nyquist()
         u[i]['kspace'][0,0,0] = 0
+        
+    return rand
 
-def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
-    """generate realization of initial conditions in CDM overdensity
-    and velocity from linger++ output. Assumes 3-dimensional fields.
+def cosmo_fields(delta_c, u_c, delta_b, u_b, spec_delta_c, spec_u_c, spec_delta_b, spec_u_b):
+    """create realization of baryon and CDM initial conditions
+
+    """
+    # use the same random number field as for delta_c
+    rand = collisionless_cosmo_fields(delta_c, u_c, spec_delta_c, spec_u_c)
+    delta_b['kspace'] = spec_delta_b * rand
+    hermitianize.enforce_hermitian(delta_b['kspace'])
+    delta_b.zero_nyquist()
+    delta_b['kspace'][0,0,0] = 0.
+
+    for i in xrange(3):
+        u_b[i]['kspace'] = rand * spec_u_b[i]
+        hermitianize.enforce_hermitian(u_b[i]['kspace'])
+        u_b[i].zero_nyquist()
+        u_b[i]['kspace'][0,0,0] = 0
+
+def cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryons=False):
+    """generate spectra for CDM overdensity and velocity from linger++
+    output. Assumes 3-dimensional fields.
 
     Length: Mpc
     Time:   Myr (linger++ uses Mpc/c)
 
-    (create_cosmo_field actually creates the realizations from
-    spectra; the rest is generating the spectra from input, which
-    might reasonably belong somewhere else)
-
     """
-    Myr_per_Mpc = 0.3063915366 # conversion factor for time units
+    h = .703 # Hubble constant = 100 * h km/s/Mpc
+    Myr_per_Mpc = 0.3063915366 # 1 c/Mpc = 0.306... 1/Myr
 
-    ak = []
-    deltacp = []
-    phi = []
-    thetac = []
-    Ttot0 = []
-    dTvc = []
-    ak_trans = [] # the k-values that go with Ttot0
+    ak = [] # the k-values that go with transfer-functions 
+    Ttot = [] # linear transfer of total spectrum at initial time
+    Ttot0 = [] # ... of total spectrum at z = 0, used with sigma_8 for norm
+    Tdc = [] # transfer of delta_CDM
+    Tdb = [] # transfer of delta_baryons
+    dTvc = [] # rate of change of CDM transfer
+    dTvb = [] # rate of change of baryon transfer
     
-    read_linger_ic_data(ic_fname, ak, deltacp, phi, thetac)
-    read_linger_norm_data(norm_fname, ak_trans, Ttot0, dTvc)
-    ak = na.array(ak)
-    deltacp = na.array(deltacp)
-    phi = na.array(phi)
-    thetac = na.array(thetac)
-    ak_trans = na.array(ak_trans) * .703 # should take h from input
-    Ttot0 = na.array(Ttot0)    
-    #thetac = -na.array(dTvc) * (.703/299792.458) * (ak_trans**2)
-        
-    # normalize
-    ampl = get_normalization(Ttot0, ak_trans, sigma_8, nspect)
+    read_linger_transfer_data(norm_fname, ak, Ttot, Tdc, Tdb, dTvc, dTvb, Ttot0)
+    ak = na.array(ak) * h
+    deltacp = na.array(Tdc)
+    thetac = -na.array(dTvc) * (h/299792.458) # linger multiplies by c/h
+    Ttot0 = na.array(Ttot0)/ak**2
+
+    # ... normalize
+    ampl = get_normalization(Ttot0, ak, sigma_8, nspect)
     deltacp = deltacp*ampl
     thetac = thetac*ampl*Myr_per_Mpc
 
-    shape = data['delta'].shape
-   
-    nk = shape[0]
-    kk = na.sqrt(data['delta'].k2(no_zero=True))
+    # ... get sample data object for shape and k-values
+    sampledata = data.fields.values()[0][0]
+    shape = sampledata.shape
 
+    nk = shape[0]
+    kk = na.sqrt(sampledata.k2(no_zero=True))
     maxkk = kk[nk/2, nk/2, nk/2]
     maxkinput = max(ak)
     if maxkk > maxkinput:
         print 'cannot interpolate: some grid wavenumbers larger than input wavenumbers; ICs for those modes are wrong'
-        # any |k| larger than the max input k is replaced by max input k
+        # ... any |k| larger than the max input k is replaced by max input k
         kk[:,:,:] = na.minimum(kk, maxkinput*na.ones_like(kk))
-
-    # calculate spectra
-    f_deltacp = interp1d(ak[::-1], deltacp[::-1], kind='cubic')
+    # ... calculate spectra
+    f_deltacp = interp1d(ak, deltacp, kind='cubic')
     spec_delta = kk**(nspect/2.)*f_deltacp(kk)
     
-    #f_thetac = interp1d(ak_trans, thetac, kind='cubic') # if thetac comes from dTvc
-    f_thetac = interp1d(ak[::-1], thetac[::-1], kind='cubic')
-    spec_vel = -1j*kk**(nspect/2. -1.)*f_thetac(kk)
-    spec_vel[0,0,0] = 0
+    f_thetac = interp1d(ak, thetac, kind='cubic')
+    spec_vel = -1j*kk**(nspect/2. -1.)*f_thetac(kk) # isotropic
+    spec_vel[0,0,0] = 0.
 
     spec_u = [na.zeros_like(spec_vel),]*3
     for i,dim in enumerate(['x','y','z']):
-        spec_u[i] = (data['u'][i].k[dim]/kk) * spec_vel #*1/3. 
+        spec_u[i] = (sampledata.k[dim]/kk) * spec_vel
+
+    if baryons:
+        deltabp = na.array(Tdb)
+        thetab = -na.array(dTvb)*(h/299792.458)
+
+        deltabp = deltabp*ampl
+        thetab = thetab*ampl*Myr_per_Mpc
         
+        f_deltabp = interp1d(ak, deltabp, kind='cubic')
+        spec_delta_b = kk**(nspect/2.)*f_deltabp(kk)
+        
+        # ... relative velocity between CDM and baryons in the synchronous gauge
+        f_thetab = interp1d(ak, thetab, kind='cubic')
+        spec_vel_b =  -(1j * kk**(nspect/2. - 1.)*f_thetab(kk))
+        spec_vel_b[0,0,0] = 0.
+        
+        spec_u_b = [na.zeros_like(spec_vel_b),]*3
+        for i,dim in enumerate(['x','y','z']):
+            spec_u_b[i] = (sampledata.k[dim]/kk) * spec_vel_b
+
+        return spec_delta, spec_u, spec_delta_b, spec_u_b
+       
+    # ... zero high k for debugging
     #tmp = na.zeros(shape)
     #for (i,j,k),t in na.ndenumerate(tmp):
     #    tmp[i,j,k] = max([i,j,k])
@@ -349,6 +389,4 @@ def cosmology(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811):
     #spec_delta[mask] = 0.
     #for i in xrange(3):
     #    spec_u[i][:,:,:] = 0.
-    
-    # create realizations
-    collisionless_cosmo_fields(data['delta'], data['u'], spec_delta, spec_u)
+    return spec_delta, spec_u
