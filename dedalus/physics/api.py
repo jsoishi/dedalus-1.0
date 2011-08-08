@@ -25,6 +25,7 @@ from .physics import \
     Hydro,\
     ShearHydro, \
     MHD, \
+    ShearMHD, \
     LinearCollisionlessCosmology, \
     CollisionlessCosmology
 
