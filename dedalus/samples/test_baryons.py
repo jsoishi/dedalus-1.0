@@ -19,7 +19,7 @@ L = (1000,)*3
 RHS = BaryonCDMCosmology(shape, FourierRepresentation, length=L)
 data = RHS.create_fields(0.)
 H0 = 7.185e-5 # 70.3 km/s/Mpc in Myr^-1
-a_i = 0.00778851#0.011681 # initial scale factor
+a_i = RHS.aux_eqns['a'].value # initial scale factor
 t0 = (2./3.)/H0 # present age of E-dS universe (although we're using LCDM)
 t_ini = (a_i**(3./2.)) * t0 # time at which a = a_i in E-dS
 
