@@ -192,7 +192,7 @@ class FourierRepresentation(Representation):
         """returns k**2. if no_zero is set, will set the mean mode to
         1. useful for division when the mean is not important.
         """
-        k2 = na.zeros(self.data.shape)
+        k2 = na.zeros(self._shape['kspace'])
         for k in self.k.values():
             k2 += k**2
         if no_zero:
@@ -309,7 +309,7 @@ class FourierShearRepresentation(FourierRepresentation):
             
 class ParallelFourierRepresentation(FourierRepresentation):
     def __init__(self, sd, shape, length, comm=None, dtype='complex128', method='numpy',
-                 dealiasing=''):
+                 dealiasing='2/3'):
         """
         Inputs:
             sd          state data object
@@ -325,6 +325,32 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.myproc = comm.Get_rank()
         self.offset = na.array([0, 0, self.myproc * shape[2]])
         FourierRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
+        self.nproc = comm.Get_size()
+        self.myproc = comm.Get_rank()
+        self.offset = na.array([0, 0, self.myproc * shape[2]])
+        self._setup_k()
+        self._shape = {'kspace': self.data.shape,
+                       'xspace': [self.data.shape[0]*self.nproc,
+                                  self.data.shape[1]/self.nproc,
+                                  self.data.shape[2]]}
+
+    def __setitem__(self, space, data):
+        """this needs to ensure the pointer for the field's data
+        member doesn't change for FFTW. Currently, we do that by
+        slicing the entire data array. 
+        """
+        if space != self._curr_space:
+            self.shape = self._shape[space]
+            self.data = na.empty(self.shape, dtype=self.data.dtype)
+
+        if data.size < self.data.size:
+            sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
+            self.data[sli] = data
+        else:
+            sli = [slice(i) for i in self.data.shape]
+            self.data[:] = data[sli]
+
+        self._curr_space = space
 
     def _setup_k(self):
         global_shape = na.array(self.shape)*na.array([self.nproc, 1, 1])
@@ -347,9 +373,6 @@ class ParallelFourierRepresentation(FourierRepresentation):
         
         # z fft
         self.data = fpack.fftn(self.data, axes=(0,))
-        f = open('fwddump_%i' %self.myproc, 'w')
-        f.write(str(self.data[1,1,:]))
-        f.close()
     
         # Transpose
         sz = self.shape[0] / self.nproc
@@ -359,12 +382,9 @@ class ParallelFourierRepresentation(FourierRepresentation):
             
         sendbuf = na.array(sendbuf)
         recvbuf = na.zeros_like(sendbuf)
-        print 'For send buffer shape: ', sendbuf.shape
         
         self.comm.Alltoall([sendbuf,MPI.COMPLEX], [recvbuf,MPI.COMPLEX])
-        print 'For receive buffer shape: ', recvbuf.shape
         recvbuf = na.concatenate(recvbuf, axis=1)
-        print 'For receive buffer reshape: ', recvbuf.shape
         
         # xy fft
         self.data = fpack.fftn(recvbuf, axes=(1,2))
@@ -389,16 +409,9 @@ class ParallelFourierRepresentation(FourierRepresentation):
             
         sendbuf = na.array(sendbuf)
         recvbuf = na.zeros_like(sendbuf)
-        print 'Rev send buffer shape: ', sendbuf.shape
         
         self.comm.Alltoall([sendbuf,MPI.COMPLEX], [recvbuf,MPI.COMPLEX])
-        print 'Rev receive buffer shape: ', recvbuf.shape
         recvbuf = na.concatenate(recvbuf, axis=0)
-        print 'Rev receive buffer reshape: ', recvbuf.shape
-        
-        f = open('revdump_%i' %self.myproc, 'w')
-        f.write(str(self.data[1,1,:]))
-        f.close()
         
         # z fft
         self.data = fpack.ifftn(recvbuf, axes=(0,))

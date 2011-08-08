@@ -28,7 +28,8 @@ from dedalus.analysis.api import \
 
 from dedalus.data_objects.api import \
     FourierRepresentation, \
-    FourierShearRepresentation
+    FourierShearRepresentation, \
+    ParallelFourierRepresentation
 
 from dedalus.init_cond.api import \
     taylor_green, \
