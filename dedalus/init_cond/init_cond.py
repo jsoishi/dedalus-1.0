@@ -215,22 +215,6 @@ def zeldovich(data, ampl, a_ini, a_cross):
     data['u'][0]['kspace'][0,0,1] = ampl * 1j / 2
     data['u'][0]['kspace'][0,0,-1] = -data['u'][0]['kspace'][0,0,1]
 
-def read_linger_ic_data(fname, ak, deltacp, deltabp, phi, thetac, thetab):
-    """read certain values from a linger output file
-
-    """
-
-    infile = open(fname)
-    for i,line in enumerate(infile):
-        values = line.split()
-        ak.append(float(values[1]))
-        deltacp.append(float(values[6]))
-        deltabp.append(float(values[7]))
-        phi.append(float(values[5]) + float(values[11])) # eta + etatophi
-        thetac.append(-float(values[11]) / float(values[20]))
-        thetab.append(float(values[12])/ak[i]**2 + thetac[i])
-    infile.close()
-
 def read_linger_transfer_data(fname, ak_trans, Ttot, Tdc, Tdb, dTvc, dTvb, Ttot0):
     """read values from a transfer-mode linger++ output file
 
@@ -314,7 +298,8 @@ def cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryo
     Time:   Myr (linger++ uses Mpc/c)
 
     """
-    h = .703 # Hubble constant = 100 * h km/s/Mpc
+    
+    h = .703 # Hubble constant = 100 * h km/s/Mpc -- should come from input
     Myr_per_Mpc = 0.3063915366 # 1 c/Mpc = 0.306... 1/Myr
 
     ak = [] # the k-values that go with transfer-functions 
@@ -348,10 +333,13 @@ def cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryo
         print 'cannot interpolate: some grid wavenumbers larger than input wavenumbers; ICs for those modes are wrong'
         # ... any |k| larger than the max input k is replaced by max input k
         kk[:,:,:] = na.minimum(kk, maxkinput*na.ones_like(kk))
+
     # ... calculate spectra
+    # delta = -i * delta_transfer * |k|^(n_s/2)
     f_deltacp = interp1d(ak, deltacp, kind='cubic')
     spec_delta = kk**(nspect/2.)*f_deltacp(kk)
     
+    # u_j = -i * k_j/|k| * theta * |k|^(n_s/2 - 1)
     f_thetac = interp1d(ak, thetac, kind='cubic')
     spec_vel = -1j*kk**(nspect/2. -1.)*f_thetac(kk) # isotropic
     spec_vel[0,0,0] = 0.
@@ -370,7 +358,6 @@ def cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryo
         f_deltabp = interp1d(ak, deltabp, kind='cubic')
         spec_delta_b = kk**(nspect/2.)*f_deltabp(kk)
         
-        # ... relative velocity between CDM and baryons in the synchronous gauge
         f_thetab = interp1d(ak, thetab, kind='cubic')
         spec_vel_b =  -(1j * kk**(nspect/2. - 1.)*f_thetab(kk))
         spec_vel_b[0,0,0] = 0.
@@ -381,12 +368,4 @@ def cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryo
 
         return spec_delta, spec_u, spec_delta_b, spec_u_b
        
-    # ... zero high k for debugging
-    #tmp = na.zeros(shape)
-    #for (i,j,k),t in na.ndenumerate(tmp):
-    #    tmp[i,j,k] = max([i,j,k])
-    #mask = (tmp > 5)
-    #spec_delta[mask] = 0.
-    #for i in xrange(3):
-    #    spec_u[i][:,:,:] = 0.
     return spec_delta, spec_u
