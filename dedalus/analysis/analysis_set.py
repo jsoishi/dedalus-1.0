@@ -154,55 +154,53 @@ def print_energy(data, it):
 def en_spec(data, it, flist=['u']):
     """Record power spectrum of specified fields."""
     
-    for f in flist:
+    N = len(flist)
+    fig = P.figure(2, figsize=(8 * N, 8))
+    
+    for i,f in enumerate(flist):
         fx = data[f]['x']
         
         # Calculate power in each mode
         power = na.zeros(fx.data.shape)
-        for i in xrange(data[f].ncomp):
-            power += na.abs(data[f][i]['kspace']) ** 2
-        power *= 0.5
+        for j in xrange(data[f].ncomp):
+            power += 0.5 * na.abs(data[f][j]['kspace']) ** 2
 
         # Construct bins by wavevector magnitude
         kmag = na.sqrt(fx.k2())
         k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
         kbottom = k - k[1] / 2.
         ktop = k + k[1] / 2.
-        spec = na.zeros_like(k)
+        spectrum = na.zeros_like(k)
         
-        for i in xrange(k.size):
-            spec[i] = (power[(kmag >= kbottom[i]) & (kmag < ktop[i])]).sum()
+        for j in xrange(k.size):
+            spectrum[j] = (power[(kmag >= kbottom[j]) & (kmag < ktop[j])]).sum()
     
         # Plotting, skip if all modes are zero
-        if spec[1:].nonzero()[0].size == 0:
+        if spectrum[1:].nonzero()[0].size == 0:
             return
-        fig = P.figure(1, figsize=(8, 6))
         
-        P.semilogy(k[1:], spec[1:], 'o-')
+        ax = fig.add_subplot(1, N, i+1)
+        ax.semilogy(k[1:], spectrum[1:], 'o-')
         
-        #from dedalus.init_cond.api import mcwilliams_spec
-        #mspec = mcwilliams_spec(k,30.)
-        #mspec *= 0.5/mspec.sum()
-        #print "E tot spec 1D = %10.5e" % mspec.sum()
-        print "%s E tot spec 2D = %10.5e" %(f, spec.sum())
-        print "%s E0 2D = %10.5e" %(f, spec[0])
-        #P.loglog(k[1:], mspec[1:])
-        P.xlabel(r"$k$")
-        P.ylabel(r"$E(k)$")
+        print "%s E total power = %10.5e" %(f, spectrum.sum())
+        print "%s E0 power = %10.5e" %(f, spectrum[0])
+        ax.set_xlabel(r"$k$")
+        ax.set_ylabel(r"$E(k)$")
+        ax.set_title('%s Power, time = %5.2f' %(f, data.time))
+
         
-        # Add timestamp
-        #tstr = 't = %5.2f' % data.time
-        #P.text(-0.3,1.,tstr, transform=P.gca().transAxes,size=24,color='black')
-        P.title('%s Power, t = %5.2f' %(f, data.time))
-       
-        if not os.path.exists('frames'):
-            os.mkdir('frames')
-        outfile = "frames/enspec_%s_%04i.png" %(f,it)
-        P.savefig(outfile)
-        P.clf()
+    # Add timestamp
+    #tstr = 't = %5.2f' % data.time
+    #P.text(-0.3,1.,tstr, transform=P.gca().transAxes, size=24, color='black')
+
+    if not os.path.exists('frames'):
+        os.mkdir('frames')
+    outfile = "frames/enspec_%04i.png" %it
+    P.savefig(outfile)
+    P.clf()
     
 @AnalysisSet.register_task
-def phase_amp(data, it, fclist=[], klist=[], log=False):
+def phase_amp(data, it, fclist=[], klist=[], log=True):
     """
     Plot phase velocity and amplification of specified modes.
     
@@ -217,15 +215,10 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
     if it == 0:
         # Construct container on first pass
         data._save_modes = {}
-        data._init_power = {}
 
         for f,c in fclist:
-            data._init_power[f] = 0
             for k in klist:
                 data._save_modes[(f,c,k)] = [data[f][c]['kspace'][k[::-1]]]
-                data._init_power[f] += 0.5 * na.abs(data._save_modes[(f,c,k)]) ** 2.
-            if data._init_power[f] == 0:
-                data._init_power[f] = 1.
         data._save_modes['time'] = [data.time]
         return
         
@@ -237,7 +230,7 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
     
     # Plotting setup
     nvars = len(fclist)
-    fig, axs = P.subplots(2, nvars, num=1, figsize=(8 * nvars, 6 * 2)) 
+    fig, axs = P.subplots(2, nvars, num=3, figsize=(8 * nvars, 6 * 2)) 
 
     # Plot field components
     time = na.array(data._save_modes['time'])
@@ -246,14 +239,10 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
     for f,c in fclist:
         for k in klist:
             plot_array = na.array(data._save_modes[(f,c,k)])
-            
-            # Calculate amplitude growth, normalized to initial power
-            relative_power = 0.5 * na.abs(plot_array) ** 2 / data._init_power[f]
+            power = 0.5 * na.abs(plot_array) ** 2
             
             # Phase evolution at fixed point is propto exp(-omega * t)
             dtheta = -na.diff(na.angle(plot_array))
-            #print f,c,k
-            #print dtheta
             
             # Correct for pi boundary crossing
             dtheta[dtheta > na.pi] -= 2 * na.pi
@@ -264,9 +253,10 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
             phase_velocity = omega / na.linalg.norm(k)
 
             if log:
-                axs[0, I].semilogy(time, relative_power, '.-', label=str(k))
+                axs[0, I].semilogy(time, power, '.-', label=str(k))
             else:
-                axs[0, I].plot(time, relative_power, '.-', label=str(k))                
+                axs[0, I].plot(time, power, '.-', label=str(k))   
+                
             axs[1, I].plot(time[1:], phase_velocity, '.-', label=str(k))
 
         # Pad and label axes
@@ -274,7 +264,7 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
         axs[1, I].axis(padrange(axs[1, I].axis(), 0.05))
                         
         if I == 0:
-            axs[0, I].set_ylabel('normalized power')
+            axs[0, I].set_ylabel('power')
             axs[1, I].set_ylabel('phase velocity')
             axs[1, I].set_xlabel('time')
         
@@ -309,7 +299,7 @@ def k_plot(data, it, zcut=0):
     ncol = na.max([f.ncomp for f in data.fields.values()])
     
     # Figure setup
-    fig = P.figure(1, figsize=(8 * ncol, 8 * nrow))
+    fig = P.figure(4, figsize=(8 * ncol, 8 * nrow))
     
     grid = AxesGrid(fig, 111,
                     nrows_ncols = (nrow, ncol),
