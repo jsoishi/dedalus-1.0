@@ -121,6 +121,8 @@ class FourierRepresentation(Representation):
     def set_dealiasing(self, dealiasing):
         if dealiasing == '2/3':
             self.dealias = self.dealias_23
+        elif dealiasing == 'cython':
+            self.dealias = self.dealias_23_cy
         elif dealiasing == '2/3spherical':
             self.dealias = self.dealias_spherical_23
         else:
@@ -156,6 +158,10 @@ class FourierRepresentation(Representation):
         self.ifft()
         self._curr_space = 'xspace'
 
+    def dealias_23_cy(self):
+        from dealias_cy import dealias_23
+        dealias_23(self.data)
+
     def dealias_23(self):
         """Orszag 2/3 dealias rule"""
         
@@ -168,7 +174,7 @@ class FourierRepresentation(Representation):
 
         self['kspace'] # Dummy call to switch spaces
         self.data[dmask] = 0.
-        
+
     def dealias_spherical_23(self):
         """Spherical 2/3 dealiasing rule."""
         
