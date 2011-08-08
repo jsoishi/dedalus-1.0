@@ -75,19 +75,20 @@ class TimeStepBase(object):
         raise NotImplementedError("do_advance must be provided by subclass.")
 
     def snapshot(self, data):
+        myproc = data[data.fields.keys()[0]][0].myproc
         pathname = "snap_%05i" % (self._nsnap)
-        if not os.path.exists(pathname):
+        if not os.path.exists(pathname) and myproc == 0:
             os.mkdir(pathname)
         
         # first, pickle physics data
-        obj_file = open(os.path.join(pathname,'dedalus_obj.cpkl'),'w')
+        obj_file = open(os.path.join(pathname,'dedalus_obj_%04i.cpkl' % myproc),'w')
         cPickle.dump(self.RHS, obj_file)
         cPickle.dump(data, obj_file)
         cPickle.dump(self, obj_file)
         obj_file.close()
 
         # now save fields
-        filename = os.path.join(pathname, "data.cpu%04i" % 0)
+        filename = os.path.join(pathname, "data.cpu%04i" % myproc)
         outfile = h5py.File(filename, mode='w')
         root_grp = outfile.create_group('/fields')
         dset = outfile.create_dataset('time',data=self.time)
