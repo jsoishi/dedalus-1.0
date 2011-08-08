@@ -47,6 +47,7 @@ from dedalus.physics.api import \
     Hydro, \
     ShearHydro, \
     MHD, \
+    ShearMHD, \
     LinearCollisionlessCosmology,\
     CollisionlessCosmology
 
