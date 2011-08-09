@@ -68,13 +68,14 @@ vs = VolumeAverageSet(data)
 vs.add('ekin', '%10.5e')
 vs.add('emag', '%10.5e')
 
-plot_slice = [slice(None), shape[1] / 2, slice(None)]
+xzslice = [slice(None), shape[1] / 2, slice(None)]
+yzslice = [slice(None), slice(None), shape[2] / 2]
 plot_cadence = 20
 
 an = AnalysisSet(data, ti)
 an.add("volume_average",1,{'va_obj': vs})
-an.add("field_snap", plot_cadence, {'plot_slice': plot_slice})
-an.add("field_snap", plot_cadence, {'space': 'kspace', 'plot_slice': plot_slice})
+an.add("field_snap", plot_cadence, {'plot_slice': xzslice, 'saveas': 'xz_snap'})
+an.add("field_snap", plot_cadence, {'plot_slize': yzslice, 'saveas': 'yz_snap'})
 an.add("k_plot", plot_cadence)
 an.add("en_spec", plot_cadence, {'flist': ['u', 'B']})
 an.add("phase_amp", plot_cadence, {'fclist': [('B', 'x'), ('B', 'y'), ('B', 'z')],
