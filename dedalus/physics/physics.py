@@ -514,7 +514,7 @@ class MHD(Hydro):
 
         # Setup temporary data container
         sampledata = data['u']['x']
-        tmp = na.zeros(sampledata._shape['kspace'], dtype=sampledata.data.dtype)
+        tmp = data.create_tmp_data('kspace')
         k2 = sampledata.k2(no_zero=True)
 
         # Construct k * ugradu - k * BgradB / (4 pi rho0)
