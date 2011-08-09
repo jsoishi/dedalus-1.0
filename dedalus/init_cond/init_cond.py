@@ -290,7 +290,7 @@ def cosmo_fields(delta_c, u_c, delta_b, u_b, spec_delta_c, spec_u_c, spec_delta_
         u_b[i].zero_nyquist()
         u_b[i]['kspace'][0,0,0] = 0
 
-def cosmo_spectra(data, ic_fname, norm_fname, nspect=0.961, sigma_8=0.811, baryons=False):
+def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, baryons=False):
     """generate spectra for CDM overdensity and velocity from linger++
     output. Assumes 3-dimensional fields.
 
