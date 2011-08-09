@@ -160,7 +160,6 @@ def compute_en_spec(data, field, normalization=1.0, averaging=None):
                          'all'    : divide power in each bin by number of modes 
                                     included in that bin
                          'nonzero': like 'all', but count only nonzero modes
-        nbins            number of bins to use
 
     Returns:
         k                centers of k-bins
@@ -227,19 +226,29 @@ def en_spec(data, it, flist=['u']):
         P.clf()
 
 @AnalysisSet.register_task
-def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio'):
-    """Compare power spectrum of two fields
+def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', output_columns=True):
+    """Compare power spectrum of two fields. Defaults for baryon
 
     Inputs:
-        data        Data object
-        it          Iteration number
-        f1, f2      Fields to compare
-        comparison  'ratio'      : use P(f1)/P(f2) (default)
-                    'difference' : use P(f1) - P(f2) 
+        data            Data object
+        it              Iteration number
+        f1, f2          Fields to compare
+        comparison      'ratio'      : use P(f1)/P(f2) (default)
+                        'difference' : use P(f1) - P(f2) 
+        output_columns  if True, output data as columns in a file
 
     """
     k, spec_f1 = compute_en_spec(data, f1)
     k, spec_f2 = compute_en_spec(data, f2)
+
+    if not os.path.exists('frames'):
+        os.mkdir('frames')
+
+    if output_columns:
+        outfile = open('frames/spec_data_%s_%s_%04i.txt'%(f1,f2,it), 'w')
+        for ak, s1, s2 in zip(k, spec_f1, spec_f2):
+            outfile.write('%08f\t%08e\t%08e\n'%(ak, s1, s2))
+        outfile.close()
 
     fig = P.figure(figsize=(8,6))
     
@@ -257,8 +266,6 @@ def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio'):
     P.xlabel(r"$k$")
     P.loglog(k[1:], spec_compare[1:], 'o-')
     
-    if not os.path.exists('frames'):
-        os.mkdir('frames')
     outfile = "frames/cmpspec_%s_%s_%04i.png" %(f1, f2, it)
     P.savefig(outfile)
     P.clf()
