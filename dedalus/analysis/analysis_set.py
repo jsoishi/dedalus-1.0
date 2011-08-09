@@ -150,29 +150,54 @@ def print_energy(data, it):
     print "k energy: %10.5e" % (0.5* e2.sum())
     print "x energy: %10.5e" % (0.5*energy.sum()/energy.size)
 
+def compute_en_spec(data, field, normalization=1.0, averaging=None):
+    """Compute power spectrum (helper function for analysis tasks).
+
+    Inputs:
+        fc               (field name, component) tuple 
+        normalization    Power in each mode is multiplied by normalization
+        averaging        None     : no averaging (default)
+                         'all'    : divide power in each bin by number of modes 
+                                    included in that bin
+                         'nonzero': like 'all', but count only nonzero modes
+        nbins            number of bins to use
+
+    Returns:
+        k                centers of k-bins
+        spec             Power spectrum of f
+    """
+    f = data[field]
+    power = na.zeros(f[0].data.shape)
+    for i in xrange(f.ncomp):
+        power += na.abs(f[i]['kspace']) ** 2
+    power *= normalization
+
+    # Construct bins by wavevector magnitude (evenly spaced)
+    kmag = na.sqrt(f[0].k2())
+    k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
+    
+    kbottom = k - k[1] / 2.
+    ktop = k + k[1] / 2.
+    spec = na.zeros_like(k)
+        
+    nonzero = (power > 0)
+    for i in xrange(k.size):
+        kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
+        spec[i] = (power[kshell]).sum()
+        if averaging == 'nonzero':
+            spec[i] /= (kshell & nonzero).sum()
+        elif averaging == 'all':
+            spec[i] /= kshell.sum()
+
+    return k, spec
+
 @AnalysisSet.register_task
 def en_spec(data, it, flist=['u']):
     """Record power spectrum of specified fields."""
     
     for f in flist:
-        fx = data[f]['x']
-        
-        # Calculate power in each mode
-        power = na.zeros(fx.data.shape)
-        for i in xrange(data[f].ncomp):
-            power += na.abs(data[f][i]['kspace']) ** 2
-        power *= 0.5
-
-        # Construct bins by wavevector magnitude
-        kmag = na.sqrt(fx.k2())
-        k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
-        kbottom = k - k[1] / 2.
-        ktop = k + k[1] / 2.
-        spec = na.zeros_like(k)
-        
-        for i in xrange(k.size):
-            spec[i] = (power[(kmag >= kbottom[i]) & (kmag < ktop[i])]).sum()
-    
+        k, spec = compute_en_spec(data, f, normalization=0.5)
+            
         # Plotting, skip if all modes are zero
         if spec[1:].nonzero()[0].size == 0:
             return
@@ -200,6 +225,43 @@ def en_spec(data, it, flist=['u']):
         outfile = "frames/enspec_%s_%04i.png" %(f,it)
         P.savefig(outfile)
         P.clf()
+
+@AnalysisSet.register_task
+def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio'):
+    """Compare power spectrum of two fields
+
+    Inputs:
+        data        Data object
+        it          Iteration number
+        f1, f2      Fields to compare
+        comparison  'ratio'      : use P(f1)/P(f2) (default)
+                    'difference' : use P(f1) - P(f2) 
+
+    """
+    k, spec_f1 = compute_en_spec(data, f1)
+    k, spec_f2 = compute_en_spec(data, f2)
+
+    fig = P.figure(figsize=(8,6))
+    
+    spec_f2[spec_f2==0] = 1.
+
+    if comparison == 'ratio':
+        spec_compare = spec_f1/spec_f2
+        P.title('Comparison of %s and %s power, t = %5.2f' %(f1, f2, data.time))
+        P.ylabel(r"P(%s)/P(%s)" %(f1, f2))
+    elif comparison == 'difference':
+        spec_compare = spec_f1 - spec_f2
+        P.title('Comparison of %s and %s power, t = %5.2f' %(f1, f2, data.time))
+        P.ylabel(r"$P(%s) - P(%s)$" %(f1, f2))
+        
+    P.xlabel(r"$k$")
+    P.loglog(k[1:], spec_compare[1:], 'o-')
+    
+    if not os.path.exists('frames'):
+        os.mkdir('frames')
+    outfile = "frames/cmpspec_%s_%s_%04i.png" %(f1, f2, it)
+    P.savefig(outfile)
+    P.clf()
     
 @AnalysisSet.register_task
 def phase_amp(data, it, fclist=[], klist=[], log=False):

@@ -23,72 +23,6 @@ a_i = RHS.aux_eqns['a'].value # initial scale factor
 t0 = (2./3.)/H0 # present age of E-dS universe (although we're using LCDM)
 t_ini = (a_i**(3./2.)) * t0 # time at which a = a_i in E-dS
 
-def pow_spec(data, it, flist=['delta_c', 'delta_b']):
-    sampledata = data.fields.values()[0][0]
-    kmag = na.sqrt(sampledata.k2())
-    k = sampledata.k['x'].flatten()
-    k = na.abs(k[0:(k.size / 2 + 1)])
-    kbottom = k - k[1] / 2.
-    ktop = k + k[1] / 2.
-    spec = {}
-    for f in flist:
-        spec[f] = na.zeros_like(k)
-        power = na.zeros(sampledata['kspace'].shape)
-        for i in xrange(data[f].ncomp):
-            power += na.abs(data[f][i]['kspace'])**2
-        for i in xrange(k.size):
-            k_rad = (kbottom[i] + ktop[i])/2
-            kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
-            nk = ((kshell & (power>0)) * na.ones_like(kmag)).sum()
-            spec[f][i] = (power[kshell]).sum()/nk
-    return k, spec
-
-def rel_matter_spec(data, it, Dplus, a, flist=['delta_c', 'delta_b']):
-    k, spec = pow_spec(data, it, flist=flist)
-    
-    spec_c = spec['delta_c']/(Dplus*Dplus)
-    spec_b = spec['delta_b']/(Dplus*Dplus)
-
-    f = open('frames/data_a%05f.txt' % a, 'w')
-    for ak, c, b in zip(k, spec_c, spec_b):
-        f.write('%08e\t%08e\t%08e\n' % (ak, c, b))
-    f.close()
-
-    outfile = "bcdm/powspec_a%05f.png" % a
-    fig = pl.figure()
-    pl.loglog(k[1:], spec_c[1:], 'o-', label = 'CDM')
-    pl.loglog(k[1:], spec_b[1:], 'o-', label = 'baryons', hold=True)
-    pl.xlabel("$k$")
-    pl.ylabel("$\mid \delta_k \mid^2 / D_+^2$")
-    pl.legend()
-    pl.title("Baryon vs. CDM power spectrum at a=%05f" % a)
-    fig.savefig(outfile)
-    fig = pl.figure()
-    pl.loglog(k[1:], spec_b[1:]/spec_c[1:], 'o-')
-    pl.xlabel("$k$")
-    pl.ylabel("$\mid\delta_b\mid^2 / \mid\delta_c\mid^2$")
-    pl.title("Ratio of baryon to CDM power at a=%05f" % a)
-    fig.savefig("bcdm/ratio_a%05f.png" % a)
-
-def iso_vel_spec(data, it, Dplus, a, flist=['u_c','u_b']):
-    k, spec = pow_spec(data, it, flist=flist)
-    spec_uc = spec['u_c']
-    spec_ub = spec['u_b']
-
-    f = open('frames/udata_a%05f.txt' % a, 'w')
-    for ak, c, b in zip(k, spec_uc, spec_ub):
-        f.write('%08e\t%08e\t%08e\n' % (ak, c, b))
-    f.close()
-
-
-    outfile = "bcdm/reluspec_a%05f.png" % a
-    fig = pl.figure()
-    pl.loglog(k[1:], abs(spec_uc[1:] - spec_ub[1:]), 'o-')
-    pl.xlabel("$k$")
-    pl.ylabel("$u^2_{rel}$")
-    pl.title("Baryon and CDM relative velocities at a=%05f" % a)
-    fig.savefig(outfile)
-
 def read_cs2(thermo_fname):
     """read baryon sound speed squared from linger++ thermal history output
 
@@ -125,22 +59,12 @@ ti.set_dtsnap(10000)
 an = AnalysisSet(data, ti)
 an.add("field_snap", 1)
 #an.add("en_spec", 100, {'flist':['u_c','u_b']})
+an.add("compare_power", 1)
 i=0
 an.run()
-outfile = open('ugrowth.dat', 'w')
 while ti.ok:
     Dplus = ((data.time + t_ini)/t_ini) ** (2./3.)
     print 'step: ', i, ' a = ', RHS.aux_eqns['a'].value
-    if i % 1 == 0:
-        rel_matter_spec(data, i, Dplus, RHS.aux_eqns['a'].value)
-        iso_vel_spec(data, i, Dplus, RHS.aux_eqns['a'].value)
     ti.advance(data, dt)
     i = i + 1
     an.run()
-    dc = data['u_c'][0]['kspace'][1,1,1].real
-    db = data['u_b'][0]['kspace'][1,1,1].real
-    outfile.write("%10.5e\t%10.5e\t%10.5e\t%10.5e\t%10.5e\n" %(ti.time, ti.RHS.aux_eqns['a'].value, dc, db, dc-db))
-outfile.close()
-
-rel_matter_spec(data, i, Dplus, RHS.aux_eqns['a'].value)
-iso_vel_spec(data, i, Dplus, RHS.aux_eqns['a'].value)
