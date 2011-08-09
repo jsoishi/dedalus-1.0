@@ -63,33 +63,27 @@ def volume_average(data, it, va_obj=None):
     va_obj.run()
 
 @AnalysisSet.register_task
-def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', **kwargs):
+def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', saveas='snap', **kwargs):
     """
     Take a snapshot of all fields defined. Currently takes z[0] slice for 3D.
     
     """
     
     # Determine image grid size
-    nvars = 0
-    for f in data.fields.values():
-        nvars += f.ncomp
-    if nvars == 4:
-        nrow = ncol = 2
-    elif nvars == 9:
-        nrow = ncol = 3
-    else:
-        nrow = na.ceil(nvars / 3.)
-        ncol = na.min([nvars, 3])
-    nrow = na.int(nrow)
-    ncol = na.int(ncol)
+    nrow = len(data.fields.keys())
+    ncol = na.max([f.ncomp for f in data.fields.values()])
+    
+    # Figure setup
+    fig = P.figure(4, figsize=(8 * ncol, 8 * nrow))
 
     if use_extent:
-        extent = [0.,data.length[-1], 0., data.length[-2]]
+        extent = [0., data.length[-1], 0., data.length[-2]]
     else:
         extent = None
     
     # Figure setup
-    fig = P.figure(1, figsize=(24. * ncol / 3., 24. * nrow / 3.))
+    fig = P.figure(1, figsize=(8 * ncol, 8 * nrow))
+    
     grid = AxesGrid(fig, 111,
                     nrows_ncols = (nrow, ncol),
                     axes_pad=0.3,
@@ -100,39 +94,44 @@ def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', **kw
                     cbar_mode="each")
                     
     # Plot field components
-    I = 0
+    i = -1
     for k,f in data.fields.iteritems():
-        for i in xrange(f.ncomp):
-            if f[i].ndim == 3:
+        i += 1
+        for j in xrange(f.ncomp):
+            I = i * ncol + j
+        
+            if f[j].ndim == 3:
                 if plot_slice == None:
-                    # Default to center xy plane
-                    plot_slice = [f[i].shape[0] / 2, slice(None), slice(None)]
-                plot_array = f[i][space][plot_slice]
+                    # Default to bottom xy plane
+                    plot_slice = [0, slice(None), slice(None)]
+                plot_array = f[j][space][plot_slice]
             else:
-                plot_array = f[i][space]
+                plot_array = f[j][space]
                 
             if space == 'kspace':
                 plot_array = na.abs(plot_array)
                 plot_array[plot_array == 0] = na.nan
                 plot_array = na.log10(plot_array)
+
             else:
                 plot_array = plot_array.real
 
+            # Plot
             im = grid[I].imshow(plot_array, extent=extent, origin='lower', 
                                 interpolation='nearest', **kwargs)
-            grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='white')
+            grid[I].text(0.05, 0.95, k + str(j), transform=grid[I].transAxes, size=24, color='white')
             grid.cbar_axes[I].colorbar(im)
-            I += 1
             
+    # Time label     
     tstr = 't = %5.2f' % data.time
     grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
     
     if not os.path.exists('frames'):
         os.mkdir('frames')
     if space == 'kspace':
-        outfile = "frames/k_snap_%07i.png" % it
+        outfile = "frames/k_" + saveas + "_%07i.png" % it
     else:
-        outfile = "frames/snap_%07i.png" % it
+        outfile = "frames/" + saveas + "_%07i.png" % it
     fig.savefig(outfile)
     fig.clf()
 
@@ -150,59 +149,125 @@ def print_energy(data, it):
     print "k energy: %10.5e" % (0.5* e2.sum())
     print "x energy: %10.5e" % (0.5*energy.sum()/energy.size)
 
+def compute_en_spec(data, field, normalization=1.0, averaging=None):
+    """Compute power spectrum (helper function for analysis tasks).
+
+    Inputs:
+        fc               (field name, component) tuple 
+        normalization    Power in each mode is multiplied by normalization
+        averaging        None     : no averaging (default)
+                         'all'    : divide power in each bin by number of modes 
+                                    included in that bin
+                         'nonzero': like 'all', but count only nonzero modes
+
+    Returns:
+        k                centers of k-bins
+        spec             Power spectrum of f
+    """
+    f = data[field]
+    power = na.zeros(f[0].data.shape)
+    for i in xrange(f.ncomp):
+        power += 0.5 * na.abs(f[i]['kspace']) ** 2
+    power *= normalization
+
+    # Construct bins by wavevector magnitude (evenly spaced)
+    kmag = na.sqrt(f[0].k2())
+    k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
+    
+    kbottom = k - k[1] / 2.
+    ktop = k + k[1] / 2.
+    spec = na.zeros_like(k)
+        
+    nonzero = (power > 0)
+    for i in xrange(k.size):
+        kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
+        spec[i] = (power[kshell]).sum()
+        if averaging == 'nonzero':
+            spec[i] /= (kshell & nonzero).sum()
+        elif averaging == 'all':
+            spec[i] /= kshell.sum()
+
+    return k, spec
+
 @AnalysisSet.register_task
 def en_spec(data, it, flist=['u']):
     """Record power spectrum of specified fields."""
+    N = len(flist)
+    fig = P.figure(2, figsize=(8 * N, 8))
     
-    for f in flist:
-        fx = data[f]['x']
-        
-        # Calculate power in each mode
-        power = na.zeros(fx.data.shape)
-        for i in xrange(data[f].ncomp):
-            power += na.abs(data[f][i]['kspace']) ** 2
-        power *= 0.5
+    for i,f in enumerate(flist):
+        k, spectrum = compute_en_spec(data, f)
 
-        # Construct bins by wavevector magnitude
-        kmag = na.sqrt(fx.k2())
-        k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
-        kbottom = k - k[1] / 2.
-        ktop = k + k[1] / 2.
-        spec = na.zeros_like(k)
-        
-        for i in xrange(k.size):
-            spec[i] = (power[(kmag >= kbottom[i]) & (kmag < ktop[i])]).sum()
-    
         # Plotting, skip if all modes are zero
-        if spec[1:].nonzero()[0].size == 0:
+        if spectrum[1:].nonzero()[0].size == 0:
             return
-        fig = P.figure(1, figsize=(8, 6))
         
-        P.semilogy(k[1:], spec[1:], 'o-')
+        ax = fig.add_subplot(1, N, i+1)
+        ax.semilogy(k[1:], spectrum[1:], 'o-')
         
-        #from dedalus.init_cond.api import mcwilliams_spec
-        #mspec = mcwilliams_spec(k,30.)
-        #mspec *= 0.5/mspec.sum()
-        #print "E tot spec 1D = %10.5e" % mspec.sum()
-        print "%s E tot spec 2D = %10.5e" %(f, spec.sum())
-        print "%s E0 2D = %10.5e" %(f, spec[0])
-        #P.loglog(k[1:], mspec[1:])
-        P.xlabel(r"$k$")
-        P.ylabel(r"$E(k)$")
-        
-        # Add timestamp
-        #tstr = 't = %5.2f' % data.time
-        #P.text(-0.3,1.,tstr, transform=P.gca().transAxes,size=24,color='black')
-        P.title('%s Power, t = %5.2f' %(f, data.time))
+        print "%s E total power = %10.5e" %(f, spectrum.sum())
+        print "%s E0 power = %10.5e" %(f, spectrum[0])
+        ax.set_xlabel(r"$k$")
+        ax.set_ylabel(r"$E(k)$")
+        ax.set_title('%s Power, time = %5.2f' %(f, data.time))
+
+    # Add timestamp
+    #tstr = 't = %5.2f' % data.time
+    #P.text(-0.3,1.,tstr, transform=P.gca().transAxes,size=24,color='black')
        
-        if not os.path.exists('frames'):
-            os.mkdir('frames')
-        outfile = "frames/enspec_%s_%04i.png" %(f,it)
-        P.savefig(outfile)
-        P.clf()
+    if not os.path.exists('frames'):
+        os.mkdir('frames')
+    outfile = "frames/enspec_%s_%04i.png" %(f,it)
+    P.savefig(outfile)
+    P.clf()
+
+@AnalysisSet.register_task
+def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', output_columns=True):
+    """Compare power spectrum of two fields. Defaults for baryon
+
+    Inputs:
+        data            Data object
+        it              Iteration number
+        f1, f2          Fields to compare
+        comparison      'ratio'      : use P(f1)/P(f2) (default)
+                        'difference' : use P(f1) - P(f2) 
+        output_columns  if True, output data as columns in a file
+
+    """
+    k, spec_f1 = compute_en_spec(data, f1)
+    k, spec_f2 = compute_en_spec(data, f2)
+
+    if not os.path.exists('frames'):
+        os.mkdir('frames')
+
+    if output_columns:
+        outfile = open('frames/spec_data_%s_%s_%04i.txt'%(f1,f2,it), 'w')
+        for ak, s1, s2 in zip(k, spec_f1, spec_f2):
+            outfile.write('%08f\t%08e\t%08e\n'%(ak, s1, s2))
+        outfile.close()
+
+    fig = P.figure(figsize=(8,6))
+    
+    spec_f2[spec_f2==0] = 1.
+
+    if comparison == 'ratio':
+        spec_compare = spec_f1/spec_f2
+        P.title('Comparison of %s and %s power, t = %5.2f' %(f1, f2, data.time))
+        P.ylabel(r"P(%s)/P(%s)" %(f1, f2))
+    elif comparison == 'difference':
+        spec_compare = spec_f1 - spec_f2
+        P.title('Comparison of %s and %s power, t = %5.2f' %(f1, f2, data.time))
+        P.ylabel(r"$P(%s) - P(%s)$" %(f1, f2))
+        
+    P.xlabel(r"$k$")
+    P.loglog(k[1:], spec_compare[1:], 'o-')
+    
+    outfile = "frames/cmpspec_%s_%s_%04i.png" %(f1, f2, it)
+    P.savefig(outfile)
+    P.clf()
     
 @AnalysisSet.register_task
-def phase_amp(data, it, fclist=[], klist=[], log=False):
+def phase_amp(data, it, fclist=[], klist=[], log=True):
     """
     Plot phase velocity and amplification of specified modes.
     
@@ -217,15 +282,10 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
     if it == 0:
         # Construct container on first pass
         data._save_modes = {}
-        data._init_power = {}
 
         for f,c in fclist:
-            data._init_power[f] = 0
             for k in klist:
                 data._save_modes[(f,c,k)] = [data[f][c]['kspace'][k[::-1]]]
-                data._init_power[f] += 0.5 * na.abs(data._save_modes[(f,c,k)]) ** 2.
-            if data._init_power[f] == 0:
-                data._init_power[f] = 1.
         data._save_modes['time'] = [data.time]
         return
         
@@ -237,7 +297,7 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
     
     # Plotting setup
     nvars = len(fclist)
-    fig, axs = P.subplots(2, nvars, num=1, figsize=(8 * nvars, 6 * 2)) 
+    fig, axs = P.subplots(2, nvars, num=3, figsize=(8 * nvars, 6 * 2)) 
 
     # Plot field components
     time = na.array(data._save_modes['time'])
@@ -246,14 +306,10 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
     for f,c in fclist:
         for k in klist:
             plot_array = na.array(data._save_modes[(f,c,k)])
-            
-            # Calculate amplitude growth, normalized to initial power
-            relative_power = 0.5 * na.abs(plot_array) ** 2 / data._init_power[f]
+            power = 0.5 * na.abs(plot_array) ** 2
             
             # Phase evolution at fixed point is propto exp(-omega * t)
             dtheta = -na.diff(na.angle(plot_array))
-            #print f,c,k
-            #print dtheta
             
             # Correct for pi boundary crossing
             dtheta[dtheta > na.pi] -= 2 * na.pi
@@ -264,9 +320,10 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
             phase_velocity = omega / na.linalg.norm(k)
 
             if log:
-                axs[0, I].semilogy(time, relative_power, '.-', label=str(k))
+                axs[0, I].semilogy(time, power, '.-', label=str(k))
             else:
-                axs[0, I].plot(time, relative_power, '.-', label=str(k))                
+                axs[0, I].plot(time, power, '.-', label=str(k))   
+                
             axs[1, I].plot(time[1:], phase_velocity, '.-', label=str(k))
 
         # Pad and label axes
@@ -274,7 +331,7 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
         axs[1, I].axis(padrange(axs[1, I].axis(), 0.05))
                         
         if I == 0:
-            axs[0, I].set_ylabel('normalized power')
+            axs[0, I].set_ylabel('power')
             axs[1, I].set_ylabel('phase velocity')
             axs[1, I].set_xlabel('time')
         
@@ -291,7 +348,7 @@ def phase_amp(data, it, fclist=[], klist=[], log=False):
     fig.clf()
     
 @AnalysisSet.register_task
-def k_plot(data, it):
+def k_plot(data, it, zcut=0):
     """
     Plot k-power for moving k modes (i.e. ShearReps)
     
@@ -299,6 +356,8 @@ def k_plot(data, it):
         data        Data object
         it          Iteration number
 
+    Keywords:
+        zcut        kz index for the kx,ky plane being plotted
 
     """
     
@@ -307,7 +366,7 @@ def k_plot(data, it):
     ncol = na.max([f.ncomp for f in data.fields.values()])
     
     # Figure setup
-    fig = P.figure(1, figsize=(8 * ncol, 8 * nrow))
+    fig = P.figure(4, figsize=(8 * ncol, 8 * nrow))
     
     grid = AxesGrid(fig, 111,
                     nrows_ncols = (nrow, ncol),
@@ -332,17 +391,18 @@ def k_plot(data, it):
             x = f[j].k['x'][0] + z_
             y = f[j].k['y'][0] + z_
 
-            if f[i].ndim == 3:
-                plot_array = f[i]['kspace'][0]
+            if f[j].ndim == 3:
+                plot_array = f[j]['kspace'][zcut]
             else:
-                plot_array = f[i]['kspace']
+                plot_array = f[j]['kspace']
                 
             plot_array = na.abs(plot_array)
-            plot_array[plot_array == 0] = 1e-50
+            plot_array[plot_array == 0] = 1e-40
             plot_array = na.log10(plot_array)
             
             # Plot
-            im = grid[I].scatter(x, y, c=plot_array, linewidth=0)
+            im = grid[I].scatter(x, y, c=plot_array, linewidth=0, 
+                                 vmax=na.max([plot_array.max(), -39]))
             
             # Nyquist boundary
             nysquarex = na.array([-ny[-1], -ny[-1], ny[-1], ny[-1], -ny[-1]])
@@ -354,12 +414,12 @@ def k_plot(data, it):
             
             # Plot range and labels
             grid[I].axis(padrange([-ny[-1], ny[1], -ny[-2], ny[-2]], 0.2))
-            grid[I].text(0.05, 0.95, k + str(i), transform=grid[I].transAxes, size=24,color='black')
+            grid[I].text(0.05, 0.95, k + str(j), transform=grid[I].transAxes, size=24, color='black')
             grid.cbar_axes[I].colorbar(im)
             
     # Time label
     tstr = 't = %6.3f' % data.time
-    grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
+    grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes, size=24, color='black')
     
     grid[0].set_xlabel('kx')
     grid[0].set_ylabel('ky')

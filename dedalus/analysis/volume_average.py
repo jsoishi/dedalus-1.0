@@ -39,15 +39,18 @@ class VolumeAverageSet(object):
         self.outfile.write("# Dedalus Volume Average\n")
         self.outfile.write("# Column 0: time\n")
 
-    def add(self, name, fmt):
-        self.tasks.append((self.known_analysis[name], fmt))
+    def add(self, name, fmt, options={}):
+        self.tasks.append((self.known_analysis[name], fmt, options))
         self.outfile.write("# Column %i: %s\n" % (len(self.tasks), name))
-
+        
     def run(self):
         line = []
         line.append("%10.5f" % self.data.time)
-        for f,fmt in self.tasks:
-            line.append(fmt % f(self.data))
+        for f, fmt, kwargs in self.tasks:
+            if len(kwargs) == 0:
+                line.append(fmt % f(self.data))
+            else:
+                line.append(fmt % f(self.data, **kwargs))
         self.outfile.write("\t".join(line)+"\n")
         self.outfile.flush()
 
@@ -59,7 +62,7 @@ class VolumeAverageSet(object):
 def ekin(data):
     en = na.zeros(data['u']['x'].data.shape)
     for i in xrange(data['u'].ncomp):
-        en += 0.5*(data['u'][i]['kspace']*data['u'][i]['kspace'].conj()).real
+        en += 0.5 * na.abs(data['u'][i]['kspace']) ** 2
 
     return en.sum()
     
@@ -67,10 +70,14 @@ def ekin(data):
 def emag(data):
     en = na.zeros(data['B']['x'].data.shape)
     for i in xrange(data['B'].ncomp):
-        en += 0.5 * na.abs(data['u'][i]['kspace']) ** 2
+        en += 0.5 * na.abs(data['B'][i]['kspace']) ** 2
 
     return en.sum()
-
+    
+@VolumeAverageSet.register_task
+def mode_track(data, k=(1, 0, 0)):
+    # NOT IMPLEMENTED
+    return 0.
 
 @VolumeAverageSet.register_task
 def enstrophy(data):
