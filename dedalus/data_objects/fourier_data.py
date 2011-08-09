@@ -24,11 +24,7 @@ import numpy as na
 import numpy.fft as fpack
 import fftw3
 
-try: 
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-except:
-    print "mpi4py not found. Parallelization will not work."
+from dedalus.utils.parallelism import comm, MPI
 
 class Representation(object):
     """a representation of a field. it stores data and provides

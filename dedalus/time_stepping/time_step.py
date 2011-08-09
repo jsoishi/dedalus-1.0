@@ -26,12 +26,7 @@ import time
 import h5py
 import numpy as na
 
-try:
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-except ImportError:
-    comm = None
-
+from dedalus.utils.parallelism import comm
 from dedalus.funcs import insert_ipython, get_mercurial_changeset_id
 
 class TimeStepBase(object):
@@ -90,8 +85,9 @@ class TimeStepBase(object):
         pathname = "snap_%05i" % (self._nsnap)
         if not os.path.exists(pathname) and myproc == 0:
             os.mkdir(pathname)
-        
-        comm.Barrier()
+        if comm:
+            comm.Barrier()
+
         # first, pickle physics data
         obj_file = open(os.path.join(pathname,'dedalus_obj_%04i.cpkl' % myproc),'w')
         cPickle.dump(self.RHS, obj_file)
