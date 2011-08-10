@@ -117,16 +117,6 @@ class FourierRepresentation(Representation):
         if method == 'numpy':
             self.fft = self.fwd_np
             self.ifft = self.rev_np
-            
-    def set_dealiasing(self, dealiasing):
-        if dealiasing == '2/3':
-            self.dealias = self.dealias_23
-        elif dealiasing == 'cython':
-            self.dealias = self.dealias_23_cy
-        elif dealiasing == '2/3spherical':
-            self.dealias = self.dealias_spherical_23
-        else:
-            self.dealias = self.zero_nyquist
 
     def fwd_fftw(self):
         self.fplan()
@@ -157,13 +147,24 @@ class FourierRepresentation(Representation):
         self.dealias()
         self.ifft()
         self._curr_space = 'xspace'
-
-    def dealias_23_cy(self):
-        from dealias_cy import dealias_23
-        dealias_23(self.data)
+        
+                
+    def set_dealiasing(self, dealiasing):
+        if dealiasing == '2/3':
+            self.dealias = self.dealias_23
+        elif dealiasing == '2/3 cython':
+            if self.ndim == 2:
+                from dealias_cy_2d import dealias_23
+            elif self.ndim == 3:
+                from dealias_cy_3d import dealias_23                
+            self.dealias = self.dealias_23_cy
+        elif dealiasing == '2/3 spherical':
+            self.dealias = self.dealias_spherical_23
+        else:
+            self.dealias = self.zero_nyquist
 
     def dealias_23(self):
-        """Orszag 2/3 dealias rule"""
+        """Orszag 2/3 dealiasing rule"""
         
         # Zeroing mask   
         dmask = ((na.abs(self.k['x']) >= 2/3. * self.kny[-1]) | 
@@ -174,8 +175,21 @@ class FourierRepresentation(Representation):
 
         self['kspace'] # Dummy call to switch spaces
         self.data[dmask] = 0.
+        
+    def dealias_23_cython_2d(self):
+        """Orszag 2/3 dealiasing rule implemented in cython."""
+        
+        if self.ndim == 2:
+            dealias_23(self.data, self.k['x'], self.k['y'], self.kny)
+        elif self.ndim == 3:
+            dealias_23(self.data, self.k['x'], self.k['y'], self.k['z'], self.kny)
 
-    def dealias_spherical_23(self):
+    def dealias_wrap(self):
+        """Test function for dealias speed testing"""
+        
+        self.dealias_func(self.data, self.k['x'], self.k['y'], self.kny)
+
+    def dealias_23_spherical(self):
         """Spherical 2/3 dealiasing rule."""
         
         # Zeroing mask   
