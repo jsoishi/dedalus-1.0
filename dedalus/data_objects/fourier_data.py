@@ -335,6 +335,10 @@ class ParallelFourierRepresentation(FourierRepresentation):
                        'xspace': [self.data.shape[0]*self.nproc,
                                   self.data.shape[1]/self.nproc,
                                   self.data.shape[2]]}
+        self._length = {'kspace': [self.length[0], self.length[1], self.length[2]],
+                       'xspace': [self.length[0]*self.nproc,
+                                  self.length[1]/self.nproc,
+                                  self.length[2]]}
 
     def __setitem__(self, space, data):
         """this needs to ensure the pointer for the field's data
@@ -370,31 +374,45 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
         self.k['z'] = self.k['z'][self.myproc*self.shape[0]:(self.myproc+1)*self.shape[0]]
 
+    def communicate(self, direction):
+        sendbuf = []        
+        if direction == 'forward':
+            sz = self.shape[0] / self.nproc
+            for i in xrange(self.nproc):
+                sendbuf.append(self.data[i * sz:(i + 1) * sz, :, :])
+            concat_axis = 1
+            space = 'kspace'
+        elif direction == 'reverse':
+            sy = self.shape[1] / self.nproc
+            for i in xrange(self.nproc):
+                sendbuf.append(self.data[:, i * sy:(i + 1) * sy, :])
+            concat_axis = 0
+            space = 'xspace'
+        else:
+            raise ValueError("Communcation direction must be forward or reverse")
+
+        sendbuf = na.array(sendbuf)
+        recvbuf = na.zeros_like(sendbuf)
+        
+        self.comm.Alltoall([sendbuf,MPI.COMPLEX], [recvbuf,MPI.COMPLEX])
+        recvbuf = na.concatenate(recvbuf, axis=concat_axis)
+
+        self.shape = self._shape[space]
+        self.length = self._length[space]
+        return recvbuf
+
     def fwd_np(self):
         """xspace to kspace"""
         
         # z fft
         self.data = fpack.fftn(self.data, axes=(0,))
-    
-        # Transpose
-        sz = self.shape[0] / self.nproc
-        sendbuf = []
-        for i in xrange(self.nproc):
-            sendbuf.append(self.data[i * sz:(i + 1) * sz, :, :])
-            
-        sendbuf = na.array(sendbuf)
-        recvbuf = na.zeros_like(sendbuf)
-        
-        self.comm.Alltoall([sendbuf,MPI.COMPLEX], [recvbuf,MPI.COMPLEX])
-        recvbuf = na.concatenate(recvbuf, axis=1)
-        
+
+        # transform
+        recvbuf = self.communicate('forward')
+
         # xy fft
         self.data = fpack.fftn(recvbuf, axes=(1,2))
-        #self.data = recvbuf
         
-        self.shape = self.data.shape
-        self.length = (self.length[0] / self.nproc, self.length[1] * self.nproc, self.length[2])
-
     def rev_np(self):
         """kspace to xspace
         
@@ -404,22 +422,24 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.data = fpack.ifftn(self.data, axes=(1,2))
 
         # Transpose
-        sy = self.shape[1] / self.nproc
-        sendbuf = []
-        for i in xrange(self.nproc):
-            sendbuf.append(self.data[:, i * sy:(i + 1) * sy, :])
-            
-        sendbuf = na.array(sendbuf)
-        recvbuf = na.zeros_like(sendbuf)
-        
-        self.comm.Alltoall([sendbuf,MPI.COMPLEX], [recvbuf,MPI.COMPLEX])
-        recvbuf = na.concatenate(recvbuf, axis=0)
-        
+        recvbuf = self.communicate('reverse')
+
         # z fft
         self.data = fpack.ifftn(recvbuf, axes=(0,))
 
-        self.shape = self.data.shape
-        self.length = (self.length[0] * self.nproc, self.length[1] / self.nproc, self.length[2])
+class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierShearRepresentation):
+    def __init__(self, sd, shape, length, dtype='complex128', method='numpy',
+                 dealiasing='2/3'):
+        FourierShearRepresentation.__init__(self, sd, shape, length, **kwargs)
+        ParallelFourierRepresentation.__init__(self, sd, shape, length, **kwargs)
+        
+    def forward(self):
+        pass
+
+    def backward(self):
+        pass
+
+    
 
 class SphericalHarmonicRepresentation(FourierRepresentation):
     """Dedalus should eventually support spherical and cylindrical geometries.
