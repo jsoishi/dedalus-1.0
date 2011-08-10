@@ -149,31 +149,55 @@ def print_energy(data, it):
     print "k energy: %10.5e" % (0.5* e2.sum())
     print "x energy: %10.5e" % (0.5*energy.sum()/energy.size)
 
+def compute_en_spec(data, field, normalization=1.0, averaging=None):
+    """Compute power spectrum (helper function for analysis tasks).
+
+    Inputs:
+        fc               (field name, component) tuple 
+        normalization    Power in each mode is multiplied by normalization
+        averaging        None     : no averaging (default)
+                         'all'    : divide power in each bin by number of modes 
+                                    included in that bin
+                         'nonzero': like 'all', but count only nonzero modes
+
+    Returns:
+        k                centers of k-bins
+        spec             Power spectrum of f
+    """
+    f = data[field]
+    power = na.zeros(f[0].data.shape)
+    for i in xrange(f.ncomp):
+        power += 0.5 * na.abs(f[i]['kspace']) ** 2
+    power *= normalization
+
+    # Construct bins by wavevector magnitude (evenly spaced)
+    kmag = na.sqrt(f[0].k2())
+    k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
+    
+    kbottom = k - k[1] / 2.
+    ktop = k + k[1] / 2.
+    spec = na.zeros_like(k)
+        
+    nonzero = (power > 0)
+    for i in xrange(k.size):
+        kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
+        spec[i] = (power[kshell]).sum()
+        if averaging == 'nonzero':
+            spec[i] /= (kshell & nonzero).sum()
+        elif averaging == 'all':
+            spec[i] /= kshell.sum()
+
+    return k, spec
+
 @AnalysisSet.register_task
 def en_spec(data, it, flist=['u']):
     """Record power spectrum of specified fields."""
-    
     N = len(flist)
     fig = P.figure(2, figsize=(8 * N, 8))
     
     for i,f in enumerate(flist):
-        fx = data[f]['x']
-        
-        # Calculate power in each mode
-        power = na.zeros(fx.data.shape)
-        for j in xrange(data[f].ncomp):
-            power += 0.5 * na.abs(data[f][j]['kspace']) ** 2
+        k, spectrum = compute_en_spec(data, f)
 
-        # Construct bins by wavevector magnitude
-        kmag = na.sqrt(fx.k2())
-        k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
-        kbottom = k - k[1] / 2.
-        ktop = k + k[1] / 2.
-        spectrum = na.zeros_like(k)
-        
-        for j in xrange(k.size):
-            spectrum[j] = (power[(kmag >= kbottom[j]) & (kmag < ktop[j])]).sum()
-    
         # Plotting, skip if all modes are zero
         if spectrum[1:].nonzero()[0].size == 0:
             return
@@ -187,14 +211,58 @@ def en_spec(data, it, flist=['u']):
         ax.set_ylabel(r"$E(k)$")
         ax.set_title('%s Power, time = %5.2f' %(f, data.time))
 
-        
     # Add timestamp
     #tstr = 't = %5.2f' % data.time
-    #P.text(-0.3,1.,tstr, transform=P.gca().transAxes, size=24, color='black')
+    #P.text(-0.3,1.,tstr, transform=P.gca().transAxes,size=24,color='black')
+       
+    if not os.path.exists('frames'):
+        os.mkdir('frames')
+    outfile = "frames/enspec_%s_%04i.png" %(f,it)
+    P.savefig(outfile)
+    P.clf()
+
+@AnalysisSet.register_task
+def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', output_columns=True):
+    """Compare power spectrum of two fields. Defaults for baryon
+
+    Inputs:
+        data            Data object
+        it              Iteration number
+        f1, f2          Fields to compare
+        comparison      'ratio'      : use P(f1)/P(f2) (default)
+                        'difference' : use P(f1) - P(f2) 
+        output_columns  if True, output data as columns in a file
+
+    """
+    k, spec_f1 = compute_en_spec(data, f1)
+    k, spec_f2 = compute_en_spec(data, f2)
 
     if not os.path.exists('frames'):
         os.mkdir('frames')
-    outfile = "frames/enspec_%04i.png" %it
+
+    if output_columns:
+        outfile = open('frames/spec_data_%s_%s_%04i.txt'%(f1,f2,it), 'w')
+        for ak, s1, s2 in zip(k, spec_f1, spec_f2):
+            outfile.write('%08f\t%08e\t%08e\n'%(ak, s1, s2))
+        outfile.close()
+
+    fig = P.figure(figsize=(8,6))
+    
+    spec_f2[spec_f2==0] = 1.
+
+    if comparison == 'ratio':
+        spec_compare = spec_f1/spec_f2
+        P.title('Comparison of %s and %s power, t = %5.2f' %(f1, f2, data.time))
+        P.ylabel(r"P(%s)/P(%s)" %(f1, f2))
+    elif comparison == 'difference':
+        spec_compare = spec_f1 - spec_f2
+        P.title('Comparison of %s and %s power, t = %5.2f' %(f1, f2, data.time))
+        P.ylabel(r"$P(%s) - P(%s)$" %(f1, f2))
+        
+    P.xlabel(r"$k$")
+    P.loglog(k[1:], spec_compare[1:], 'o-')
+    
+    outfile = "frames/cmpspec_%s_%s_%04i.png" %(f1, f2, it)
     P.savefig(outfile)
     P.clf()
     
