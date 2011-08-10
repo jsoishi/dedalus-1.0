@@ -3,3 +3,6 @@ from .metrics import \
 
 from .restart import \
     restart
+
+from .parallelism import \
+    setup_parallel_objs
