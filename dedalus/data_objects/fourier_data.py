@@ -156,8 +156,9 @@ class FourierRepresentation(Representation):
             if self.ndim == 2:
                 from dealias_cy_2d import dealias_23
             elif self.ndim == 3:
-                from dealias_cy_3d import dealias_23                
-            self.dealias = self.dealias_23_cy
+                from dealias_cy_3d import dealias_23 
+            self._cython_dealias_function = dealias_23
+            self.dealias = self.dealias_23_cython
         elif dealiasing == '2/3 spherical':
             self.dealias = self.dealias_spherical_23
         else:
@@ -176,13 +177,13 @@ class FourierRepresentation(Representation):
         self['kspace'] # Dummy call to switch spaces
         self.data[dmask] = 0.
         
-    def dealias_23_cython_2d(self):
+    def dealias_23_cython(self):
         """Orszag 2/3 dealiasing rule implemented in cython."""
         
         if self.ndim == 2:
-            dealias_23(self.data, self.k['x'], self.k['y'], self.kny)
+            self._cython_dealias_function(self.data, self.k['x'], self.k['y'], self.kny)
         elif self.ndim == 3:
-            dealias_23(self.data, self.k['x'], self.k['y'], self.k['z'], self.kny)
+            self._cython_dealias_function(self.data, self.k['x'], self.k['y'], self.k['z'], self.kny)
 
     def dealias_wrap(self):
         """Test function for dealias speed testing"""

@@ -217,7 +217,7 @@ def en_spec(data, it, flist=['u']):
        
     if not os.path.exists('frames'):
         os.mkdir('frames')
-    outfile = "frames/enspec_%s_%04i.png" %(f,it)
+    outfile = "frames/enspec_%04i.png" %it
     P.savefig(outfile)
     P.clf()
 
