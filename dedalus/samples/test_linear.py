@@ -37,33 +37,37 @@ else:
 shape = (10,10,10)
 RHS = LinearCollisionlessCosmology(shape, FourierRepresentation)
 data = RHS.create_fields(0.)
+
+H0 = 7.185e-5 # 70.3 km/s/Mpc in Myr^-1
+a_i = RHS.aux_eqns['a'].value # initial scale factor
+t0 = (2./3.)/H0 # present age of E-dS universe
+t_ini = (a_i**(3./2.)) * t0 # time at which a = a_i (in Einstein-de Sitter)
+
 RHS.parameters['Omega_r'] = 8.4e-5
 RHS.parameters['Omega_m'] = 0.276
 RHS.parameters['Omega_l'] = 0.724
-RHS.parameters['H0'] = 7.185e-5 # 70.3 km/s/Mpc in Myr
+RHS.parameters['H0'] = H0
 
 spec_delta, spec_u = cosmo_spectra(data, normfname)
 collisionless_cosmo_fields(data['delta'], data['u'], spec_delta, spec_u)
 
+dt = 5. # time in Myr
 ti = RK4simplevisc(RHS)
-ti.stop_time(1000)
+ti.stop_time(500)
 ti.set_nsnap(100)
 ti.set_dtsnap(1000)
-dt = 1 # time in Myr
 
-outfile = open('growth.dat','w')
+an = AnalysisSet(data, ti)
 
-delta_init = na.zeros_like(data['delta']['kspace'])
-ti.advance(data, dt) 
-# May need to advance more for the decaying mode to vanish completely
-delta_init[:] = data['delta']['kspace']
+an.add("field_snap", 20)
+an.add("compare_power", 20, {'f1':'delta', 'f2':'u'})
+
+i=0
+an.run()
 while ti.ok:
+    Dplus = ((data.time + t_ini)/t_ini) ** (2./3.)
+    print 'step: ', i, ' a = ', RHS.aux_eqns['a'].value
     ti.advance(data, dt)
-    delta = data['delta']['kspace'][1,1,1].real
-    outfile.write("%10.5e\t%10.5e\t%10.5e\n" %(ti.time, ti.RHS.aux_eqns['a'].value, delta))
-outfile.close()
+    i = i + 1
+    an.run()    
 
-delta_final = data['delta']['kspace'] 
-#print delta_final/delta_init
-#Should be a single real number for all modes, assuming the decaying
-#solution is negligible in delta_init
