@@ -81,7 +81,7 @@ ti.set_dtsnap(10000)
 
 an = AnalysisSet(data, ti)
 an.add("field_snap", 10)
-an.add("en_spec", 100, {'flist':['u_c','u_b']})
+#an.add("en_spec", 100, {'flist':['u_c','u_b']})
 an.add("compare_power", 10)
 i=0
 an.run()
