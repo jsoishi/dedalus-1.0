@@ -264,12 +264,14 @@ def collisionless_cosmo_fields(delta, u, spec_delta, spec_u, mean=0., stdev=1.):
     hermitianize.enforce_hermitian(delta['kspace'])
     delta.zero_nyquist()
     delta['kspace'][0,0,0] = 0.
+    delta.dealias()
 
     for i in xrange(3):
         u[i]['kspace'] = rand * spec_u[i]
         hermitianize.enforce_hermitian(u[i]['kspace'])
         u[i].zero_nyquist()
         u[i]['kspace'][0,0,0] = 0
+        u[i].dealias()
         
     return rand
 
@@ -283,12 +285,14 @@ def cosmo_fields(delta_c, u_c, delta_b, u_b, spec_delta_c, spec_u_c, spec_delta_
     hermitianize.enforce_hermitian(delta_b['kspace'])
     delta_b.zero_nyquist()
     delta_b['kspace'][0,0,0] = 0.
+    delta_b.dealias()
 
     for i in xrange(3):
         u_b[i]['kspace'] = rand * spec_u_b[i]
         hermitianize.enforce_hermitian(u_b[i]['kspace'])
         u_b[i].zero_nyquist()
         u_b[i]['kspace'][0,0,0] = 0
+        u_b[i].dealias()
 
 def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, baryons=False):
     """generate spectra for CDM overdensity and velocity from linger++
