@@ -78,7 +78,7 @@ an.add("field_snap", plot_cadence, {'plot_slice': xzslice, 'saveas': 'xz_snap'})
 an.add("field_snap", plot_cadence, {'plot_slice': yzslice, 'saveas': 'yz_snap'})
 an.add("k_plot", plot_cadence)
 an.add("en_spec", plot_cadence, {'flist': ['u', 'B']})
-an.add("phase_amp", plot_cadence, {'fclist': [('B', 'x'), ('B', 'y'), ('B', 'z')],
+an.add("phase_track", plot_cadence, {'flist': ['u', 'B'],
                                    'klist': [(2, 0, 0), (4, 0, 0), (6, 0, 0)]})
 
 # Main loop

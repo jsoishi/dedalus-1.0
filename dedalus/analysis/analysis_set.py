@@ -267,14 +267,14 @@ def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', outp
     P.clf()
     
 @AnalysisSet.register_task
-def phase_amp(data, it, fclist=[], klist=[], log=True):
+def mode_track(data, it, flist=[], klist=[], log=True):
     """
-    Plot phase velocity and amplification of specified modes.
+    Plot amplification of specified modes.
     
     Inputs:
         data        Data object
         it          Iteration number
-        fclist      List of field/component tuples to track: [('u', 'x'), ('phi', 0), ...]
+        flist       List of fields to track: ['u', ...]
         klist       List of wavevectors given as tuples: [(1,0,0), (1,1,1), ...]
     
     """
@@ -283,67 +283,51 @@ def phase_amp(data, it, fclist=[], klist=[], log=True):
         # Construct container on first pass
         data._save_modes = {}
 
-        for f,c in fclist:
-            for k in klist:
-                data._save_modes[(f,c,k)] = [data[f][c]['kspace'][k[::-1]]]
+        for f in flist:
+            for i in xrange(data[f].ncomp):
+                for k in klist:
+                    data._save_modes[(f,i,k)] = [data[f][i]['kspace'][k[::-1]]]
         data._save_modes['time'] = [data.time]
         return
         
     # Save components and time
-    for f,c in fclist:
-        for k in klist:
-            data._save_modes[(f,c,k)].append(data[f][c]['kspace'][k[::-1]])
+    for f in flist:
+        for i in xrange(data[f].ncomp):
+            for k in klist:
+                data._save_modes[(f,i,k)].append(data[f][i]['kspace'][k[::-1]])
     data._save_modes['time'].append(data.time)
     
-    # Plotting setup
-    nvars = len(fclist)
-    fig, axs = P.subplots(2, nvars, num=3, figsize=(8 * nvars, 6 * 2)) 
+    # Determine image grid size
+    nrow = len(flist)
+    ncol = na.max([data[f].ncomp for f in flist])
+    fig, axs = P.subplots(nrow, ncol, num=3, figsize=(8 * ncol, 6 * nrow)) 
 
     # Plot field components
     time = na.array(data._save_modes['time'])
-    
-    I = 0
-    for f,c in fclist:
-        for k in klist:
-            plot_array = na.array(data._save_modes[(f,c,k)])
-            power = 0.5 * na.abs(plot_array) ** 2
-            
-            # Phase evolution at fixed point is propto exp(-omega * t)
-            dtheta = -na.diff(na.angle(plot_array))
-            
-            # Correct for pi boundary crossing
-            dtheta[dtheta > na.pi] -= 2 * na.pi
-            dtheta[dtheta < -na.pi] += 2 * na.pi
-            
-            # Calculate phase velocity
-            omega = dtheta / na.diff(time)
-            phase_velocity = omega / na.linalg.norm(k)
-
-            if log:
-                axs[0, I].semilogy(time, power, '.-', label=str(k))
-            else:
-                axs[0, I].plot(time, power, '.-', label=str(k))   
-                
-            axs[1, I].plot(time[1:], phase_velocity, '.-', label=str(k))
-
-        # Pad and label axes
-        axs[0, I].axis(padrange(axs[0, I].axis(), 0.05))
-        axs[1, I].axis(padrange(axs[1, I].axis(), 0.05))
-                        
-        if I == 0:
-            axs[0, I].set_ylabel('power')
-            axs[1, I].set_ylabel('phase velocity')
-            axs[1, I].set_xlabel('time')
         
-        axs[0, I].legend()
-        axs[1, I].legend()
-        axs[0, I].set_title(f + c)
+    for j,f in enumerate(flist):
+        for i in xrange(data[f].ncomp):
+            for k in klist:
+                plot_array = na.array(data._save_modes[(f,i,k)])
+                power = 0.5 * na.abs(plot_array) ** 2
+                
+                if log:
+                    axs[j, i].semilogy(time, power, '.-', label=str(k))
+                else:
+                    axs[j, i].plot(time, power, '.-', label=str(k))   
+    
+            # Pad and label axes
+            axs[j, i].axis(padrange(axs[j, i].axis(), 0.05))
+            axs[j, i].legend()
+            axs[j, i].set_title(f + str(i))
+                            
 
-        I += 1
+    axs[-1, 0].set_ylabel('power')
+    axs[-1, 0].set_xlabel('time')
 
     if not os.path.exists('frames'):
         os.mkdir('frames')
-    outfile = "frames/phase_amp.png"
+    outfile = "frames/phase_track.png"
     fig.savefig(outfile)
     fig.clf()
     

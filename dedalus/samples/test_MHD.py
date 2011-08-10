@@ -44,7 +44,7 @@ ti.set_dtsnap(1e6)
 
 an = AnalysisSet(data, ti)
 an.add("field_snap", 10)
-an.add("phase_amp", 10, {'fclist': [('u', 'z'), ('B', 'z')], 'klist': [k]})
+an.add("mode_track", 10, {'flist': ['u', 'B'], 'klist': [k]})
 an.add("en_spec", 10)
 
 # Main loop
