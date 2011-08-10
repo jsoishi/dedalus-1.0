@@ -120,18 +120,18 @@ class FourierRepresentation(Representation):
 
     def fwd_fftw(self):
         self.fplan()
-        self.data /= np.sqrt(self.data.size)
+        self.data /= na.sqrt(self.data.size)
 
     def rev_fftw(self):
         self.rplan()
-        self.data /= np.sqrt(self.data.size)
+        self.data /= na.sqrt(self.data.size)
         self.data.imag = 0.
 
     def fwd_np(self):
-        self.data = fpack.fftn(self.data / np.sqrt(self.data.size))
+        self.data = fpack.fftn(self.data / na.sqrt(self.data.size))
 
     def rev_np(self):
-        self.data = fpack.ifftn(self.data) * np.sqrt(self.data.size)
+        self.data = fpack.ifftn(self.data) * na.sqrt(self.data.size)
         self.data.imag = 0
 
     def forward(self):
@@ -280,17 +280,17 @@ class FourierShearRepresentation(FourierRepresentation):
         self.dealias()
         
         # Do x fft
-        self.data = self.ifft(self.data, axis=-1) * np.sqrt(self.shape[-1])
+        self.data = self.ifft(self.data, axis=-1) * na.sqrt(self.shape[-1])
         
         # Phase shift
         self.data *= na.exp(-1j * self.k['y'] * x * deltay)
         
         # Do y fft
-        self.data = self.ifft(self.data, axis=-2) * np.sqrt(self.shape[-2])
+        self.data = self.ifft(self.data, axis=-2) * na.sqrt(self.shape[-2])
         
         # Do z fft
         if self.ndim == 3:
-            self.data = self.ifft(self.data, axis=0) * np.sqrt(self.shape[0])
+            self.data = self.ifft(self.data, axis=0) * na.sqrt(self.shape[0])
         
         self._curr_space = 'xspace'
 
@@ -303,16 +303,16 @@ class FourierShearRepresentation(FourierRepresentation):
 
         # Do z fft
         if self.ndim == 3:
-            self.data = self.fft(self.data / np.sqrt(self.shape[0]), axis=0)
+            self.data = self.fft(self.data / na.sqrt(self.shape[0]), axis=0)
 
         # Do y fft
-        self.data = self.fft(self.data / np.sqrt(self.shape[-2]), axis=-2)
+        self.data = self.fft(self.data / na.sqrt(self.shape[-2]), axis=-2)
 
         # Phase shift
         self.data *= na.exp(1j * self.k['y'] * x * deltay)
         
         # Do x fft
-        self.data = self.fft(self.data / np.sqrt(self.shape[-1]), axis=-1)
+        self.data = self.fft(self.data / na.sqrt(self.shape[-1]), axis=-1)
         
         self._curr_space = 'kspace'
         self.dealias()
