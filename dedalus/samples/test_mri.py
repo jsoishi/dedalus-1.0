@@ -59,6 +59,7 @@ for i in xrange(3):
 
 # Integration parameters
 ti = RK2simple(RHS)
+ti.stop_iter(10)
 ti.stop_time(10.) # set stoptime
 ti.stop_walltime(3600.) # stop after 1 hour
 ti.set_nsnap(1e6)
