@@ -1,5 +1,4 @@
-"""The Main Dedalus data object. This is dynamically created with a
-given representation when the physics class is initialized.
+"""parallel support.
 
 Author: J. S. Oishi <jsoishi@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
@@ -21,20 +20,32 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from .field_object import \
-    create_field_classes
 
-from .state_data import \
-    StateData
+try:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+except:
+    print "Cannot import mpi4py. Parallelism disabled" 
+    comm = None
 
-from .fourier_data import \
-    FourierRepresentation, \
-    FourierShearRepresentation, \
-    ParallelFourierRepresentation, \
-    ParallelFourierShearRepresentation
 
-from .hermitianize import \
-    enforce_hermitian
+def setup_parallel_objs(global_shape, global_len):
+    """Helper function for parallel runs. Given a global shape and
+    length, it returns a local shape and length.
+
+    inputs
+    ------
+    global_shape (tuple of int)
+    global_length (tuple of reals)
+
+    returns
+    -------
+    local_shape, local_len (tuple of ints, tuple of reals)
+
+    """
     
-from .aux_equation import \
-    AuxEquation
+    local_shape = (global_shape[0]/comm.Get_size(),) + global_shape[1:]
+    
+    local_len = (global_len[0]/comm.Get_size(),) + global_len[1:]
+
+    return local_shape, local_len
