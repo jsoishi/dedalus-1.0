@@ -327,7 +327,7 @@ def mode_track(data, it, flist=[], klist=[], log=True):
 
     if not os.path.exists('frames'):
         os.mkdir('frames')
-    outfile = "frames/phase_track.png"
+    outfile = "frames/mode_track.png"
     fig.savefig(outfile)
     fig.clf()
     
