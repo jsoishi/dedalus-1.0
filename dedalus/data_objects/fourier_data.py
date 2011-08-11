@@ -322,6 +322,8 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.comm = comm
         if not comm:
             raise ValueError("mpi4py cannot be loaded. A parallel run cannot be initialized.")
+        if len(shape) != 3:
+            raise ValueError("Parallel runs must be 3D")
 
         self.nproc = comm.Get_size()
         self.myproc = comm.Get_rank()
@@ -333,12 +335,12 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self._setup_k()
         self._shape = {'kspace': self.data.shape,
                        'xspace': [self.data.shape[0]*self.nproc,
-                                  self.data.shape[1]/self.nproc,
-                                  self.data.shape[2]]}
+                                  self.data.shape[1],
+                                  self.data.shape[2]/self.nproc]}
         self._length = {'kspace': [self.length[0], self.length[1], self.length[2]],
                        'xspace': [self.length[0]*self.nproc,
-                                  self.length[1]/self.nproc,
-                                  self.length[2]]}
+                                  self.length[1],
+                                  self.length[2]/self.nproc]}
 
     def __setitem__(self, space, data):
         """this needs to ensure the pointer for the field's data
@@ -380,17 +382,17 @@ class ParallelFourierRepresentation(FourierRepresentation):
             sz = self.shape[0] / self.nproc
             for i in xrange(self.nproc):
                 sendbuf.append(self.data[i * sz:(i + 1) * sz, :, :])
-            concat_axis = 1
+            concat_axis = 2
             space = 'kspace'
-        elif direction == 'reverse':
-            sy = self.shape[1] / self.nproc
+        elif direction == 'backward':
+            sx = self.shape[2] / self.nproc
             for i in xrange(self.nproc):
-                sendbuf.append(self.data[:, i * sy:(i + 1) * sy, :])
+                sendbuf.append(self.data[:, :, i * sx:(i + 1) * sx])
             concat_axis = 0
             space = 'xspace'
         else:
-            raise ValueError("Communcation direction must be forward or reverse")
-
+            raise ValueError("Communcation direction must be forward or backward")
+        
         sendbuf = na.array(sendbuf)
         recvbuf = na.zeros_like(sendbuf)
         
@@ -422,7 +424,7 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.data = fpack.ifftn(self.data, axes=(1,2))
 
         # Transpose
-        recvbuf = self.communicate('reverse')
+        recvbuf = self.communicate('backward')
 
         # z fft
         self.data = fpack.ifftn(recvbuf, axes=(0,))
@@ -430,16 +432,57 @@ class ParallelFourierRepresentation(FourierRepresentation):
 class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierShearRepresentation):
     def __init__(self, sd, shape, length, dtype='complex128', method='numpy',
                  dealiasing='2/3'):
-        FourierShearRepresentation.__init__(self, sd, shape, length, **kwargs)
-        ParallelFourierRepresentation.__init__(self, sd, shape, length, **kwargs)
+        ParallelFourierRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
+        FourierShearRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
+        self.nproc = comm.Get_size()
+        self.myproc = comm.Get_rank()
+        self.offset = na.array([0, 0, self.myproc * shape[2]])
+
         
     def forward(self):
-        pass
+        """FFT method to go from xspace to kspace."""
+        
+        deltay = self.shear_rate * self.sd.time
+        x = (na.linspace(0., self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False) +
+             na.zeros(self._shape['kspace']))
+
+        # Do y-z fft
+        
+        self.data = fpack.fftn(self.data, axes=(0,1))
+
+        # communicate
+        recvbuf = self.communicate('forward')
+
+        # Phase shift
+        recvbuf *= na.exp(1j * self.k['y'] * x * deltay)
+        
+        # Do x fft
+        self.data = fpack.fft(recvbuf, axis=2)
+        
+        self._curr_space = 'kspace'
+        self.dealias()
 
     def backward(self):
-        pass
+        """IFFT method to go from kspace to xspace."""
+        
+        deltay = self.shear_rate * self.sd.time 
+        x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
+        
+        self.dealias()
+        
+        # Do x fft
+        self.data = fpack.ifft(self.data, axis=2)
+        
+        # Phase shift
+        self.data *= na.exp(-1j * self.k['y'] * x * deltay)
 
-    
+        # communicate
+        recvbuf = self.communicate('backward')
+        
+        # Do y-z fft
+        self.data = fpack.ifftn(recvbuf, axes=(0,1))
+
+        self._curr_space = 'xspace'
 
 class SphericalHarmonicRepresentation(FourierRepresentation):
     """Dedalus should eventually support spherical and cylindrical geometries.
