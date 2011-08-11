@@ -514,7 +514,7 @@ class MHD(Hydro):
 
         # Setup temporary data container
         sampledata = data['u']['x']
-        tmp = na.zeros_like(sampledata.data)
+        tmp = data.create_tmp_data('kspace')
         k2 = sampledata.k2(no_zero=True)
 
         # Construct k * ugradu - k * BgradB / (4 pi rho0)
@@ -581,7 +581,7 @@ class ShearMHD(MHD):
 
         # Setup temporary data container
         sampledata = data['u']['x']
-        tmp = na.zeros_like(sampledata.data)
+        tmp = data.create_tmp_data('kspace')
         k2 = sampledata.k2(no_zero=True)
 
         # Construct k * ugradu - k * BgradB / (4 pi rho0)

@@ -28,7 +28,9 @@ from dedalus.analysis.api import \
 
 from dedalus.data_objects.api import \
     FourierRepresentation, \
-    FourierShearRepresentation
+    FourierShearRepresentation, \
+    ParallelFourierRepresentation, \
+    ParallelFourierShearRepresentation
 
 from dedalus.init_cond.api import \
     taylor_green, \
@@ -63,4 +65,6 @@ from dedalus.time_stepping.api import \
     RK4simplevisc
 
 from dedalus.utils.api import \
-    restart
+    restart, \
+    setup_parallel_objs
+
