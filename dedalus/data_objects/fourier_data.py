@@ -357,6 +357,8 @@ class ParallelFourierRepresentation(FourierRepresentation):
                        'xspace': [self.length[0]*self.nproc,
                                   self.length[1],
                                   self.length[2]/self.nproc]}
+        self.sendbuf = na.empty((self.nproc,) + (self._shape['kspace'][0],) + tuple(self._shape['xspace'][1:]))
+        self.recvbuf = na.empty_like(self.sendbuf)
 
     def __setitem__(self, space, data):
         """this needs to ensure the pointer for the field's data
@@ -393,31 +395,26 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.k['z'] = self.k['z'][self.myproc*self.shape[0]:(self.myproc+1)*self.shape[0]]
 
     def communicate(self, direction):
-        sendbuf = []        
         if direction == 'forward':
             sz = self.shape[0] / self.nproc
             for i in xrange(self.nproc):
-                sendbuf.append(self.data[i * sz:(i + 1) * sz, :, :])
+                self.sendbuf[i] = self.data[i * sz:(i + 1) * sz, :, :]
             concat_axis = 2
             space = 'kspace'
         elif direction == 'backward':
             sx = self.shape[2] / self.nproc
             for i in xrange(self.nproc):
-                sendbuf.append(self.data[:, :, i * sx:(i + 1) * sx])
+                self.sendbuf[i] = self.data[:, :, i * sx:(i + 1) * sx]
             concat_axis = 0
             space = 'xspace'
         else:
             raise ValueError("Communcation direction must be forward or backward")
         
-        sendbuf = na.array(sendbuf)
-        recvbuf = na.zeros_like(sendbuf)
-        
-        self.comm.Alltoall([sendbuf,MPI.COMPLEX], [recvbuf,MPI.COMPLEX])
-        recvbuf = na.concatenate(recvbuf, axis=concat_axis)
+        self.comm.Alltoall([self.sendbuf,MPI.COMPLEX], [self.recvbuf,MPI.COMPLEX])
 
         self.shape = self._shape[space]
         self.length = self._length[space]
-        return recvbuf
+        return na.concatenate(self.recvbuf, axis=concat_axis)
 
     def fwd_np(self):
         """xspace to kspace"""
@@ -447,7 +444,7 @@ class ParallelFourierRepresentation(FourierRepresentation):
 
 class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierShearRepresentation):
     def __init__(self, sd, shape, length, dtype='complex128', method='numpy',
-                 dealiasing='2/3'):
+                 dealiasing='2/3 cython'):
         ParallelFourierRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
         FourierShearRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
         self.nproc = comm.Get_size()
