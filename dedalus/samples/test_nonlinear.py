@@ -1,6 +1,6 @@
 """Test of cosmology with only CDM fluid
 
-Authors: G. Peairs <gpeairs@stanford.edeu>
+Authors: G. Peairs <gpeairs@stanford.edu>
 Affiliation: KIPAC/SLAC/Stanford
 License:
   Copyright (C) 2011 J. S. Oishi, G. Peairs.  All Rights Reserved.

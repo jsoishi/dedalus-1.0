@@ -231,23 +231,23 @@ def read_linger_transfer_data(fname, ak_trans, Ttot, Tdc, Tdb, dTvc, dTvb, Ttot0
         Ttot0.append(float(values[6]))
     infile.close()
 
-def sig2_integrand(Ttot0, ak, nspect):
+def sig2_integrand(Ttot0, ak, nspect, h):
     """calculate the integrand in the expression for the mean square
     of the overdensity field, smoothed with a top-hat window function W
     at 8 Mpc.
 
     """
-    R = 8.
+    R = 8.*h
     x = ak*R
     w = 3. * (na.sin(x) - x*na.cos(x))/(x*x*x)
     Pk = (ak**nspect) * (Ttot0*Ttot0)
     return (w*w) * Pk * (ak*ak)
 
-def get_normalization(Ttot0, ak, sigma_8, nspect):
+def get_normalization(Ttot0, ak, sigma_8, nspect, h):
     """calculate the normalization for delta_tot using sigma_8
 
     """
-    integrand = sig2_integrand(Ttot0, ak, nspect)
+    integrand = sig2_integrand(Ttot0, ak, nspect, h)
     sig2 = 4.*na.pi*simps(integrand, ak)
     ampl = sigma_8/na.sqrt(sig2)
     return ampl
@@ -294,7 +294,7 @@ def cosmo_fields(delta_c, u_c, delta_b, u_b, spec_delta_c, spec_u_c, spec_delta_
         u_b[i]['kspace'][0,0,0] = 0
         u_b[i].dealias()
 
-def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, baryons=False):
+def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, h=.703, baryons=False, f_nl=None):
     """generate spectra for CDM overdensity and velocity from linger++
     output. Assumes 3-dimensional fields.
 
@@ -303,7 +303,6 @@ def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, baryons=False):
 
     """
     
-    h = .703 # Hubble constant = 100 * h km/s/Mpc -- should come from input
     Myr_per_Mpc = 0.3063915366 # 1 c/Mpc = 0.306... 1/Myr
 
     ak = [] # the k-values that go with transfer-functions 
@@ -320,17 +319,13 @@ def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, baryons=False):
     thetac = -na.array(dTvc) * (h/299792.458) # linger multiplies by c/h
     Ttot0 = na.array(Ttot0)/ak**2
 
-    # ... normalize
-    ampl = get_normalization(Ttot0, ak, sigma_8, nspect)
-    deltacp = deltacp*ampl
-    thetac = thetac*ampl*Myr_per_Mpc
-
     # ... get sample data object for shape and k-values
     sampledata = data.fields.values()[0][0]
     shape = sampledata.shape
 
     nk = shape[0]
-    kk = na.sqrt(sampledata.k2(no_zero=True))
+    k2 = sampledata.k2(no_zero=True)
+    kk = na.sqrt(k2)
     maxkk = kk[nk/2, nk/2, nk/2]
     maxkinput = max(ak)
     if maxkk > maxkinput:
@@ -338,11 +333,33 @@ def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, baryons=False):
         # ... any |k| larger than the max input k is replaced by max input k
         kk[:,:,:] = na.minimum(kk, maxkinput*na.ones_like(kk))
 
-    # ... calculate spectra
-    # delta = -i * delta_transfer * |k|^(n_s/2)
+    # ... normalize
+    ampl = get_normalization(Ttot0, ak, sigma_8, nspect, h)
     f_deltacp = interp1d(ak, deltacp, kind='cubic')
-    spec_delta = kk**(nspect/2.)*f_deltacp(kk)
-    
+    # ... calculate spectra
+    if f_nl is not None:
+        """ Primordial non-Gaussianity:
+        phi(k) = -3/2 H^2/c^2 Omega_m a^2 A k^(n_s/2)/k^2
+        phi_NG(x) = phi(x) + f_NL(phi)
+        delta(k) = (-3/2 H^2/c^2 Omega_m a^2)^-1 * k^2 phi_NG(k) T_delta(k)
+        """
+        Omega_m = 0.276 # not necessarily...
+        a = 0.002
+        H = 0.452997
+        c = Myr_per_Mpc
+        to_phi = (-3/2.) * H*H / c*c * Omega_m * a*a
+        phi = FourierRepresentation(None, kk.shape, sampledata.length, dtype='float128')
+        phi['kspace'] = to_phi * ampl * kk**(nspect/2.)/k2
+        phi_ng['xspace'] = phi['xspace'] + f_nl(phi['xspace'])
+        f_deltacp = interp1d(ak, deltacp, kind='cubic')
+        spec_delta = k2 * phi_ng['kspace'] * f_deltacp(kk) / to_phi
+    else:
+        # ... delta = -i * delta_transfer * |k|^(n_s/2)
+        spec_delta = kk**(nspect/2.)*f_deltacp(kk)*ampl
+
+    thetac = thetac*ampl*Myr_per_Mpc
+
+    # ... calculate spectra    
     # u_j = -i * k_j/|k| * theta * |k|^(n_s/2 - 1)
     f_thetac = interp1d(ak, thetac, kind='cubic')
     spec_vel = -1j*kk**(nspect/2. -1.)*f_thetac(kk) # isotropic
