@@ -48,7 +48,7 @@ RHS.parameters['Omega_m'] = 0.276
 RHS.parameters['Omega_l'] = 0.724
 RHS.parameters['H0'] = H0
 
-spec_delta, spec_u = cosmo_spectra(data, normfname)
+spec_delta, spec_u = cosmo_spectra(data, normfname, a_i)
 collisionless_cosmo_fields(data['delta'], data['u'], spec_delta, spec_u)
 
 dt = 5. # time in Myr
@@ -64,9 +64,14 @@ an.add("compare_power", 20, {'f1':'delta', 'f2':'u'})
 
 i=0
 an.run()
+
+outfile = open('growth.dat','w')
+
 while ti.ok:
     Dplus = ((data.time + t_ini)/t_ini) ** (2./3.)
     print 'step: ', i, ' a = ', RHS.aux_eqns['a'].value
     ti.advance(data, dt)
+    d = data['delta']['kspace'][1,1,1]
+    outfile.write('%08f\t%08e\t%08f\n'%(RHS.aux_eqns['a'].value, d, Dplus))
     i = i + 1
     an.run()    

@@ -262,15 +262,11 @@ def collisionless_cosmo_fields(delta, u, spec_delta, spec_u, mean=0., stdev=1.):
     rand = (na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape))/na.sqrt(2)
     delta['kspace'] = spec_delta * rand
     hermitianize.enforce_hermitian(delta['kspace'])
-    delta.zero_nyquist()
-    delta['kspace'][0,0,0] = 0.
     delta.dealias()
 
     for i in xrange(3):
         u[i]['kspace'] = rand * spec_u[i]
         hermitianize.enforce_hermitian(u[i]['kspace'])
-        u[i].zero_nyquist()
-        u[i]['kspace'][0,0,0] = 0
         u[i].dealias()
         
     return rand
@@ -283,18 +279,14 @@ def cosmo_fields(delta_c, u_c, delta_b, u_b, spec_delta_c, spec_u_c, spec_delta_
     rand = collisionless_cosmo_fields(delta_c, u_c, spec_delta_c, spec_u_c)
     delta_b['kspace'] = spec_delta_b * rand
     hermitianize.enforce_hermitian(delta_b['kspace'])
-    delta_b.zero_nyquist()
-    delta_b['kspace'][0,0,0] = 0.
     delta_b.dealias()
 
     for i in xrange(3):
         u_b[i]['kspace'] = rand * spec_u_b[i]
         hermitianize.enforce_hermitian(u_b[i]['kspace'])
-        u_b[i].zero_nyquist()
-        u_b[i]['kspace'][0,0,0] = 0
         u_b[i].dealias()
 
-def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, h=.703, baryons=False, f_nl=None):
+def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, baryons=False, f_nl=None):
     """generate spectra for CDM overdensity and velocity from linger++
     output. Assumes 3-dimensional fields.
 
@@ -324,9 +316,11 @@ def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, h=.703, baryons
     shape = sampledata.shape
 
     nk = shape[0]
-    k2 = sampledata.k2(no_zero=True)
+    k2 = sampledata.k2()
+    kzero = (k2==0)
+    k2[kzero] = 1. # may cause problems for non-gaussian IC...
     kk = na.sqrt(k2)
-    maxkk = kk[nk/2, nk/2, nk/2]
+    maxkk = na.sqrt(3*na.max(sampledata.kny)**2)
     maxkinput = max(ak)
     if maxkk > maxkinput:
         print 'cannot interpolate: some grid wavenumbers larger than input wavenumbers; ICs for those modes are wrong'
@@ -344,7 +338,6 @@ def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, h=.703, baryons
         delta(k) = (-3/2 H^2/c^2 Omega_m a^2)^-1 * k^2 phi_NG(k) T_delta(k)
         """
         Omega_m = 0.276 # not necessarily...
-        a = 0.002
         H = 0.452997
         c = Myr_per_Mpc
         to_phi = (-3/2.) * H*H / c*c * Omega_m * a*a
@@ -356,14 +349,15 @@ def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, h=.703, baryons
     else:
         # ... delta = -i * delta_transfer * |k|^(n_s/2)
         spec_delta = kk**(nspect/2.)*f_deltacp(kk)*ampl
+    spec_delta[kzero] = 0.
 
-    thetac = thetac*ampl*Myr_per_Mpc
+    thetac = thetac*ampl*Myr_per_Mpc/a # input uses conformal time
 
     # ... calculate spectra    
     # u_j = -i * k_j/|k| * theta * |k|^(n_s/2 - 1)
     f_thetac = interp1d(ak, thetac, kind='cubic')
     spec_vel = -1j*kk**(nspect/2. -1.)*f_thetac(kk) # isotropic
-    spec_vel[0,0,0] = 0.
+    spec_vel[kzero] = 0.
 
     spec_u = [na.zeros_like(spec_vel),]*3
     for i,dim in enumerate(['x','y','z']):
@@ -374,14 +368,15 @@ def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, h=.703, baryons
         thetab = -na.array(dTvb)*(h/299792.458)
 
         deltabp = deltabp*ampl
-        thetab = thetab*ampl*Myr_per_Mpc
+        thetab = thetab*ampl*Myr_per_Mpc/a
         
         f_deltabp = interp1d(ak, deltabp, kind='cubic')
         spec_delta_b = kk**(nspect/2.)*f_deltabp(kk)
+        spec_delta_b[kzero] = 0.
         
         f_thetab = interp1d(ak, thetab, kind='cubic')
         spec_vel_b =  -(1j * kk**(nspect/2. - 1.)*f_thetab(kk))
-        spec_vel_b[0,0,0] = 0.
+        spec_vel_b[kzero] = 0.
         
         spec_u_b = [na.zeros_like(spec_vel_b),]*3
         for i,dim in enumerate(['x','y','z']):

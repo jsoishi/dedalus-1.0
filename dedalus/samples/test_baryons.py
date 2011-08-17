@@ -70,7 +70,7 @@ RHS.parameters['H0'] = H0
 a, cs2 = read_cs2(thermofname)
 RHS.init_cs2(a, cs2)
 
-spec_delta_c, spec_u_c, spec_delta_b, spec_u_b = cosmo_spectra(data, normfname, baryons=True)
+spec_delta_c, spec_u_c, spec_delta_b, spec_u_b = cosmo_spectra(data, normfname, a_i, baryons=True)
 cosmo_fields(data['delta_c'], data['u_c'], data['delta_b'], data['u_b'], spec_delta_c, spec_u_c, spec_delta_b, spec_u_b)
 
 dt = 5. # time in Myr
