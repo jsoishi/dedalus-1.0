@@ -37,7 +37,7 @@ else:
     normfname = sys.argv[1]
 
 shape = (32,32,32)
-L = (1,)*3
+L = (1000,)*3
 RHS = CollisionlessCosmology(shape, FourierRepresentation, length=L)
 data = RHS.create_fields(0.)
 H0 = 7.185e-5 # 70.3 km/s/Mpc in Myr^-1
@@ -50,7 +50,7 @@ RHS.parameters['Omega_m'] = 1.#0.276
 RHS.parameters['Omega_l'] = 0.#0.724
 RHS.parameters['H0'] = H0
 
-spec_delta, spec_u = cosmo_spectra(data, normfname)
+spec_delta, spec_u = cosmo_spectra(data, normfname, a_i)
 collisionless_cosmo_fields(data['delta'], data['u'], spec_delta, spec_u)
 
 dt = 5. # time in Myr
