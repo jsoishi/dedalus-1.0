@@ -34,7 +34,7 @@ if len(sys.argv) != 2:
 else:
     normfname = sys.argv[1]
 
-shape = (10,10,10)
+shape = (16,16,16)
 RHS = LinearCollisionlessCosmology(shape, FourierRepresentation)
 data = RHS.create_fields(0.)
 
@@ -59,19 +59,21 @@ ti.set_dtsnap(1000)
 
 an = AnalysisSet(data, ti)
 
-an.add("field_snap", 20)
+#an.add("field_snap", 20)
 an.add("compare_power", 20, {'f1':'delta', 'f2':'u'})
 
 i=0
 an.run()
 
 outfile = open('growth.dat','w')
-
+a_i = 0.002
+d_i = data['delta']['kspace'][1,1,1]
 while ti.ok:
     Dplus = ((data.time + t_ini)/t_ini) ** (2./3.)
     print 'step: ', i, ' a = ', RHS.aux_eqns['a'].value
     ti.advance(data, dt)
     d = data['delta']['kspace'][1,1,1]
-    outfile.write('%08f\t%08e\t%08f\n'%(RHS.aux_eqns['a'].value, d, Dplus))
+    outfile.write('%08f\t%08e\t%08f\n'%(RHS.aux_eqns['a'].value/a_i, d/d_i, Dplus))
     i = i + 1
     an.run()    
+outfile.close()

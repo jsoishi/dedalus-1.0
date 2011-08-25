@@ -231,24 +231,25 @@ def read_linger_transfer_data(fname, ak_trans, Ttot, Tdc, Tdb, dTvc, dTvb, Ttot0
         Ttot0.append(float(values[6]))
     infile.close()
 
-def sig2_integrand(Ttot0, ak, nspect, h):
+def sig2_integrand(Ttot0, akoh, nspect):
     """calculate the integrand in the expression for the mean square
     of the overdensity field, smoothed with a top-hat window function W
-    at 8 Mpc.
+    at 8 Mpc/h.
 
     """
-    R = 8.*h
-    x = ak*R
+    R = 8.
+    x = akoh*R
     w = 3. * (na.sin(x) - x*na.cos(x))/(x*x*x)
-    Pk = (ak**nspect) * (Ttot0*Ttot0)
-    return (w*w) * Pk * (ak*ak)
+    Pk = (akoh**nspect) * (Ttot0*Ttot0)
+    return (w*w) * Pk * (akoh*akoh)
 
 def get_normalization(Ttot0, ak, sigma_8, nspect, h):
     """calculate the normalization for delta_tot using sigma_8
 
     """
-    integrand = sig2_integrand(Ttot0, ak, nspect, h)
-    sig2 = 4.*na.pi*simps(integrand, ak)
+    akoh = ak/h
+    integrand = sig2_integrand(Ttot0, akoh, nspect)
+    sig2 = 4.*na.pi*simps(integrand, akoh)
     ampl = sigma_8/na.sqrt(sig2)
     return ampl
 
@@ -309,7 +310,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
     ak = na.array(ak) * h
     deltacp = na.array(Tdc)
     thetac = -na.array(dTvc) * (h/299792.458) # linger multiplies by c/h
-    Ttot0 = na.array(Ttot0)/ak**2
+    Ttot0 = na.array(Ttot0)
 
     # ... get sample data object for shape and k-values
     sampledata = data.fields.values()[0][0]
@@ -329,6 +330,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
 
     # ... normalize
     ampl = get_normalization(Ttot0, ak, sigma_8, nspect, h)
+    print ampl
     f_deltacp = interp1d(ak, deltacp, kind='cubic')
     # ... calculate spectra
     if f_nl is not None:
@@ -351,7 +353,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
         spec_delta = kk**(nspect/2.)*f_deltacp(kk)*ampl
     spec_delta[kzero] = 0.
 
-    thetac = thetac*ampl*Myr_per_Mpc/a # input uses conformal time
+    thetac = thetac*ampl*Myr_per_Mpc
 
     # ... calculate spectra    
     # u_j = -i * k_j/|k| * theta * |k|^(n_s/2 - 1)
@@ -368,7 +370,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
         thetab = -na.array(dTvb)*(h/299792.458)
 
         deltabp = deltabp*ampl
-        thetab = thetab*ampl*Myr_per_Mpc/a
+        thetab = thetab*ampl*Myr_per_Mpc
         
         f_deltabp = interp1d(ak, deltabp, kind='cubic')
         spec_delta_b = kk**(nspect/2.)*f_deltabp(kk)
