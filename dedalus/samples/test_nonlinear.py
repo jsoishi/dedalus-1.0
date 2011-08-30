@@ -36,8 +36,8 @@ if len(sys.argv) != 2:
 else:
     normfname = sys.argv[1]
 
-shape = (32,32,32)
-L = (1000,)*3
+shape = (128,)*3
+L = (100,)*3
 RHS = CollisionlessCosmology(shape, FourierRepresentation, length=L)
 data = RHS.create_fields(0.)
 H0 = 7.185e-5 # 70.3 km/s/Mpc in Myr^-1
@@ -53,7 +53,7 @@ RHS.parameters['H0'] = H0
 spec_delta, spec_u = cosmo_spectra(data, normfname, a_i)
 collisionless_cosmo_fields(data['delta'], data['u'], spec_delta, spec_u)
 
-dt = 5. # time in Myr
+dt = 5 # time in Myr
 ti = RK4simplevisc(RHS)
 ti.stop_time(100.*dt)
 ti.set_nsnap(100)
@@ -66,10 +66,15 @@ an.add("compare_power", 20, {'f1':'delta', 'f2':'u'})
 
 i=0
 an.run()
+
+CFL = dt / (2*na.pi/na.max(data['delta'].k['x']))
+
 while ti.ok:
     Dplus = ((data.time + t_ini)/t_ini) ** (2./3.)
     adot = RHS.aux_eqns['a'].RHS(RHS.aux_eqns['a'].value)
     print 'step: ', i, ' a = ', RHS.aux_eqns['a'].value
+    print CFL * na.max(data['u'][0]['xspace'])
+
     ti.advance(data, dt)
     i = i + 1
     an.run()

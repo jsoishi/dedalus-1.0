@@ -85,9 +85,13 @@ an.add("field_snap", 10)
 an.add("compare_power", 10)
 i=0
 an.run()
+
+CFL = dt / (2*na.pi/na.max(data['delta_b'].k['x']))
+
 while ti.ok:
     Dplus = ((data.time + t_ini)/t_ini) ** (2./3.)
     print 'step: ', i, ' a = ', RHS.aux_eqns['a'].value
+    print CFL * na.max(data['u_c'][0]['xspace'])
     ti.advance(data, dt)
     i = i + 1
     an.run()

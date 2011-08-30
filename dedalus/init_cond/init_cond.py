@@ -330,7 +330,6 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
 
     # ... normalize
     ampl = get_normalization(Ttot0, ak, sigma_8, nspect, h)
-    print ampl
     f_deltacp = interp1d(ak, deltacp, kind='cubic')
     # ... calculate spectra
     if f_nl is not None:
@@ -349,7 +348,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
         f_deltacp = interp1d(ak, deltacp, kind='cubic')
         spec_delta = k2 * phi_ng['kspace'] * f_deltacp(kk) / to_phi
     else:
-        # ... delta = -i * delta_transfer * |k|^(n_s/2)
+        # ... delta = delta_transfer * |k|^(n_s/2)
         spec_delta = kk**(nspect/2.)*f_deltacp(kk)*ampl
     spec_delta[kzero] = 0.
 
