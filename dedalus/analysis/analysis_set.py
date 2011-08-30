@@ -245,6 +245,7 @@ def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', outp
         for ak, s1, s2 in zip(k, spec_f1, spec_f2):
             outfile.write('%08f\t%08e\t%08e\n'%(ak, s1, s2))
         outfile.close()
+        return
 
     fig = P.figure(figsize=(8,6))
 
