@@ -73,7 +73,7 @@ while ti.ok:
     Dplus = ((data.time + t_ini)/t_ini) ** (2./3.)
     adot = RHS.aux_eqns['a'].RHS(RHS.aux_eqns['a'].value)
     print 'step: ', i, ' a = ', RHS.aux_eqns['a'].value
-    print CFL * na.max(data['u'][0]['xspace'])
+    #print CFL * na.max(data['u'][0]['xspace'])
 
     ti.advance(data, dt)
     i = i + 1
