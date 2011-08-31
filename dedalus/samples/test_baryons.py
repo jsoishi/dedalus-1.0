@@ -1,6 +1,6 @@
 """Test of cosmology with coupled baryon and CDM fluids
 
-Authors: G. Peairs <gpeairs@stanford.edeu>
+Authors: G. Peairs <gpeairs@stanford.edu>
 Affiliation: KIPAC/SLAC/Stanford
 License:
   Copyright (C) 2011 J. S. Oishi, G. Peairs.  All Rights Reserved.
@@ -70,7 +70,7 @@ RHS.parameters['H0'] = H0
 a, cs2 = read_cs2(thermofname)
 RHS.init_cs2(a, cs2)
 
-spec_delta_c, spec_u_c, spec_delta_b, spec_u_b = cosmo_spectra(data, normfname, baryons=True)
+spec_delta_c, spec_u_c, spec_delta_b, spec_u_b = cosmo_spectra(data, normfname, a_i, baryons=True)
 cosmo_fields(data['delta_c'], data['u_c'], data['delta_b'], data['u_b'], spec_delta_c, spec_u_c, spec_delta_b, spec_u_b)
 
 dt = 5. # time in Myr
@@ -81,13 +81,17 @@ ti.set_dtsnap(10000)
 
 an = AnalysisSet(data, ti)
 an.add("field_snap", 10)
-an.add("en_spec", 100, {'flist':['u_c','u_b']})
+#an.add("en_spec", 100, {'flist':['u_c','u_b']})
 an.add("compare_power", 10)
 i=0
 an.run()
+
+CFL = dt / (2*na.pi/na.max(data['delta_b'].k['x']))
+
 while ti.ok:
     Dplus = ((data.time + t_ini)/t_ini) ** (2./3.)
     print 'step: ', i, ' a = ', RHS.aux_eqns['a'].value
+    print CFL * na.max(data['u_c'][0]['xspace'])
     ti.advance(data, dt)
     i = i + 1
     an.run()

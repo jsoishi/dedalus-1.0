@@ -231,24 +231,25 @@ def read_linger_transfer_data(fname, ak_trans, Ttot, Tdc, Tdb, dTvc, dTvb, Ttot0
         Ttot0.append(float(values[6]))
     infile.close()
 
-def sig2_integrand(Ttot0, ak, nspect):
+def sig2_integrand(Ttot0, akoh, nspect):
     """calculate the integrand in the expression for the mean square
     of the overdensity field, smoothed with a top-hat window function W
-    at 8 Mpc.
+    at 8 Mpc/h.
 
     """
     R = 8.
-    x = ak*R
+    x = akoh*R
     w = 3. * (na.sin(x) - x*na.cos(x))/(x*x*x)
-    Pk = (ak**nspect) * (Ttot0*Ttot0)
-    return (w*w) * Pk * (ak*ak)
+    Pk = (akoh**nspect) * (Ttot0*Ttot0)
+    return (w*w) * Pk * (akoh*akoh)
 
-def get_normalization(Ttot0, ak, sigma_8, nspect):
+def get_normalization(Ttot0, ak, sigma_8, nspect, h):
     """calculate the normalization for delta_tot using sigma_8
 
     """
-    integrand = sig2_integrand(Ttot0, ak, nspect)
-    sig2 = 4.*na.pi*simps(integrand, ak)
+    akoh = ak/h
+    integrand = sig2_integrand(Ttot0, akoh, nspect)
+    sig2 = 4.*na.pi*simps(integrand, akoh)
     ampl = sigma_8/na.sqrt(sig2)
     return ampl
 
@@ -262,14 +263,12 @@ def collisionless_cosmo_fields(delta, u, spec_delta, spec_u, mean=0., stdev=1.):
     rand = (na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape))/na.sqrt(2)
     delta['kspace'] = spec_delta * rand
     hermitianize.enforce_hermitian(delta['kspace'])
-    delta.zero_nyquist()
-    delta['kspace'][0,0,0] = 0.
+    delta.dealias()
 
     for i in xrange(3):
         u[i]['kspace'] = rand * spec_u[i]
         hermitianize.enforce_hermitian(u[i]['kspace'])
-        u[i].zero_nyquist()
-        u[i]['kspace'][0,0,0] = 0
+        u[i].dealias()
         
     return rand
 
@@ -281,16 +280,14 @@ def cosmo_fields(delta_c, u_c, delta_b, u_b, spec_delta_c, spec_u_c, spec_delta_
     rand = collisionless_cosmo_fields(delta_c, u_c, spec_delta_c, spec_u_c)
     delta_b['kspace'] = spec_delta_b * rand
     hermitianize.enforce_hermitian(delta_b['kspace'])
-    delta_b.zero_nyquist()
-    delta_b['kspace'][0,0,0] = 0.
+    delta_b.dealias()
 
     for i in xrange(3):
         u_b[i]['kspace'] = rand * spec_u_b[i]
         hermitianize.enforce_hermitian(u_b[i]['kspace'])
-        u_b[i].zero_nyquist()
-        u_b[i]['kspace'][0,0,0] = 0
+        u_b[i].dealias()
 
-def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, baryons=False):
+def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, baryons=False, f_nl=None):
     """generate spectra for CDM overdensity and velocity from linger++
     output. Assumes 3-dimensional fields.
 
@@ -299,7 +296,6 @@ def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, baryons=False):
 
     """
     
-    h = .703 # Hubble constant = 100 * h km/s/Mpc -- should come from input
     Myr_per_Mpc = 0.3063915366 # 1 c/Mpc = 0.306... 1/Myr
 
     ak = [] # the k-values that go with transfer-functions 
@@ -314,35 +310,55 @@ def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, baryons=False):
     ak = na.array(ak) * h
     deltacp = na.array(Tdc)
     thetac = -na.array(dTvc) * (h/299792.458) # linger multiplies by c/h
-    Ttot0 = na.array(Ttot0)/ak**2
-
-    # ... normalize
-    ampl = get_normalization(Ttot0, ak, sigma_8, nspect)
-    deltacp = deltacp*ampl
-    thetac = thetac*ampl*Myr_per_Mpc
+    Ttot0 = na.array(Ttot0)
 
     # ... get sample data object for shape and k-values
     sampledata = data.fields.values()[0][0]
     shape = sampledata.shape
 
     nk = shape[0]
-    kk = na.sqrt(sampledata.k2(no_zero=True))
-    maxkk = kk[nk/2, nk/2, nk/2]
+    k2 = sampledata.k2()
+    kzero = (k2==0)
+    k2[kzero] = 1. # may cause problems for non-gaussian IC...
+    kk = na.sqrt(k2)
+    maxkk = na.sqrt(3*na.max(sampledata.kny)**2)
     maxkinput = max(ak)
     if maxkk > maxkinput:
         print 'cannot interpolate: some grid wavenumbers larger than input wavenumbers; ICs for those modes are wrong'
         # ... any |k| larger than the max input k is replaced by max input k
         kk[:,:,:] = na.minimum(kk, maxkinput*na.ones_like(kk))
 
-    # ... calculate spectra
-    # delta = -i * delta_transfer * |k|^(n_s/2)
+    # ... normalize
+    ampl = get_normalization(Ttot0, ak, sigma_8, nspect, h)
     f_deltacp = interp1d(ak, deltacp, kind='cubic')
-    spec_delta = kk**(nspect/2.)*f_deltacp(kk)
-    
+    # ... calculate spectra
+    if f_nl is not None:
+        """ Primordial non-Gaussianity:
+        phi(k) = -3/2 H^2/c^2 Omega_m a^2 A k^(n_s/2)/k^2
+        phi_NG(x) = phi(x) + f_NL(phi)
+        delta(k) = (-3/2 H^2/c^2 Omega_m a^2)^-1 * k^2 phi_NG(k) T_delta(k)
+        """
+        Omega_m = 0.276 # not necessarily...
+        H = 0.452997
+        c = Myr_per_Mpc
+        to_phi = (-3/2.) * H*H / c*c * Omega_m * a*a
+        phi = FourierRepresentation(None, kk.shape, sampledata.length, dtype='float128')
+        phi['kspace'] = to_phi * ampl * kk**(nspect/2.)/k2
+        phi_ng['xspace'] = phi['xspace'] + f_nl(phi['xspace'])
+        f_deltacp = interp1d(ak, deltacp, kind='cubic')
+        spec_delta = k2 * phi_ng['kspace'] * f_deltacp(kk) / to_phi
+    else:
+        # ... delta = delta_transfer * |k|^(n_s/2)
+        spec_delta = kk**(nspect/2.)*f_deltacp(kk)*ampl
+    spec_delta[kzero] = 0.
+
+    thetac = thetac*ampl*Myr_per_Mpc
+
+    # ... calculate spectra    
     # u_j = -i * k_j/|k| * theta * |k|^(n_s/2 - 1)
     f_thetac = interp1d(ak, thetac, kind='cubic')
     spec_vel = -1j*kk**(nspect/2. -1.)*f_thetac(kk) # isotropic
-    spec_vel[0,0,0] = 0.
+    spec_vel[kzero] = 0.
 
     spec_u = [na.zeros_like(spec_vel),]*3
     for i,dim in enumerate(['x','y','z']):
@@ -357,10 +373,11 @@ def cosmo_spectra(data, norm_fname, nspect=0.961, sigma_8=0.811, baryons=False):
         
         f_deltabp = interp1d(ak, deltabp, kind='cubic')
         spec_delta_b = kk**(nspect/2.)*f_deltabp(kk)
+        spec_delta_b[kzero] = 0.
         
         f_thetab = interp1d(ak, thetab, kind='cubic')
         spec_vel_b =  -(1j * kk**(nspect/2. - 1.)*f_thetab(kk))
-        spec_vel_b[0,0,0] = 0.
+        spec_vel_b[kzero] = 0.
         
         spec_u_b = [na.zeros_like(spec_vel_b),]*3
         for i,dim in enumerate(['x','y','z']):

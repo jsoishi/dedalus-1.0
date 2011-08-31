@@ -234,8 +234,8 @@ def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', outp
         output_columns  if True, output data as columns in a file
 
     """
-    k, spec_f1 = compute_en_spec(data, f1)
-    k, spec_f2 = compute_en_spec(data, f2)
+    k, spec_f1 = compute_en_spec(data, f1, averaging='nonzero')
+    k, spec_f2 = compute_en_spec(data, f2, averaging='nonzero')
 
     if not os.path.exists('frames'):
         os.mkdir('frames')
@@ -245,12 +245,12 @@ def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', outp
         for ak, s1, s2 in zip(k, spec_f1, spec_f2):
             outfile.write('%08f\t%08e\t%08e\n'%(ak, s1, s2))
         outfile.close()
+        return
 
     fig = P.figure(figsize=(8,6))
-    
-    spec_f2[spec_f2==0] = 1.
 
     if comparison == 'ratio':
+        spec_f2[spec_f2==0] = 1.
         spec_compare = spec_f1/spec_f2
         P.title('Comparison of %s and %s power, t = %5.2f' %(f1, f2, data.time))
         P.ylabel(r"P(%s)/P(%s)" %(f1, f2))
