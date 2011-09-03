@@ -23,6 +23,7 @@ License:
 """
 
 import numpy as na
+from dedalus.utils.parallelism import MPI, comm
 
 def enforce_hermitian(data, verbose=False):
     """
@@ -37,6 +38,11 @@ def enforce_hermitian(data, verbose=False):
     if data.size == 1: 
         if verbose: print data
         data.imag = 0
+        return
+
+
+    if comm:
+
         return
     
     # Flip about k-origin

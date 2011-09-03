@@ -31,6 +31,7 @@ from mpl_toolkits.axes_grid1 import AxesGrid
 import numpy as na
 import os
 from functools import wraps
+from dedalus.utils.parallelism import MPI, comm
 
 class AnalysisSet(object):
 
@@ -173,21 +174,45 @@ def compute_en_spec(data, field, normalization=1.0, averaging=None):
     # Construct bins by wavevector magnitude (evenly spaced)
     kmag = na.sqrt(f[0].k2())
     k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
+    if comm:
+        # note: not the same k-values as serial version
+        k = na.linspace(0, na.max(f[0].kny), na.max(data.shape) / 2.)
     
     kbottom = k - k[1] / 2.
     ktop = k + k[1] / 2.
     spec = na.zeros_like(k)
         
     nonzero = (power > 0)
-    for i in xrange(k.size):
-        kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
-        spec[i] = (power[kshell]).sum()
-        if averaging == 'nonzero':
-            spec[i] /= (kshell & nonzero).sum()
-        elif averaging == 'all':
-            spec[i] /= kshell.sum()
 
-    return k, spec
+    if comm:
+        myspec = na.zeros_like(k)
+        myproc = comm.rank
+        nk = na.zeros_like(spec)
+        mynk = na.zeros_like(spec)
+        for i in xrange(k.size):
+            kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
+            myspec[i] = (power[kshell]).sum()
+            if averaging == 'all':
+                mynk[i] = kshell.sum()
+            elif averaging == 'nonzero':
+                mynk[i] = (kshell & nonzero).sum()
+        spec = comm.reduce(myspec, op=MPI.SUM, root=0)
+        nk = comm.reduce(mynk, op=MPI.SUM, root=0)
+        if myproc != 0: return None, None
+        if averaging is None:
+            return k, spec
+        else:
+            nk[(nk==0)] = 1.
+            return k, spec/nk
+    else:
+        for i in xrange(k.size):
+            kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
+            spec[i] = (power[kshell]).sum()
+            if averaging == 'nonzero':
+                spec[i] /= (kshell & nonzero).sum()
+            elif averaging == 'all':
+                spec[i] /= kshell.sum()
+        return k, spec
 
 @AnalysisSet.register_task
 def en_spec(data, it, flist=['u']):
