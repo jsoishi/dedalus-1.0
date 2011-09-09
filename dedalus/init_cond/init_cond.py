@@ -332,7 +332,8 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
     ampl = get_normalization(Ttot0, ak, sigma_8, nspect, h)
     ampl = ampl * (2.*na.pi/sampledata.length[0])**1.5 # volume factor from FT
 
-    f_deltacp = interp1d(ak, deltacp, kind='cubic')
+    f_deltacp = interp1d(na.log10(ak), na.log10(deltacp), kind='linear')
+
     # ... calculate spectra
     if f_nl is not None:
         """ Primordial non-Gaussianity:
@@ -351,7 +352,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
         spec_delta = k2 * phi_ng['kspace'] * f_deltacp(kk) / to_phi
     else:
         # ... delta = delta_transfer * |k|^(n_s/2)
-        spec_delta = kk**(nspect/2.)*f_deltacp(kk)*ampl
+        spec_delta = kk**(nspect/2.)*(10.**f_deltacp(kk))*ampl
     spec_delta[kzero] = 0.
 
 
@@ -362,8 +363,8 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
 
     # ... calculate spectra    
     # u_j = -i * k_j/|k| * theta * |k|^(n_s/2 - 1)
-    f_thetac = interp1d(ak, thetac, kind='cubic')
-    spec_vel = -1j*kk**(nspect/2. -1.)*f_thetac(kk) # isotropic
+    f_thetac = interp1d(na.log10(ak), na.log10(-thetac), kind='linear')
+    spec_vel = -1j*kk**(nspect/2. -1.)*(-1)*(10.**f_thetac(kk)) # isotropic
     spec_vel[kzero] = 0.
 
     spec_u = [na.zeros_like(spec_vel),]*3
