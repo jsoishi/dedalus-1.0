@@ -36,11 +36,15 @@ if len(sys.argv) != 2:
 else:
     normfname = sys.argv[1]
 
-shape = (128,)*3
+shape = (32,)*3
 L = (100,)*3
 RHS = CollisionlessCosmology(shape, FourierRepresentation, length=L)
 data = RHS.create_fields(0.)
-H0 = 7.185e-5 # 70.3 km/s/Mpc in Myr^-1
+h = 0.703
+nsp = 0.961
+sigma8 = 0.811
+
+H0 = h * 1.02204836e-4 # h * 100 km/s/Mpc in Myr^-1
 a_i = RHS.aux_eqns['a'].value # initial scale factor
 t0 = (2./3.)/H0 # present age of E-dS universe
 t_ini = (a_i**(3./2.)) * t0 # time at which a = a_i (in Einstein-de Sitter)
@@ -50,14 +54,14 @@ RHS.parameters['Omega_m'] = 1.#0.276
 RHS.parameters['Omega_l'] = 0.#0.724
 RHS.parameters['H0'] = H0
 
-spec_delta, spec_u = cosmo_spectra(data, normfname, a_i)
+spec_delta, spec_u = cosmo_spectra(data, normfname, a_i, nspect=nsp, sigma_8=sigma8, h=h )
 collisionless_cosmo_fields(data['delta'], data['u'], spec_delta, spec_u)
 
-dt = 5 # time in Myr
+dt = 0.25 # time in Myr
 ti = RK4simplevisc(RHS)
-ti.stop_time(100.*dt)
+ti.stop_time(1000.)
 ti.set_nsnap(100)
-ti.set_dtsnap(100)
+ti.set_dtsnap(100*2)
 
 an = AnalysisSet(data, ti)
 
@@ -68,11 +72,20 @@ i=0
 an.run()
 
 CFL = dt / (2*na.pi/na.max(data['delta'].k['x']))
+MAXCOSMOSTEP = 0.25
 
 while ti.ok:
     Dplus = ((data.time + t_ini)/t_ini) ** (2./3.)
     adot = RHS.aux_eqns['a'].RHS(RHS.aux_eqns['a'].value)
-    print 'step: ', i, ' a = ', RHS.aux_eqns['a'].value
+
+    #dtcfl = CFL * na.max(data['u'][0]['xspace'])
+    aexp = RHS.aux_eqns['a'].value
+    dadt = H0 * na.sqrt( RHS.parameters['Omega_r']/aexp**4 + RHS.parameters['Omega_m']/aexp**3 + RHS.parameters['Omega_l'] ) 
+    dtcosmo = MAXCOSMOSTEP / dadt # already in Myr as H0 is
+
+    dt = dtcosmo #na.min([dtcosmo,dtcfl])
+    
+    print 'step: %04d, a = %.4g, t = %.4g, dt = %.4g' % (i,RHS.aux_eqns['a'].value,data.time,dt)
     #print CFL * na.max(data['u'][0]['xspace'])
 
     ti.advance(data, dt)
