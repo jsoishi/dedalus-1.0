@@ -308,8 +308,16 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
     
     read_linger_transfer_data(norm_fname, ak, Ttot, Tdc, Tdb, dTvc, dTvb, Ttot0)
     ak = na.array(ak) * h
-    deltacp = na.array(Tdc)
-    thetac = -na.array(dTvc) #* (h/299792.458) # linger multiplies by c/h
+
+    if baryons:
+        deltacp = na.array(Tdc)
+        thetac = -na.array(dTvc) #* (h/299792.458) # linger multiplies by c/h
+    else:
+        deltacp = na.array(Ttot)
+        # need to put also total matter velocities here!!
+        thetac = -na.array(dTvc)
+
+
     Ttot0 = na.array(Ttot0)
 
     # ... get sample data object for shape and k-values
