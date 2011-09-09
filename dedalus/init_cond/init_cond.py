@@ -309,7 +309,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
     read_linger_transfer_data(norm_fname, ak, Ttot, Tdc, Tdb, dTvc, dTvb, Ttot0)
     ak = na.array(ak) * h
     deltacp = na.array(Tdc)
-    thetac = -na.array(dTvc) * (h/299792.458) # linger multiplies by c/h
+    thetac = -na.array(dTvc) #* (h/299792.458) # linger multiplies by c/h
     Ttot0 = na.array(Ttot0)
 
     # ... get sample data object for shape and k-values
@@ -330,6 +330,8 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
 
     # ... normalize
     ampl = get_normalization(Ttot0, ak, sigma_8, nspect, h)
+    ampl = ampl * (2.*na.pi/sampledata.length[0])**1.5 # volume factor from FT
+
     f_deltacp = interp1d(ak, deltacp, kind='cubic')
     # ... calculate spectra
     if f_nl is not None:
@@ -352,7 +354,11 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
         spec_delta = kk**(nspect/2.)*f_deltacp(kk)*ampl
     spec_delta[kzero] = 0.
 
-    thetac = thetac*ampl*Myr_per_Mpc
+
+    #thetac = thetac*ampl*Myr_per_Mpc
+    lunit = 1.02268944e-6 # km/s in Mpc/Myr
+    thetac = thetac * ampl * h * lunit / na.sqrt(a)
+
 
     # ... calculate spectra    
     # u_j = -i * k_j/|k| * theta * |k|^(n_s/2 - 1)
