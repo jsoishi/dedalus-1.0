@@ -215,7 +215,7 @@ def zeldovich(data, ampl, a_ini, a_cross):
     data['u'][0]['kspace'][0,0,1] = ampl * 1j / 2
     data['u'][0]['kspace'][0,0,-1] = -data['u'][0]['kspace'][0,0,1]
 
-def read_linger_transfer_data(fname, ak_trans, Ttot, Tdc, Tdb, dTvc, dTvb, Ttot0):
+def read_linger_transfer_data(fname, ak_trans, Ttot, Tdc, Tdb, dTvc, dTvb, dTtot, Ttot0):
     """read values from a transfer-mode linger++ output file
 
     """
@@ -228,7 +228,8 @@ def read_linger_transfer_data(fname, ak_trans, Ttot, Tdc, Tdb, dTvc, dTvb, Ttot0
         Tdb.append(float(values[3]))
         dTvc.append(float(values[4]))
         dTvb.append(float(values[5]))
-        Ttot0.append(float(values[6]))
+        dTtot.append(float(values[6]))
+        Ttot0.append(float(values[7]))
     infile.close()
 
 def sig2_integrand(Ttot0, akoh, nspect):
@@ -298,24 +299,24 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
     
     Myr_per_Mpc = 0.3063915366 # 1 c/Mpc = 0.306... 1/Myr
 
-    ak = [] # the k-values that go with transfer-functions 
-    Ttot = [] # linear transfer of total spectrum at initial time
+    ak    = [] # the k-values that go with transfer-functions 
+    Ttot  = [] # linear transfer of total spectrum at initial time
     Ttot0 = [] # ... of total spectrum at z = 0, used with sigma_8 for norm
-    Tdc = [] # transfer of delta_CDM
-    Tdb = [] # transfer of delta_baryons
-    dTvc = [] # rate of change of CDM transfer
-    dTvb = [] # rate of change of baryon transfer
+    Tdc   = [] # transfer of delta_CDM
+    Tdb   = [] # transfer of delta_baryons
+    dTvc  = [] # rate of change of CDM transfer
+    dTvb  = [] # rate of change of baryon transfer
+    dTtot = [] # ... of total spectrum
     
-    read_linger_transfer_data(norm_fname, ak, Ttot, Tdc, Tdb, dTvc, dTvb, Ttot0)
+    read_linger_transfer_data(norm_fname, ak, Ttot, Tdc, Tdb, dTvc, dTvb, dTtot, Ttot0)
     ak = na.array(ak) * h
 
     if baryons:
         deltacp = na.array(Tdc)
-        thetac = -na.array(dTvc) #* (h/299792.458) # linger multiplies by c/h
+        thetac  = -na.array(dTvc) #* (h/299792.458) # linger multiplies by c/h
     else:
         deltacp = na.array(Ttot)
-        # need to put also total matter velocities here!!
-        thetac = -na.array(dTvc)
+        thetac  = -na.array(dTtot)
 
 
     Ttot0 = na.array(Ttot0)
