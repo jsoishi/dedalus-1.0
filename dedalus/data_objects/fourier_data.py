@@ -24,6 +24,13 @@ import numpy as na
 import numpy.fft as fpack
 import fftw3
 
+try:
+    import pycuda.autoinit
+    import pycuda.gpuarray as gpuarray
+    import scikits.cuda.fft as cu_fft
+except ImportError:
+    print "Warning: CUDA cannot be imported. Must use FFTW or numpy FFT"
+
 class Representation(object):
     """a representation of a field. it stores data and provides
     spatial derivatives.
@@ -41,7 +48,7 @@ class FourierRepresentation(Representation):
 
     """
 
-    def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
+    def __init__(self, sd, shape, length, dtype='complex64', method='cu_fft',
                  dealiasing='2/3'):
         """
         Inputs:
@@ -117,6 +124,30 @@ class FourierRepresentation(Representation):
         if method == 'numpy':
             self.fft = self.fwd_np
             self.ifft = self.rev_np
+        if method =='cu_fft':
+            if self.data.dtype != 'complex64':
+                raise TypeError("Must use complex64 (single precision) to use CUDA FFT (maybe?).")
+            self.data_gpu = gpuarray.to_gpu(self.data)
+            self.fplan = cu_fft.Plan(self.data_gpu.shape, self.data.dtype, self.data.dtype)
+            self.fft = self.fwd_cufft
+            self.ifft = self.rev_cufft
+            
+            
+    def set_dealiasing(self, dealiasing):
+        if dealiasing == '2/3':
+            self.dealias = self.dealias_23
+        else:
+            self.dealias = None
+
+    def fwd_cufft(self):
+        self.data_gpu = gpuarray.to_gpu(self.data)
+        cu_fft.fft(self.data_gpu, self.data_gpu, self.fplan)
+        self.data = self.data_gpu.get()
+
+    def rev_cufft(self):
+        self.data_gpu = gpuarray.to_gpu(self.data)
+        cu_fft.ifft(self.data_gpu, self.data_gpu, self.fplan, True)
+        self.data = self.data_gpu.get()
 
     def fwd_fftw(self):
         self.fplan()
