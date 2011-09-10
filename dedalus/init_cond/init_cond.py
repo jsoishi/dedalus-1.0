@@ -296,7 +296,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
     Time:   Myr (linger++ uses Mpc/c)
 
     """
-    
+
     Myr_per_Mpc = 0.3063915366 # 1 c/Mpc = 0.306... 1/Myr
 
     ak    = [] # the k-values that go with transfer-functions 
@@ -313,10 +313,10 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
 
     if baryons:
         deltacp = na.array(Tdc)
-        thetac  = -na.array(dTvc) #* (h/299792.458) # linger multiplies by c/h
+        thetac  = na.array(dTvc) #* (h/299792.458) # linger multiplies by c/h
     else:
         deltacp = na.array(Ttot)
-        thetac  = -na.array(dTtot)
+        thetac  = na.array(dTtot)
 
 
     Ttot0 = na.array(Ttot0)
@@ -339,7 +339,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
 
     # ... normalize
     ampl = get_normalization(Ttot0, ak, sigma_8, nspect, h)
-    ampl = ampl * (2.*na.pi/sampledata.length[0])**1.5 # volume factor from FT
+    ampl = ampl * (2.*na.pi/sampledata.length[0])**1.5 * (sampledata.shape[0])**1.5
 
     f_deltacp = interp1d(na.log10(ak), na.log10(deltacp), kind='linear')
 
@@ -365,15 +365,15 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
     spec_delta[kzero] = 0.
 
 
-    #thetac = thetac*ampl*Myr_per_Mpc
-    lunit = 1.02268944e-6 # km/s in Mpc/Myr
-    thetac = thetac * ampl * h * lunit / na.sqrt(a)
+
+    vunit = 1.02268944e-6 # km/s in Mpc/Myr
+    thetac = thetac * ampl * vunit * h * 2. ## why 2!?!?!?
 
 
     # ... calculate spectra    
     # u_j = -i * k_j/|k| * theta * |k|^(n_s/2 - 1)
-    f_thetac = interp1d(na.log10(ak), na.log10(-thetac), kind='linear')
-    spec_vel = -1j*kk**(nspect/2. -1.)*(-1)*(10.**f_thetac(na.log10(kk))) # isotropic
+    f_thetac = interp1d(na.log10(ak), na.log10(thetac), kind='linear')
+    spec_vel = 1j*kk**(nspect/2. -1.)*(10.**f_thetac(na.log10(kk))) # isotropic
     spec_vel[kzero] = 0.
 
     spec_u = [na.zeros_like(spec_vel),]*3
