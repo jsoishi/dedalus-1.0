@@ -658,10 +658,9 @@ class LinearCollisionlessCosmology(Physics):
                                             adot * data['u'][i]['kspace']) / a
         
     def grad_phi(self, data):
-        a = self.aux_eqns['a'].value
-        H = self.aux_eqns['a'].RHS(a) / a
-        #H0 = self.parameters['H0']
-
+        a  = self.aux_eqns['a'].value
+        H  = self.aux_eqns['a'].RHS(a) / a
+        Om = self.parameters['Omega_m']
         gradphi = self.aux_fields['gradphi']
         tmp = (-3./2. * H*H * data['delta']['kspace'] /
                 data['delta'].k2(no_zero=True))
@@ -854,8 +853,8 @@ class LinearBaryonCDMCosmology(Physics):
         gradphi = self.aux_fields['gradphi']
         tmp = (-3./2. * H*H * 
                 ((self.parameters['Omega_c'] * data['delta_c']['kspace'] + 
-                  self.parameters['Omega_b'] * data['delta_b']['kspace']) /
-                 self.parameters['Omega_m']) / 
+                  self.parameters['Omega_b'] * data['delta_b']['kspace'])) /
+                 #self.parameters['Omega_m']) / 
                 sampledata.k2(no_zero=True))
 
         for i in self.dims:
