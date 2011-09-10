@@ -204,14 +204,17 @@ def zeldovich(data, ampl, a_ini, a_cross):
     """
     k = 2*na.pi/data.length[0]
     N = data['delta'].shape[0]
+    volfac = 1./N**1.5
     D = 1.
     A = a_ini/(a_cross * k)
     x = na.array([i - N/2 for i in xrange(N)])*data.length[0]/N
     q = na.array(broyden1(lambda y: na.array(y) + D*A*na.sin(k*na.array(y)) - x, x))
-    delta1d = 1./(1. + D*A*k*na.cos(k*q)) - 1.
+    delta1d = (1./(1. + D*A*k*na.cos(k*q)) - 1.)*volfac
     for i in xrange(N):
         for j in xrange(N):
             data['delta']['xspace'][i,j,:] = delta1d
+
+    ampl = ampl * volfac
     data['u'][0]['kspace'][0,0,1] = ampl * 1j / 2
     data['u'][0]['kspace'][0,0,-1] = -data['u'][0]['kspace'][0,0,1]
 
