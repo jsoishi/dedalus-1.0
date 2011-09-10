@@ -660,6 +660,7 @@ class LinearCollisionlessCosmology(Physics):
     def grad_phi(self, data):
         a = self.aux_eqns['a'].value
         H = self.aux_eqns['a'].RHS(a) / a
+        #H0 = self.parameters['H0']
 
         gradphi = self.aux_fields['gradphi']
         tmp = (-3./2. * H*H * data['delta']['kspace'] /

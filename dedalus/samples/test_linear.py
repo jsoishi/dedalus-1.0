@@ -34,28 +34,36 @@ if len(sys.argv) != 2:
 else:
     normfname = sys.argv[1]
 
-shape = (16,16,16)
-RHS = LinearCollisionlessCosmology(shape, FourierRepresentation)
+L = (100,)*3
+shape = (16,)*3
+
+h = 0.5#703 #0.703
+nsp = 0.961
+sigma8 = 0.811
+
+
+RHS = LinearCollisionlessCosmology(shape, FourierRepresentation, length=L)
 data = RHS.create_fields(0.)
 
-H0 = 7.185e-5 # 70.3 km/s/Mpc in Myr^-1
+H0 = h * 1.02204836e-4 # h * 100 km/s/Mpc in Myr^-1
 a_i = RHS.aux_eqns['a'].value # initial scale factor
 t0 = (2./3.)/H0 # present age of E-dS universe
 t_ini = (a_i**(3./2.)) * t0 # time at which a = a_i (in Einstein-de Sitter)
 
-RHS.parameters['Omega_r'] = 8.4e-5
-RHS.parameters['Omega_m'] = 0.276
-RHS.parameters['Omega_l'] = 0.724
+RHS.parameters['Omega_r'] = 0.#8.4e-5
+RHS.parameters['Omega_m'] = 1.#0.276
+RHS.parameters['Omega_l'] = 0.#0.724
 RHS.parameters['H0'] = H0
 
-spec_delta, spec_u = cosmo_spectra(data, normfname, a_i)
+spec_delta, spec_u = cosmo_spectra(data, normfname, a_i, nspect=nsp, sigma_8=sigma8, h=h)
 collisionless_cosmo_fields(data['delta'], data['u'], spec_delta, spec_u)
 
-dt = 5. # time in Myr
+dt = 0.5 # time in Myr
 ti = RK4simplevisc(RHS)
 ti.stop_time(500)
 ti.set_nsnap(100)
 ti.set_dtsnap(1000)
+
 
 an = AnalysisSet(data, ti)
 
@@ -73,7 +81,8 @@ while ti.ok:
     print 'step: ', i, ' a = ', RHS.aux_eqns['a'].value
     ti.advance(data, dt)
     d = data['delta']['kspace'][1,1,1]
-    outfile.write('%08f\t%08e\t%08f\n'%(RHS.aux_eqns['a'].value/a_i, d/d_i, Dplus))
+    a = RHS.aux_eqns['a'].value
+    outfile.write('%08f\t%08f\t%08f\t%08e\t%08f\n'%(a,d/a,a/a_i, d/d_i, Dplus))
     i = i + 1
     an.run()    
 outfile.close()

@@ -36,8 +36,8 @@ if len(sys.argv) != 2:
 else:
     normfname = sys.argv[1]
 
-shape = (32,)*3
-L = (100,)*3
+shape = (64,)*3
+L = (30,)*3
 RHS = CollisionlessCosmology(shape, FourierRepresentation, length=L)
 data = RHS.create_fields(0.)
 h = 0.703
@@ -72,7 +72,7 @@ i=0
 an.run()
 
 CFL = dt / (2*na.pi/na.max(data['delta'].k['x']))
-MAXCOSMOSTEP = 0.25
+MAXCOSMOSTEP = 0.125
 
 while ti.ok:
     Dplus = ((data.time + t_ini)/t_ini) ** (2./3.)
