@@ -50,7 +50,7 @@ class TimeStepBase(object):
         self._dnsnap  = 100
         self._dtsnap = 1.
 
-        self.__start_time = time.time()
+        self._start_time = time.time()
 
     @property
     def ok(self):
@@ -60,7 +60,7 @@ class TimeStepBase(object):
         if self.time >= self._stop_time:
             print "Time > stop time. Done"
             self._is_ok = False
-        if (time.time() - self.__start_time) >= self._stop_wall:
+        if (time.time() - self._start_time) >= self._stop_wall:
             print "Wall clock time exceeded. Done."
             self._is_ok = False
 
@@ -115,7 +115,7 @@ class TimeStepBase(object):
                        
     def final_stats(self):
         stop_time = time.time()
-        total_wtime = stop_time - self.__start_time
+        total_wtime = stop_time - self._start_time
         print "total wall time: %10.5e sec" % total_wtime
         print "%10.5e sec/step " %(total_wtime/self.iter)
         print "Simulation complete. Status: awesome"
