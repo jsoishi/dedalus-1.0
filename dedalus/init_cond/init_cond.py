@@ -342,7 +342,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
 
     # ... normalize
     ampl = get_normalization(Ttot0, ak, sigma_8, nspect, h)
-    ampl = ampl * (2.*na.pi/sampledata.length[0])**1.5 * (sampledata.shape[0])**1.5
+    ampl = ampl * (2.*na.pi/sampledata.length[0])**1.5 * (sampledata.shape[0])**1.5 # *h**1.5
 
     f_deltacp = interp1d(na.log10(ak), na.log10(deltacp), kind='linear')
 
@@ -376,7 +376,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
     # ... calculate spectra    
     # u_j = -i * k_j/|k| * theta * |k|^(n_s/2 - 1)
     f_thetac = interp1d(na.log10(ak), na.log10(thetac), kind='linear')
-    spec_vel = 1j*kk**(nspect/2. -1.)*(10.**f_thetac(na.log10(kk))) # isotropic
+    spec_vel = 1j*kk**(nspect/2. -1.) * 10.**f_thetac(na.log10(kk)) # isotropic
     spec_vel[kzero] = 0.
 
     spec_u = [na.zeros_like(spec_vel),]*3
@@ -385,17 +385,17 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
 
     if baryons:
         deltabp = na.array(Tdb)
-        thetab = -na.array(dTvb)*(h/299792.458)
+        thetab  = na.array(dTvc)
 
-        deltabp = deltabp*ampl
-        thetab = thetab*ampl*Myr_per_Mpc
+        deltabp = deltabp * ampl
+        thetab  = thetab * ampl * vunit * h * 2.0## again 2, needs to be understood
         
-        f_deltabp = interp1d(ak, deltabp, kind='cubic')
-        spec_delta_b = kk**(nspect/2.)*f_deltabp(kk)
+        f_deltabp = interp1d(na.log10(ak), na.log10(deltabp), kind='linear')
+        spec_delta_b = kk**(nspect/2.)*10.**f_deltabp(na.log10(kk))
         spec_delta_b[kzero] = 0.
         
-        f_thetab = interp1d(ak, thetab, kind='cubic')
-        spec_vel_b =  -(1j * kk**(nspect/2. - 1.)*f_thetab(kk))
+        f_thetab = interp1d(na.log10(ak), na.log10(thetab), kind='linear')
+        spec_vel_b = 1j * kk**(nspect/2. - 1.) * 10.**f_thetab(na.log10(kk))
         spec_vel_b[kzero] = 0.
         
         spec_u_b = [na.zeros_like(spec_vel_b),]*3
