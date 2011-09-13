@@ -66,11 +66,7 @@ cdef class Plan:
         def __set__(self, inp):
             self._data[:]=inp
 
-cdef class PlanAxes:
-    cdef fftw_plan _fftw_plan
-    cdef np.ndarray _data
-    cdef int direction
-    cdef int flags
+cdef class PlanAxes(Plan):
     def __cinit__(self, data, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
         """PlanAxes returns a special FFTW plan that will take a 2D
         FFT along the z-y planes of a 3D, row-major data array.
@@ -109,18 +105,3 @@ cdef class PlanAxes:
 
         libc.stdlib.free(dims)
         libc.stdlib.free(howmany_dims)
-
-    def __call__(self):
-        if self._fftw_plan != NULL:
-            fftw_execute(self._fftw_plan)
-
-    def __dealloc__(self):
-        fftw_destroy_plan(self._fftw_plan)
-
-    property data:
-        def __get__(self):
-            return self._data
-    
-        def __set__(self, inp):
-            self._data[:]=inp
-
