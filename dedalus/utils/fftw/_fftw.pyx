@@ -1,5 +1,5 @@
 from _fftw cimport *
-
+cimport libc
 cimport numpy as np
 import numpy as np
 fftw_flags = {'FFTW_FORWARD': FFTW_FORWARD,
@@ -65,3 +65,62 @@ cdef class Plan:
     
         def __set__(self, inp):
             self._data[:]=inp
+
+cdef class PlanAxes:
+    cdef fftw_plan _fftw_plan
+    cdef np.ndarray _data
+    cdef int direction
+    cdef int flags
+    def __cinit__(self, data, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
+        """PlanAxes returns a special FFTW plan that will take a 2D
+        FFT along the z-y planes of a 3D, row-major data array.
+
+        """
+        if direction == 'FFTW_FORWARD':
+            self.direction = FFTW_FORWARD
+        else:
+            self.direction = FFTW_BACKWARD
+        for f in flags:
+            self.flags = self.flags | fftw_flags[f]
+        self._data = data
+
+        # allocate 
+        cdef int rank = 2
+        cdef fftw_iodim *dims = <fftw_iodim *> libc.stdlib.malloc(sizeof(fftw_iodim) * rank)
+        cdef int howmany_rank = 1
+        cdef fftw_iodim *howmany_dims = <fftw_iodim *> libc.stdlib.malloc(sizeof(fftw_iodim) * howmany_rank)
+
+
+        # setup transforms
+        dims[0].n = data.shape[0]
+        dims[0].ins = data.shape[1]*data.shape[2]
+        dims[0].ous = data.shape[1]*data.shape[2]
+        dims[1].n = data.shape[1]
+        dims[1].ins = data.shape[2]
+        dims[1].ous = data.shape[2]
+
+        howmany_dims[0].n = data.shape[2]
+        howmany_dims[0].ins = 1
+        howmany_dims[0].ous = 1
+        
+        self._fftw_plan = fftw_plan_guru_dft(rank, dims, howmany_rank, howmany_dims,
+                                             <complex *> self._data.data, <complex *> self._data.data,
+                                             self.direction, self.flags)
+
+        libc.stdlib.free(dims)
+        libc.stdlib.free(howmany_dims)
+
+    def __call__(self):
+        if self._fftw_plan != NULL:
+            fftw_execute(self._fftw_plan)
+
+    def __dealloc__(self):
+        fftw_destroy_plan(self._fftw_plan)
+
+    property data:
+        def __get__(self):
+            return self._data
+    
+        def __set__(self, inp):
+            self._data[:]=inp
+
