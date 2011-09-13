@@ -1,9 +1,14 @@
 cdef extern from "complex.h":
     pass
+
 cdef extern from "fftw3.h":
     ctypedef struct fftw_plan_s:
         pass
     ctypedef fftw_plan_s *fftw_plan
+    ctypedef struct fftw_iodim:
+        int n
+        int ins "is"
+        int ous "os"
 
     fftw_plan fftw_plan_dft_2d(int n0,
                                int n1,
@@ -18,7 +23,6 @@ cdef extern from "fftw3.h":
                                complex* out_,
                                int sign,
                                unsigned flags)
-                               
     fftw_plan fftw_plan_many_dft(int rank,
                                  int* n_,
                                  int howmany,
@@ -32,11 +36,17 @@ cdef extern from "fftw3.h":
                                  int odist,
                                  int sign,
                                  unsigned flags)
+    fftw_plan fftw_plan_guru_dft(int rank,
+                                 fftw_iodim *dims,
+                                 int howmany_rank,
+                                 fftw_iodim *howmany_dims,
+                                 complex *in_,
+                                 complex *out,
+                                 int sign,
+                                 unsigned flags)
 
     void fftw_execute(fftw_plan plan)
     void fftw_destroy_plan(fftw_plan plan)
-
-    # TODO: NEED GURU WRAPPER TOO
 
 cdef enum:
     FFTW_FORWARD = -1
