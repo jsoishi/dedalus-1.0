@@ -1022,6 +1022,7 @@ class BaryonCDMCosmology(Physics):
     def grad_phi(self, data):
         a = self.aux_eqns['a'].value
         H = self.aux_eqns['a'].RHS(a) / a
+        H0 = self.parameters['H0']
         
         sampledata = data['delta_c']
         

@@ -37,9 +37,10 @@ else:
     normfname = sys.argv[1]
     thermofname = sys.argv[2]
 
-shape = (32,32,32)
-L = (1000,)*3
+shape = (128,)*3
+L = (500,)*3
 RHS = BaryonCDMCosmology(shape, FourierRepresentation, length=L)
+#RHS = LinearBaryonCDMCosmology(shape, FourierRepresentation, length=L)
 data = RHS.create_fields(0.)
 H0 = 7.185e-5 # 70.3 km/s/Mpc in Myr^-1
 a_i = RHS.aux_eqns['a'].value # initial scale factor
@@ -61,7 +62,7 @@ def read_cs2(thermo_fname):
         
     return a, cs2
 
-RHS.parameters['Omega_r'] = 8.4e-5
+RHS.parameters['Omega_r'] = 0.0#8.4e-5
 RHS.parameters['Omega_m'] = 0.276
 RHS.parameters['Omega_b'] = 0.045
 RHS.parameters['Omega_c'] = RHS.parameters['Omega_m'] - RHS.parameters['Omega_b']
@@ -73,9 +74,9 @@ RHS.init_cs2(a, cs2)
 spec_delta_c, spec_u_c, spec_delta_b, spec_u_b = cosmo_spectra(data, normfname, a_i, baryons=True)
 cosmo_fields(data['delta_c'], data['u_c'], data['delta_b'], data['u_b'], spec_delta_c, spec_u_c, spec_delta_b, spec_u_b)
 
-dt = 5. # time in Myr
+dt = 0.25 # time in Myr
 ti = RK4simplevisc(RHS)
-ti.stop_time(100.*dt)
+ti.stop_time(1000)
 ti.set_nsnap(100)
 ti.set_dtsnap(10000)
 
@@ -90,7 +91,7 @@ CFL = dt / (2*na.pi/na.max(data['delta_b'].k['x']))
 
 while ti.ok:
     Dplus = ((data.time + t_ini)/t_ini) ** (2./3.)
-    print 'step: ', i, ' a = ', RHS.aux_eqns['a'].value
+    print 'step: ', i, ' a = ', RHS.aux_eqns['a'].value, ' t = ', data.time
     print CFL * na.max(data['u_c'][0]['xspace'])
     ti.advance(data, dt)
     i = i + 1
