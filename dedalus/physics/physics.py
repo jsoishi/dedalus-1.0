@@ -660,13 +660,15 @@ class LinearCollisionlessCosmology(Physics):
     def grad_phi(self, data):
         a  = self.aux_eqns['a'].value
         H  = self.aux_eqns['a'].RHS(a) / a
+        H0 = self.parameters['H0']
         Om = self.parameters['Omega_m']
+
         gradphi = self.aux_fields['gradphi']
-        tmp = (-3./2. * H*H * data['delta']['kspace'] /
+        tmp = (-3./2. * H0*H0/a * data['delta']['kspace'] /
                 data['delta'].k2(no_zero=True))
         
         for i in self.dims:            
-            gradphi[i]['kspace'] = 1j * a*a * data['u'][i].k[self._trans[i]] * tmp
+            gradphi[i]['kspace'] = 1j * data['u'][i].k[self._trans[i]] * tmp
 
 class CollisionlessCosmology(LinearCollisionlessCosmology):
     """This class implements collisionless cosmology with nonlinear terms.
@@ -847,18 +849,18 @@ class LinearBaryonCDMCosmology(Physics):
     def grad_phi(self, data):
         a = self.aux_eqns['a'].value
         H = self.aux_eqns['a'].RHS(a) / a
+        H0 = self.parameters['H0']
         
         sampledata = data['delta_c']
         
         gradphi = self.aux_fields['gradphi']
-        tmp = (-3./2. * H*H * 
+        tmp = (-3./2. * H0*H0/a * 
                 ((self.parameters['Omega_c'] * data['delta_c']['kspace'] + 
                   self.parameters['Omega_b'] * data['delta_b']['kspace'])) /
-                 #self.parameters['Omega_m']) / 
                 sampledata.k2(no_zero=True))
 
         for i in self.dims:
-            gradphi[i]['kspace'] = 1j * a*a * sampledata.k[self._trans[i]] * tmp
+            gradphi[i]['kspace'] = 1j * sampledata.k[self._trans[i]] * tmp
 
     def v_b_RHS(self, data):
         # needs pressure term
@@ -1024,14 +1026,13 @@ class BaryonCDMCosmology(Physics):
         sampledata = data['delta_c']
         
         gradphi = self.aux_fields['gradphi']
-        tmp = (-3./2. * H*H * 
+        tmp = (-3./2. * H0*H0/a * 
                 ((self.parameters['Omega_c'] * data['delta_c']['kspace'] + 
-                  self.parameters['Omega_b'] * data['delta_b']['kspace']) /
-                 self.parameters['Omega_m']) / 
+                  self.parameters['Omega_b'] * data['delta_b']['kspace'])) /
                 sampledata.k2(no_zero=True))
 
         for i in self.dims:
-            gradphi[i]['kspace'] = 1j * a*a * sampledata.k[self._trans[i]] * tmp
+            gradphi[i]['kspace'] = 1j * sampledata.k[self._trans[i]] * tmp
 
     def v_b_RHS(self, data):
         # needs pressure term
