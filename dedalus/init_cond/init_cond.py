@@ -370,7 +370,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
 
 
     vunit = 1.02268944e-6 # km/s in Mpc/Myr
-    thetac = thetac * ampl * vunit * h * 2. ## why 2!?!?!?
+    thetac = thetac * ampl * vunit 
 
 
     # ... calculate spectra    
@@ -385,13 +385,13 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
 
     if baryons:
         deltabp = na.array(Tdb)
-        thetab  = na.array(dTvc)
+        thetab  = na.array(dTvb)
 
         deltabp = deltabp * ampl
-        thetab  = thetab * ampl * vunit * h * 2.0## again 2, needs to be understood
+        thetab  = thetab * ampl * vunit 
         
         f_deltabp = interp1d(na.log10(ak), na.log10(deltabp), kind='linear')
-        spec_delta_b = kk**(nspect/2.)*10.**f_deltabp(na.log10(kk))
+        spec_delta_b = kk**(nspect/2.)*10.**f_deltabp(na.log10(kk)) 
         spec_delta_b[kzero] = 0.
         
         f_thetab = interp1d(na.log10(ak), na.log10(thetab), kind='linear')
