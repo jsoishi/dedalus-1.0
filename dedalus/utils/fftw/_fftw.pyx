@@ -1,3 +1,25 @@
+"""Custom FFTW wrappers for Dedalus
+
+Author: J. S. Oishi <jsoishi@gmail.com>
+Affiliation: KIPAC/SLAC/Stanford
+License:
+  Copyright (C) 2011 J. S. Oishi.  All Rights Reserved.
+
+  This file is part of dedalus.
+
+  dedalus is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
 from _fftw cimport *
 cimport libc
 cimport numpy as np
@@ -20,6 +42,9 @@ cdef class Plan:
     cdef int direction
     cdef int flags
     def __cinit__(self, data, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
+        """A custom wrapping of FFTW for use in Dedalus.
+
+        """
         if direction == 'FFTW_FORWARD':
             self.direction = FFTW_FORWARD
         else:
@@ -85,7 +110,6 @@ cdef class PlanPlane(Plan):
         cdef int howmany_rank = 1
         cdef fftw_iodim *howmany_dims = <fftw_iodim *> libc.stdlib.malloc(sizeof(fftw_iodim) * howmany_rank)
 
-
         # setup transforms
         dims[0].n = data.shape[0]
         dims[0].ins = data.shape[1]*data.shape[2]
@@ -98,8 +122,10 @@ cdef class PlanPlane(Plan):
         howmany_dims[0].ins = 1
         howmany_dims[0].ous = 1
         
-        self._fftw_plan = fftw_plan_guru_dft(rank, dims, howmany_rank, howmany_dims,
-                                             <complex *> self._data.data, <complex *> self._data.data,
+        self._fftw_plan = fftw_plan_guru_dft(rank, dims,
+                                             howmany_rank, howmany_dims,
+                                             <complex *> self._data.data,
+                                             <complex *> self._data.data,
                                              self.direction, self.flags)
 
         libc.stdlib.free(dims)
