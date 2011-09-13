@@ -66,11 +66,10 @@ cdef class Plan:
         def __set__(self, inp):
             self._data[:]=inp
 
-cdef class PlanAxes(Plan):
+cdef class PlanPlane(Plan):
     def __cinit__(self, data, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
-        """PlanAxes returns a special FFTW plan that will take a 2D
+        """PlanPlane returns a special FFTW plan that will take a 2D
         FFT along the z-y planes of a 3D, row-major data array.
-
         """
         if direction == 'FFTW_FORWARD':
             self.direction = FFTW_FORWARD
@@ -105,3 +104,35 @@ cdef class PlanAxes(Plan):
 
         libc.stdlib.free(dims)
         libc.stdlib.free(howmany_dims)
+
+cdef class PlanPencil(Plan):
+    def __cinit__(self, data, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
+        """PlanPencil returns a FFTW plan that will take a 1D
+        FFT along the x pencils of a 3D, row-major data array.
+        """
+        if direction == 'FFTW_FORWARD':
+            self.direction = FFTW_FORWARD
+        else:
+            self.direction = FFTW_BACKWARD
+        for f in flags:
+            self.flags = self.flags | fftw_flags[f]
+        self._data = data
+
+        cdef np.ndarray n = np.array(data.shape, dtype='int32')
+        cdef int rank = 1
+        cdef int howmany = data.shape[0]*data.shape[1]
+        cdef int istride = 1
+        cdef int ostride = istride
+        cdef int idist = data.shape[2]
+        cdef int odist = idist
+
+        self._fftw_plan = fftw_plan_many_dft(rank, <int *> n.data,
+                                             howmany,
+                                             <complex *> self._data.data,
+                                             <int *> n. data,
+                                             istride, idist,
+                                             <complex *> self._data.data,
+                                             <int *> n. data,
+                                             ostride, odist,
+                                             self.direction,
+                                             self.flags)
