@@ -166,7 +166,7 @@ def compute_en_spec(data, field, normalization=1.0, averaging=None):
         spec             Power spectrum of f
     """
     f = data[field]
-    power = na.zeros(f[0].data.shape)
+    power = na.zeros(f[0]['kspace'].shape)
     for i in xrange(f.ncomp):
         power += 0.5 * na.abs(f[i]['kspace']) ** 2
     power *= normalization
@@ -261,6 +261,9 @@ def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', outp
     """
     k, spec_f1 = compute_en_spec(data, f1)
     k, spec_f2 = compute_en_spec(data, f2)
+
+    if comm and comm.Get_rank() != 0:
+        return
 
     if not os.path.exists('frames'):
         os.mkdir('frames')
