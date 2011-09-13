@@ -357,7 +357,7 @@ class ParallelFourierRepresentation(FourierRepresentation):
                        'xspace': [self.length[0]*self.nproc,
                                   self.length[1],
                                   self.length[2]/self.nproc]}
-        self.sendbuf = na.empty((self.nproc,) + (self._shape['kspace'][0],) + tuple(self._shape['xspace'][1:]))
+        self.sendbuf = na.empty((self.nproc,) + (self._shape['kspace'][0],) + tuple(self._shape['xspace'][1:]), dtype=dtype)
         self.recvbuf = na.empty_like(self.sendbuf)
 
     def __setitem__(self, space, data):
