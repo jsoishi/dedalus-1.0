@@ -48,7 +48,7 @@ class FourierRepresentation(Representation):
 
     """
 
-    def __init__(self, sd, shape, length, dtype='complex64', method='cu_fft',
+    def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
                  dealiasing='2/3'):
         """
         Inputs:
