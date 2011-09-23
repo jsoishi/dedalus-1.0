@@ -25,6 +25,7 @@ import numpy.fft as fpack
 import fftw3
 
 from dedalus.utils.parallelism import comm, MPI
+from dedalus.utils.fftw import fftw
 
 class Representation(object):
     """a representation of a field. it stores data and provides
@@ -360,6 +361,7 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.sendbuf = na.empty((self.nproc,) + (self._shape['kspace'][0],) + tuple(self._shape['xspace'][1:]), dtype=dtype)
         self.recvbuf = na.empty_like(self.sendbuf)
 
+
     def __setitem__(self, space, data):
         """this needs to ensure the pointer for the field's data
         member doesn't change for FFTW. Currently, we do that by
@@ -378,6 +380,22 @@ class ParallelFourierRepresentation(FourierRepresentation):
 
         self._curr_space = space
 
+    def set_fft(self, method):
+        self._mid  = na.empty([self.data.shape[0]*self.nproc,
+                                  self.data.shape[1],
+                                  self.data.shape[2]/self.nproc],dtype='complex128')
+        if method == 'fftw':
+            self.fplan_yz = fftw.PlanPlane(self.data, direction='forward', flags=['FFTW_MEASURE'])
+            self.fplan_x = fftw.PlanPencil(self.data, direction='forward', flags=['FFTW_MEASURE'])
+            self.rplan_yz = fftw.PlanPlane(self.data, direction='backward', flags=['FFTW_MEASURE'])
+            self.rplan_x = fftw.PlanPencil(self.data, direction='backward', flags=['FFTW_MEASURE'])
+
+            self.fft = self.fwd_fftw
+            self.ifft = self.rev_fftw
+        if method == 'numpy':
+            self.fft = self.fwd_np
+            self.ifft = self.rev_np
+
     def _setup_k(self):
         global_shape = na.array(self.shape)*na.array([self.nproc, 1, 1])
         global_length = na.array(self.length)*na.array([self.nproc, 1, 1])
@@ -395,6 +413,11 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.k['z'] = self.k['z'][self.myproc*self.shape[0]:(self.myproc+1)*self.shape[0]]
 
     def communicate(self, direction):
+        """Handles the communication.
+
+        """
+        # concatenate assumes a list of arrays, so concat_axis is
+        # actually indexing into data, not recvbuf; 0 --> z, 2 --> x
         if direction == 'forward':
             sz = self.shape[0] / self.nproc
             for i in xrange(self.nproc):
@@ -419,28 +442,46 @@ class ParallelFourierRepresentation(FourierRepresentation):
     def fwd_np(self):
         """xspace to kspace"""
         
-        # z fft
-        self.data = fpack.fftn(self.data, axes=(0,))
+        # yz fft
+        self.data = fpack.fftn(self.data, axes=(0,1))
 
+        print "FWD: self.data.shape = ", self.data.shape
         # transform
         recvbuf = self.communicate('forward')
-
-        # xy fft
-        self.data = fpack.fftn(recvbuf, axes=(1,2))
-        
+        print "FWD: recvbuf.shape = ", recvbuf.shape
+        # x fft
+        self.data = fpack.fft(recvbuf, axis=2)
+        print "FWD: self.data.shape = ", self.data.shape
     def rev_np(self):
         """kspace to xspace
         
         """
         
-        # xy fft
-        self.data = fpack.ifftn(self.data, axes=(1,2))
+        # x fft
+        self.data = fpack.ifft(self.data, axis=2)
 
+        print "REV: self.data.shape = ", self.data.shape
         # Transpose
         recvbuf = self.communicate('backward')
+        print "REV: recvbuf.shape = ", recvbuf.shape
+        # yz fft
+        self.data = fpack.ifftn(recvbuf, axes=(0,1))
+        print "REV: self.data.shape = ", self.data.shape
 
-        # z fft
-        self.data = fpack.ifftn(recvbuf, axes=(0,))
+    def fwd_fftw(self):
+        self.fplan_yz()
+        self.data.shape = self._shape['kspace']
+        self.data[:] = self.communicate('forward')
+        self.fplan_x()
+        self.data /= na.sqrt(self.data.size)
+
+    def rev_fftw(self):
+        self.rplan_x()
+        self.data.shape = self._shape['xspace']
+        self.data[:] = self.communicate('backward')
+        self.rplan_yz()
+        self.data /= na.sqrt(self.data.size)
+        self.data.imag = 0.
 
 class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierShearRepresentation):
     def __init__(self, sd, shape, length, dtype='complex128', method='numpy',
