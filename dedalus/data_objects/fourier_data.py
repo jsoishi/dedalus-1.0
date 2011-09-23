@@ -351,9 +351,9 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.offset = na.array([0, 0, self.myproc * shape[2]])
         self._setup_k()
         self._shape = {'kspace': self.data.shape,
-                       'xspace': [self.data.shape[0]*self.nproc,
+                       'xspace': (self.data.shape[0]*self.nproc,
                                   self.data.shape[1],
-                                  self.data.shape[2]/self.nproc]}
+                                  self.data.shape[2]/self.nproc)}
         self._length = {'kspace': [self.length[0], self.length[1], self.length[2]],
                        'xspace': [self.length[0]*self.nproc,
                                   self.length[1],
