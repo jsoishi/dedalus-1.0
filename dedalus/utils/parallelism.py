@@ -49,3 +49,44 @@ def setup_parallel_objs(global_shape, global_len):
     local_len = (global_len[0]/comm.Get_size(),) + global_len[1:]
 
     return local_shape, local_len
+
+def load_all(field, snap_dir):
+    """hacky function to concatenate all MPI tasks data into a single
+    global size cube for analysis/testing.
+
+    inputs
+    ------
+    field -- the name of the field to be retrived
+    snap_dir -- the snapshot directory
+
+    returns
+    -------
+    data -- a numpy array containing the data.
+    space -- a string of 'xspace' or 'kspace'
+    """
+    import h5py
+    import os
+    import glob
+    import numpy as np
+
+    nproc = len(glob.glob(os.path.join(snap_dir,"data.cpu*")))
+
+    data_file = os.path.join(snap_dir, 'data.cpu%04i')
+    fi = h5py.File(data_file % 0)
+    space = fi['/fields/u/0'].attrs['space']
+    local_size = fi['/fields/u/0'].shape
+    dtype = fi['/fields/u/0'].dtype
+    data = np.empty((nproc,)+local_size, dtype=dtype)
+    fi.close()
+    for i in range(1,nproc):
+        fi = h5py.File(data_file % i)
+        fi[field].read_direct(data[i])
+        fi.close()
+
+        
+    if space == 'xspace':
+        concat_ax = 2
+    else:
+        concat_ax = 0
+    return np.concatenate(data,axis=concat_ax), space
+    
