@@ -381,9 +381,6 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self._curr_space = space
 
     def set_fft(self, method):
-        self._mid  = na.empty([self.data.shape[0]*self.nproc,
-                                  self.data.shape[1],
-                                  self.data.shape[2]/self.nproc],dtype='complex128')
         if method == 'fftw':
             self.fplan_yz = fftw.PlanPlane(self.data, direction='forward', flags=['FFTW_MEASURE'])
             self.fplan_x = fftw.PlanPencil(self.data, direction='forward', flags=['FFTW_MEASURE'])
@@ -445,13 +442,12 @@ class ParallelFourierRepresentation(FourierRepresentation):
         # yz fft
         self.data = fpack.fftn(self.data, axes=(0,1))
 
-        print "FWD: self.data.shape = ", self.data.shape
         # transform
         recvbuf = self.communicate('forward')
-        print "FWD: recvbuf.shape = ", recvbuf.shape
+
         # x fft
         self.data = fpack.fft(recvbuf, axis=2)
-        print "FWD: self.data.shape = ", self.data.shape
+
     def rev_np(self):
         """kspace to xspace
         
@@ -460,25 +456,27 @@ class ParallelFourierRepresentation(FourierRepresentation):
         # x fft
         self.data = fpack.ifft(self.data, axis=2)
 
-        print "REV: self.data.shape = ", self.data.shape
         # Transpose
         recvbuf = self.communicate('backward')
-        print "REV: recvbuf.shape = ", recvbuf.shape
+
         # yz fft
         self.data = fpack.ifftn(recvbuf, axes=(0,1))
-        print "REV: self.data.shape = ", self.data.shape
 
     def fwd_fftw(self):
         self.fplan_yz()
+        a = self.communicate('forward')
+
         self.data.shape = self._shape['kspace']
-        self.data[:] = self.communicate('forward')
+        self.data[:] = a
         self.fplan_x()
         self.data /= na.sqrt(self.data.size)
 
     def rev_fftw(self):
         self.rplan_x()
+        
+        a = self.communicate('backward')
         self.data.shape = self._shape['xspace']
-        self.data[:] = self.communicate('backward')
+        self.data[:] = a
         self.rplan_yz()
         self.data /= na.sqrt(self.data.size)
         self.data.imag = 0.
