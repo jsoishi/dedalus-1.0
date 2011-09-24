@@ -66,5 +66,6 @@ from dedalus.time_stepping.api import \
 
 from dedalus.utils.api import \
     restart, \
-    setup_parallel_objs
+    setup_parallel_objs, \
+    load_all
 
