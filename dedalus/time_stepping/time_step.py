@@ -26,8 +26,10 @@ import time
 import h5py
 import numpy as na
 from dedalus.funcs import insert_ipython, get_mercurial_changeset_id
+from dedalus.utils.api import Timer
 
 class TimeStepBase(object):
+    timer = Timer()
     def __init__(self, RHS, CFL=0.4, int_factor=None):
         """Base class for dedalus time stepping methods. Provides
         stopping controls, statistics, and (eventually) a snapshotting
@@ -65,7 +67,7 @@ class TimeStepBase(object):
             self._is_ok = False
 
         return self._is_ok
-
+    @timer
     def advance(self, data, dt):
         if ((self.iter % self._dnsnap) == 0) or (data.time - self._tlastsnap >= self._dtsnap):
             self.snapshot(data)
@@ -114,9 +116,9 @@ class TimeStepBase(object):
         self._dtsnap = dt
                        
     def final_stats(self):
-        stop_time = time.time()
-        total_wtime = stop_time - self._start_time
-        print "total wall time: %10.5e sec" % total_wtime
+        self.timer.print_stats()
+        total_wtime = self.timer.timers['advance']
+        print "total advance wall time: %10.5e sec" % total_wtime
         print "%10.5e sec/step " %(total_wtime/self.iter)
         print "Simulation complete. Status: awesome"
 
