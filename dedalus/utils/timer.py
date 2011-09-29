@@ -40,8 +40,11 @@ class Timer(object):
         return wrapper
 
     def print_stats(self):
+        print
+        print "---Timings---"
         for k,v in self.timers.iteritems():
             print "%s: %10.5f sec" % (k,v)
+        print
 
 if __name__ == "__main__":
     from time import sleep
