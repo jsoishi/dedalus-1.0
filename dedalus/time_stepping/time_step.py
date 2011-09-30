@@ -76,6 +76,7 @@ class TimeStepBase(object):
     def do_advance(self, data, dt):
         raise NotImplementedError("do_advance must be provided by subclass.")
 
+    @timer
     def snapshot(self, data):
         pathname = "snap_%05i" % (self._nsnap)
         if not os.path.exists(pathname):
