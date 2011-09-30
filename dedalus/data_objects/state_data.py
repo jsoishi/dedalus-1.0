@@ -93,7 +93,6 @@ class StateData(object):
         if field not in self.fields.keys():
             self.fields[field] = self._field_classes[field_type](self)
 
-    @timer
     def snapshot(self, root_grp):
         """save all fields to the HDF5 group given by input
 
