@@ -22,8 +22,6 @@ License:
 """
 import numpy as na
 import numpy.fft as fpack
-import fftw3
-
 from dedalus.utils.parallelism import comm, MPI
 from dedalus.utils.fftw import fftw
 
@@ -55,6 +53,9 @@ class FourierRepresentation(Representation):
         """
         self.sd = sd
         self.shape = shape
+        self._shape = {'kspace': shape,
+                       'xspace': shape
+            }
         self.length = length
         self.ndim = len(self.shape)
         self.data = na.zeros(self.shape, dtype=dtype)
@@ -111,8 +112,8 @@ class FourierRepresentation(Representation):
 
     def set_fft(self, method):
         if method == 'fftw':
-            self.fplan = fftw3.Plan(self.data, direction='forward', flags=['measure'])
-            self.rplan = fftw3.Plan(self.data, direction='backward', flags=['measure'])
+            self.fplan = fftw.Plan(self.data, direction='forward', flags=['FFTW_MEASURE'])
+            self.rplan = fftw.Plan(self.data, direction='backward', flags=['FFTW_MEASURE'])
             self.fft = self.fwd_fftw
             self.ifft = self.rev_fftw
         if method == 'numpy':
