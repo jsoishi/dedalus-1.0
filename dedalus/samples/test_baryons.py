@@ -25,6 +25,7 @@ from dedalus.mods import *
 import numpy as na
 import sys
 import pylab as pl
+from dedalus.utils.parallelism import setup_parallel_objs
 
 if len(sys.argv) != 3:
     print "usage: ", sys.argv[0], "<normalization data file> <thermal history data file>"
@@ -37,10 +38,11 @@ else:
     normfname = sys.argv[1]
     thermofname = sys.argv[2]
 
-shape = (128,)*3
-L = (500,)*3
-RHS = BaryonCDMCosmology(shape, FourierRepresentation, length=L)
-#RHS = LinearBaryonCDMCosmology(shape, FourierRepresentation, length=L)
+shape = (32,32,32)
+L = (1000,)*3
+shape, L = setup_parallel_objs(shape, L)
+RHS = BaryonCDMCosmology(shape, ParallelFourierRepresentation, length=L)
+
 data = RHS.create_fields(0.)
 H0 = 7.185e-5 # 70.3 km/s/Mpc in Myr^-1
 a_i = RHS.aux_eqns['a'].value # initial scale factor
