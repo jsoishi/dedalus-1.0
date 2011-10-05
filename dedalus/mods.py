@@ -63,4 +63,5 @@ from dedalus.time_stepping.api import \
     RK4simplevisc
 
 from dedalus.utils.api import \
-    restart
+    restart, \
+    Timer

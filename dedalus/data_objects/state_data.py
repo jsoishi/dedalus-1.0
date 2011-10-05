@@ -25,6 +25,7 @@ from collections import OrderedDict
 import h5py
 import numpy as na
 from dedalus.funcs import get_mercurial_changeset_id
+from dedalus.utils.api import Timer
 from field_object import create_field_classes
 
 def _reconstruct_data(*args, **kwargs):
@@ -44,6 +45,7 @@ class StateData(object):
     according to the coordinate system in use (xyz/rthetaphi/rphiz/etc
     etc etc)...or 0,1,2
     """
+    timer = Timer()
     def __init__(self, time, shape, length, field_class_dict, field_list=[], params={}):
         self.time = time
         self.shape = shape
@@ -102,4 +104,3 @@ class StateData(object):
         for name, field in self.fields.iteritems():
             fgrp = root_grp.create_group(name)
             field.save(fgrp)
-

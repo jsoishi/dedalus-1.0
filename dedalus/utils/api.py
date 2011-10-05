@@ -3,3 +3,6 @@ from .metrics import \
 
 from .restart import \
     restart
+
+from .timer import \
+     Timer
