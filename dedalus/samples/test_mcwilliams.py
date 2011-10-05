@@ -23,12 +23,12 @@ License:
 from dedalus.mods import *
 
 shape = (450,450)
-RHS = Hydro(shape, FourierRepresentation)
+RHS = Hydro(shape, FourierRepresentation, visc_order=2)
 RHS.parameters['nu'] = 3.5e-7 # 100x mcwilliams
 data = RHS.create_fields(0.)
 
 turb(data['u']['x'],data['u']['y'],mcwilliams_spec,k0=23.)
-ti = RK2simplehypervisc4(RHS,CFL=0.4)
+ti = RK2simplevisc(RHS,CFL=0.4)
 ti.stop_time(1.) # set stoptime
 ti.stop_iter(100) # max iterations
 ti.stop_walltime(3600.) # stop after 10 hours
