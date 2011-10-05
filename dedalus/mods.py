@@ -28,7 +28,9 @@ from dedalus.analysis.api import \
 
 from dedalus.data_objects.api import \
     FourierRepresentation, \
-    FourierShearRepresentation
+    FourierShearRepresentation, \
+    ParallelFourierRepresentation, \
+    ParallelFourierShearRepresentation
 
 from dedalus.init_cond.api import \
     taylor_green, \
@@ -64,4 +66,6 @@ from dedalus.time_stepping.api import \
 
 from dedalus.utils.api import \
     restart, \
-    Timer
+    Timer, \
+    setup_parallel_objs, \
+    load_all

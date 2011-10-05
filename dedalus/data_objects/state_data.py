@@ -104,3 +104,22 @@ class StateData(object):
         for name, field in self.fields.iteritems():
             fgrp = root_grp.create_group(name)
             field.save(fgrp)
+
+    def create_tmp_data(self, space):
+        """create a temporary data space with the dimensions of the
+        first field element (we assume all fields have the same shape)
+        
+        input
+        -----
+        space -- x or kspace. In parallel, these have different shapes
+
+        output
+        ------
+        a numpy array of zeros with shape of data space (x or k) and
+        dtype set to the same as the data
+        
+        """
+
+        fi = self.fields[self.fields.keys()[0]][0]
+        return na.zeros(fi._shape[space], fi.data.dtype)
+>>>>>>> other
