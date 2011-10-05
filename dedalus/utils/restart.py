@@ -23,6 +23,7 @@ License:
 import os
 import cPickle
 import h5py
+import time
 from dedalus.funcs import insert_ipython
 OBJECT_FILENAME='dedalus_obj.cpkl'
 
@@ -38,6 +39,7 @@ def restart(snap_dir):
     filename = os.path.join(snap_dir, DATA_FILENAME)
     load_all_data(data, filename)
     ti.RHS = RHS
+    ti._start_time = time.time()
     return RHS, data, ti
 
 def load_all_data(data, filename):
