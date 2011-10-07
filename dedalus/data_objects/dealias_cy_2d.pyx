@@ -1,12 +1,12 @@
 import numpy as np
 cimport numpy as np
-
+cimport cython
 DTYPE1 = np.complex128
 ctypedef np.complex128_t DTYPE1_t
 
 DTYPE2 = np.float64
 ctypedef np.float64_t DTYPE2_t
-
+@cython.boundscheck(False)
 def dealias_23(np.ndarray[DTYPE1_t, ndim=2] data not None,
                np.ndarray[DTYPE2_t, ndim=2] kx not None,
                np.ndarray[DTYPE2_t, ndim=2] ky not None,
