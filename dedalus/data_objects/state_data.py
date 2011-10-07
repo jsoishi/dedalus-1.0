@@ -122,4 +122,3 @@ class StateData(object):
 
         fi = self.fields[self.fields.keys()[0]][0]
         return na.zeros(fi._shape[space], fi.data.dtype)
->>>>>>> other
