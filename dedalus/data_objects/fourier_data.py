@@ -360,7 +360,7 @@ class FourierShearRepresentation(FourierRepresentation):
             self.k['x'][self.k['x'] >= self.kny[-1]] -= 2 * self.kny[-1]
             
 class ParallelFourierRepresentation(FourierRepresentation):
-    def __init__(self, sd, shape, length, dtype='complex128', method='numpy',
+    def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
                  dealiasing='2/3'):
         """
         Inputs:
