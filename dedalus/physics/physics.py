@@ -664,7 +664,7 @@ class LinearCollisionlessCosmology(Physics):
         Om = self.parameters['Omega_m']
 
         gradphi = self.aux_fields['gradphi']
-        tmp = (-3./2. * H0*H0/a * data['delta']['kspace'] /
+        tmp = (-3./2. * H0*H0/a * Om * data['delta']['kspace'] /
                 data['delta'].k2(no_zero=True))
         
         for i in self.dims:            

@@ -198,18 +198,18 @@ def shearing_wave(data, wampl, kinit):
     data['u']['x']['kspace'] = aux['psi'].deriv('y')
     data['u']['y']['kspace'] = -aux['psi'].deriv('x')
 
-def zeldovich(data, ampl, a_ini, a_cross):
+def zeldovich(data, ampl, A, a_ini, a_cross):
     """velocity wave IC, for testing nonlinear collisionless cosmology
     against the Zeldovich approximation
     """
     k = 2*na.pi/data.length[0]
     N = data['delta'].shape[0]
-    volfac = 1./N**1.5
+    volfac = N**1.5
     D = 1.
-    A = a_ini/(a_cross * k)
+    #A = a_ini/(a_cross * k) # Only true for EdS
     x = na.array([i - N/2 for i in xrange(N)])*data.length[0]/N
     q = na.array(broyden1(lambda y: na.array(y) + D*A*na.sin(k*na.array(y)) - x, x))
-    delta1d = (1./(1. + D*A*k*na.cos(k*q)) - 1.)*volfac
+    delta1d = (1./(1. + D*A*k*na.cos(k*q)) - 1.)
     for i in xrange(N):
         for j in xrange(N):
             data['delta']['xspace'][i,j,:] = delta1d
@@ -264,7 +264,7 @@ def collisionless_cosmo_fields(delta, u, spec_delta, spec_u, mean=0., stdev=1.):
 
     """
     shape = spec_delta.shape
-    rand = (na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape))/na.sqrt(2)
+    rand = (na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape))
     delta['kspace'] = spec_delta * rand
     hermitianize.enforce_hermitian(delta['kspace'])
     delta.dealias()
