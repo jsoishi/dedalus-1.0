@@ -14,7 +14,6 @@ shape = (16,16,16)
 RHS = CollisionlessCosmology(shape, FourierRepresentation)
 data = RHS.create_fields(0.)
 H_0 = 7.185e-5 # 70.3 km/s/Mpc in Myr^-1 (2.27826587e-18 seconds^-1) 
-#ampl = 5e-5 # amplitude of initial velocity wave
 
 L = 2*na.pi # size of box
 N_p = 128 # resolution of analytic solution
@@ -34,18 +33,13 @@ H = lambda ap: H_0*na.sqrt(Omega_r/ap**4 + Omega_m/ap**3 +
                            (1-Omega_r-Omega_l-Omega_m)/ap**2 + Omega_l)
 Hint = lambda ap: 1./(ap**3)/(H(ap))**3
 D_unnorm = lambda ap: H_0**2 * H(ap) * quad(Hint, 0, ap, epsabs=1.0e-10)[0]
-D0 = D_unnorm(a_i)#H_0**2 * H(a_i) * quad(Hint, 0, a_i, epsabs=1.0e-10)[0]
-# dD/dt = da/dt * dD/da
+D0 = D_unnorm(a_i)
 Ddot_i = (H(a_i)*a_i)*(D_unnorm(a_i + 1e-6) - D0)/(1e-6)/D0
-#Ddot_i = (H(a_i)*a_i)*(H_0**2 * H(a_i)
-#                       * Hint(a_i)
-#                       + H_0**2 * (H(a_i + 1e-6)-H(a_i))/1e-6
-#                       * quad(Hint, 0, a_i, epsabs=1.0e-10)[0])/D0
+
 a_cross = 0.1
 A = D0/(H_0**2 * H(a_cross) * quad(Hint, 0, a_cross, epsabs=1.0e-10)[0] * k)
-
 ampl = A * a_i * Ddot_i
-#a_cross = a_i / (A * k)
+
 print "a_cross = ", a_cross
 tcross = (a_cross**(3./2.))*t0 # valid for Einsten-de Sitter 
 
@@ -124,14 +118,11 @@ for i,a in enumerate(a_snapshots):
     outfile = "frames/cmp_a%05f.png" % a
 
     # ... growth factor
-    Da = D_unnorm(a)#H_0**2 * H(a)*quad(Hint, 0, a, epsabs=1.0e-10)[0]
+    Da = D_unnorm(a)
     D = Da/D0
     da = 1e-6
     Ddot = (H(a)*a)*(D_unnorm(a + da) - Da)/da/D0
-    #H_0**2 * H(a)
-    #                 * Hint(a)
-    #                 + H_0**2 * (H(a + da)-H(a))/da
-    #                 * quad(Hint, 0, a, epsabs=1.0e-10)[0])/ D0
+
     # ... analytic solution
     x = q + D*A*na.sin(k*q)
     delta = 1./(1.+D*A*k*na.cos(k*q))-1.
