@@ -77,6 +77,7 @@ def load_all(field, snap_dir):
     local_size = fi['/fields/u/0'].shape
     dtype = fi['/fields/u/0'].dtype
     data = np.empty((nproc,)+local_size, dtype=dtype)
+    fi[field].read_direct(data[0])
     fi.close()
     for i in range(1,nproc):
         fi = h5py.File(data_file % i)
