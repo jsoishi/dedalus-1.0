@@ -68,4 +68,6 @@ from dedalus.utils.api import \
     restart, \
     Timer, \
     setup_parallel_objs, \
-    load_all
+    load_all, \
+    comm
+
