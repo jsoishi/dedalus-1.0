@@ -86,22 +86,23 @@ def alfven(data, k=(0, 0, 1), B0mag=5.0, u1mag=5e-6):
     B0 = na.array([0., 0., 1.])[:N] * B0mag
     
     # Background magnetic field
-    if data['u'].myproc == 0:
-    for i in xrange(data['B'].ndim):
-        k0 = (0,) * N
-        data['B'][i]['kspace'][k0] = B0[i]
+    if (0 in data['u']['x'].k['z'] and
+        0 in data['u']['x'].k['y'] and
+        0 in data['u']['x'].k['x']):
+        for i in xrange(data['B'].ndim):
+            k0 = (0,) * N
+            data['B'][i]['kspace'][k0] = B0[i]
     
     # Assign modes for k and -k
     if (k[0] in data['u']['x'].k['z'] and
         k[1] in data['u']['x'].k['y'] and
         k[2] in data['u']['x'].k['x']):
         
-        kiz = np.where(data['u']['x'].k['y'] == k[0]
-        kiy = np.where(data['u']['x'].k['y'] == k[1]
-        kix = np.where(data['u']['x'].k['x'] == k[2]
+        kiz = na.array(na.where(data['u']['x'].k['z'] == k[0]))
+        kiy = na.array(na.where(data['u']['x'].k['y'] == k[1]))
+        kix = na.array(na.where(data['u']['x'].k['x'] == k[2]))
         
-        kindex = kiz + kiy + kix
-        
+        kindex = tuple(kiz + kiy + kix)
         # Alfven speed and wave frequency
         cA = B0mag / na.sqrt(4 * na.pi * data.parameters['rho0'])
         omega = na.abs(cA * na.dot(k, B0) / B0mag)
@@ -114,7 +115,6 @@ def alfven(data, k=(0, 0, 1), B0mag=5.0, u1mag=5e-6):
     
         # u and B perturbations
         u1 = na.array([0., 1., 0.])[3-N:] * u1mag
-        
         B1 = (na.dot(k, u1) * B0 - na.dot(k, B0) * u1) / omega
         B1mag = na.linalg.norm(B1)
         
@@ -122,25 +122,24 @@ def alfven(data, k=(0, 0, 1), B0mag=5.0, u1mag=5e-6):
             data['u'][i]['kspace']
             data['B'][i]['kspace']
         
-            data['u'][i].data[kindex] = u1[i] * 1j / 2.
+            data['u'][i].data[kindex] = -u1[i] * 1j / 2.
             data['B'][i].data[kindex] = B1[i] * 1j / 2.
             
-    elif (-k[0] in data['u']['x'].k['z'] and
-          -k[1] in data['u']['x'].k['y'] and
-          -k[2] in data['u']['x'].k['x']):
+    if (-k[0] in data['u']['x'].k['z'] and
+         -k[1] in data['u']['x'].k['y'] and
+         -k[2] in data['u']['x'].k['x']):
           
         # Find correct mode
-        # dkx = np.abs(data['u']['x'].k['x'][1] - data['u']['x'].k['x'][0])
-#         dky = np.abs(data['u']['x'].k['y'][1] - data['u']['x'].k['y'][0])
-#         dkz = np.abs(data['u']['x'].k['z'][1] - data['u']['x'].k['z'][0])
+        # dkx = na.abs(data['u']['x'].k['x'][1] - data['u']['x'].k['x'][0])
+#         dky = na.abs(data['u']['x'].k['y'][1] - data['u']['x'].k['y'][0])
+#         dkz = na.abs(data['u']['x'].k['z'][1] - data['u']['x'].k['z'][0])
 #         
 #         
-        kiz = np.where(data['u']['x'].k['y'] == -k[0]
-        kiy = np.where(data['u']['x'].k['y'] == -k[1]
-        kix = np.where(data['u']['x'].k['x'] == -k[2]
+        kiz = na.array(na.where(data['u']['x'].k['y'] == -k[0]))
+        kiy = na.array(na.where(data['u']['x'].k['y'] == -k[1]))
+        kix = na.array(na.where(data['u']['x'].k['x'] == -k[2]))
         
-        kindex = kiz + kiy + kix
-          
+        kindex = tuple(kiz + kiy + kix)
         # Alfven speed and wave frequency
         cA = B0mag / na.sqrt(4 * na.pi * data.parameters['rho0'])
         omega = na.abs(cA * na.dot(k, B0) / B0mag)
