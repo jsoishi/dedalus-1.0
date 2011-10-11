@@ -25,7 +25,7 @@ from dedalus.mods import *
 import numpy as na
 import sys
 import pylab as pl
-
+from dedalus.utils.parallelism import setup_parallel_objs
 
 if len(sys.argv) != 2:
     print "usage: ", sys.argv[0], " <normalization data file>"
@@ -36,9 +36,10 @@ if len(sys.argv) != 2:
 else:
     normfname = sys.argv[1]
 
-shape = (64,)*3
-L = (30,)*3
-RHS = CollisionlessCosmology(shape, FourierRepresentation, length=L)
+shape = (32,32,32)
+L = (1000,)*3
+shape, L = setup_parallel_objs(shape, L)
+RHS = CollisionlessCosmology(shape, ParallelFourierRepresentation, length=L)
 data = RHS.create_fields(0.)
 h = 0.703
 nsp = 0.961
@@ -47,6 +48,7 @@ sigma8 = 0.811
 H0 = h * 1.02204836e-4 # h * 100 km/s/Mpc in Myr^-1
 a_i = RHS.aux_eqns['a'].value # initial scale factor
 t0 = (2./3.)/H0 # present age of E-dS universe
+
 t_ini = (a_i**(3./2.)) * t0 # time at which a = a_i (in Einstein-de Sitter)
 
 RHS.parameters['Omega_r'] = 0.#8.4e-5
@@ -70,7 +72,6 @@ an.add("compare_power", 20, {'f1':'delta', 'f2':'u'})
 
 i=0
 an.run()
-
 CFL = dt / (2*na.pi/na.max(data['delta'].k['x']))
 MAXCOSMOSTEP = 0.125
 
@@ -91,4 +92,3 @@ while ti.ok:
     ti.advance(data, dt)
     i = i + 1
     an.run()
-    

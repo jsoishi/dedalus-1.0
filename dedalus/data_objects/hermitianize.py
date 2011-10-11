@@ -23,6 +23,7 @@ License:
 """
 
 import numpy as na
+from dedalus.utils.parallelism import MPI, comm
 
 def enforce_hermitian(data, verbose=False):
     """
@@ -34,11 +35,37 @@ def enforce_hermitian(data, verbose=False):
     n = data.shape
     if verbose: print n
     
+    # parallel version -- never hold entire field (could be several gigabytes)
+    if comm:
+        nproc = comm.size
+        myproc = comm.rank
+
+        sz = data.shape[1] / nproc
+
+        left = nproc - myproc - 1
+        right = (nproc - myproc) % nproc
+
+        req0 = comm.isend(data, dest=left)
+        req1 = comm.isend(data, dest=right)
+        recvleft = comm.recv(source=left)
+        recvright = comm.recv(source=right)
+
+        MPI.Request.Waitall([req0, req1])
+
+        recv = na.concatenate((recvleft, recvright), axis=0)
+
+        # (M + transpose_conjugate(M)) / 2
+        data[:,1:,1:] += recv[sz:0:-1, -1:0:-1, -1:0:-1].conj()
+        data[:,0,1:] += recv[sz:0:-1,0,-1:0:-1].conj()
+        data[:,1:,0] += recv[sz:0:-1,-1:0:-1,0].conj()
+        data[:,0,0] += recv[sz:0:-1,0,0].conj()
+        data /= 2.
+        return
+    # Serial version
     if data.size == 1: 
         if verbose: print data
         data.imag = 0
         return
-    
     # Flip about k-origin
     nonzero = [slice(1, None, 1)] * data.ndim 
     nonzero_flip = [slice(-1, 0, -1)] * data.ndim
