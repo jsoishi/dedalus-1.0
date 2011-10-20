@@ -64,7 +64,7 @@ def cos_k(f, kindex, ampl=1.):
     f[tuple(-1*na.array(kindex))] = f[tuple(kindex)].conjugate()
 
 
-def alfven(data, k=(0, 0, 1), B0mag=5.0, u1mag=5e-6):
+def alfven(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6):
     """
     Generate conditions for simulating Alfven waves in MHD.
     For 2d, must have k and B0 in same direction.
@@ -83,7 +83,7 @@ def alfven(data, k=(0, 0, 1), B0mag=5.0, u1mag=5e-6):
     kmag = na.linalg.norm(k)
     
     # Field setup and calculation
-    B0 = na.array([0., 0., 1.])[:N] * B0mag
+    B0 = na.array([1., 0., 0.])[:N] * B0mag
     
     # Background magnetic field
     if (0 in data['u']['x'].k['z'] and
@@ -94,13 +94,13 @@ def alfven(data, k=(0, 0, 1), B0mag=5.0, u1mag=5e-6):
             data['B'][i]['kspace'][k0] = B0[i]
     
     # Assign modes for k and -k
-    if (k[0] in data['u']['x'].k['z'] and
+    if (k[2] in data['u']['x'].k['z'] and
         k[1] in data['u']['x'].k['y'] and
-        k[2] in data['u']['x'].k['x']):
+        k[0] in data['u']['x'].k['x']):
         
-        kiz = na.array(na.where(data['u']['x'].k['z'] == k[0]))
+        kiz = na.array(na.where(data['u']['x'].k['z'] == k[2]))
         kiy = na.array(na.where(data['u']['x'].k['y'] == k[1]))
-        kix = na.array(na.where(data['u']['x'].k['x'] == k[2]))
+        kix = na.array(na.where(data['u']['x'].k['x'] == k[0]))
         
         kindex = tuple(kiz + kiy + kix)
         # Alfven speed and wave frequency
@@ -122,12 +122,12 @@ def alfven(data, k=(0, 0, 1), B0mag=5.0, u1mag=5e-6):
             data['u'][i]['kspace']
             data['B'][i]['kspace']
         
-            data['u'][i].data[kindex] = -u1[i] * 1j / 2.
+            data['u'][i].data[kindex] = u1[i] * 1j / 2.
             data['B'][i].data[kindex] = B1[i] * 1j / 2.
             
-    if (-k[0] in data['u']['x'].k['z'] and
+    if (-k[2] in data['u']['x'].k['z'] and
          -k[1] in data['u']['x'].k['y'] and
-         -k[2] in data['u']['x'].k['x']):
+         -k[0] in data['u']['x'].k['x']):
           
         # Find correct mode
         # dkx = na.abs(data['u']['x'].k['x'][1] - data['u']['x'].k['x'][0])
@@ -135,9 +135,9 @@ def alfven(data, k=(0, 0, 1), B0mag=5.0, u1mag=5e-6):
 #         dkz = na.abs(data['u']['x'].k['z'][1] - data['u']['x'].k['z'][0])
 #         
 #         
-        kiz = na.array(na.where(data['u']['x'].k['y'] == -k[0]))
+        kiz = na.array(na.where(data['u']['x'].k['z'] == -k[2]))
         kiy = na.array(na.where(data['u']['x'].k['y'] == -k[1]))
-        kix = na.array(na.where(data['u']['x'].k['x'] == -k[2]))
+        kix = na.array(na.where(data['u']['x'].k['x'] == -k[0]))
         
         kindex = tuple(kiz + kiy + kix)
         # Alfven speed and wave frequency
@@ -145,7 +145,7 @@ def alfven(data, k=(0, 0, 1), B0mag=5.0, u1mag=5e-6):
         omega = na.abs(cA * na.dot(k, B0) / B0mag)
     
         # u and B perturbations
-        u1 = na.array([0., 1., 0.])[3-N:] * u1mag
+        u1 = na.array([0, 1., 0.])[3-N:] * u1mag
         
         B1 = (na.dot(k, u1) * B0 - na.dot(k, B0) * u1) / omega
         B1mag = na.linalg.norm(B1)
@@ -154,9 +154,55 @@ def alfven(data, k=(0, 0, 1), B0mag=5.0, u1mag=5e-6):
             data['u'][i]['kspace']
             data['B'][i]['kspace']
         
-            data['u'][i].data[kindex] = - u1[i] * 1j / 2.
-            data['B'][i].data[kindex] = - B1[i] * 1j / 2.
+            data['u'][i].data[kindex] = -u1[i] * 1j / 2.
+            data['B'][i].data[kindex] = -B1[i] * 1j / 2.
 
+
+def alfven_old(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6):
+    """
+    Generate conditions for simulating Alfven waves in MHD.
+    For 2d, must have k and B0 in same direction.
+    
+    Inputs:
+        data        StateData object
+        k           k-index tuple, (kx, ky, kz), adds sine wave here in u1 and B1
+        B0mag       B0 magnitude along x-direction
+        u1mag       u1 magnitude for k-wave being added
+    """
+    
+    N = len(k)
+    kmag = na.linalg.norm(k)
+    
+    # Field setup and calculation
+    B0 = na.array([1., 0., 0.])[:N] * B0mag
+        
+    # Alfven speed and wave frequency
+    cA = B0mag / na.sqrt(4 * na.pi * data.parameters['rho0'])
+    omega = na.abs(cA * na.dot(k, B0) / B0mag)
+    print '-' * 20
+    print 'cA = ', cA
+    print 'cA * cos(theta) = ', cA * na.dot(k, B0) / B0mag / kmag
+    print 'Max dt (CFL=1) = ', na.min(na.array(data['u']['x'].length) / 
+                                      na.array(data['u']['x'].shape)) / cA
+    print '-' * 20
+    
+    # Background magnetic field
+    for i in xrange(data['B'].ndim):
+        k0 = (0,) * N
+        data['B'][i]['kspace'][k0] = B0[i]
+
+    # u and B perturbations
+    u1 = na.array([0., 1., 0.])[3-N:] * u1mag
+    
+    B1 = (na.dot(k, u1) * B0 - na.dot(k, B0) * u1) / omega
+    B1mag = na.linalg.norm(B1)
+    
+    for i in xrange(data['u'].ndim):
+        data['u'][i]['kspace']
+        data['B'][i]['kspace']
+    
+        sin_k(data['u'][i].data, k[::-1], ampl=u1[i])
+        sin_k(data['B'][i].data, k[::-1], ampl=B1[i])
 
 def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     """generate noise with a random phase and a spectrum given by
