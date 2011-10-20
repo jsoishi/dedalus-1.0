@@ -24,7 +24,7 @@ import numpy as na
 import numpy.fft as fpack
 from dedalus.utils.parallelism import comm, MPI
 from dedalus.utils.fftw import fftw
-
+from dedalus.funcs import insert_ipython
 try:
     import pycuda.autoinit
     import pycuda.gpuarray as gpuarray
@@ -115,6 +115,7 @@ class FourierRepresentation(Representation):
             ki = fpack.fftfreq(S) * 2. * self.kny[i]
             ki.resize(kshape)
             self.k.append(ki)
+        insert_ipython()
         self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
 
     def set_fft(self, method):
@@ -500,7 +501,7 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.data.shape = self._shape['kspace']
         self.data[:] = a
         self.fplan_x()
-        self.data /= na.sqrt(self.data.size)
+        self.data /= self.data.size
 
     def rev_fftw(self):
         self.rplan_x()
@@ -509,7 +510,6 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.data.shape = self._shape['xspace']
         self.data[:] = a
         self.rplan_yz()
-        self.data /= na.sqrt(self.data.size)
         self.data.imag = 0.
 
 class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierShearRepresentation):
