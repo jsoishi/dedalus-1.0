@@ -7,5 +7,6 @@ setup(
     cmdclass = {'build_ext': build_ext},
     include_dirs = [np.get_include()],
     ext_modules = [Extension("fftw", ["_fftw.pyx"],
-                              libraries=["fftw3"])]
+                              libraries=["fftw3"],
+                              include_dirs=["."])]
 )
