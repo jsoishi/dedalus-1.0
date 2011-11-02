@@ -22,7 +22,7 @@ License:
 """
 import numpy as na
 import numpy.fft as fpack
-from dedalus.utils.parallelism import comm, MPI
+from dedalus.utils.parallelism import com_sys
 from dedalus.utils.fftw import fftw
 from dedalus.funcs import insert_ipython
 try:
@@ -368,18 +368,18 @@ class ParallelFourierRepresentation(FourierRepresentation):
             shape       The shape of the data, tuple of ints
             length      The length of the data, tuple of floats (default: 2 pi)
         """
-        self.comm = comm
-        if not comm:
+        self.comm = com_sys.comm
+        if not self.comm:
             raise ValueError("mpi4py cannot be loaded. A parallel run cannot be initialized.")
         if len(shape) != 3:
             raise ValueError("Parallel runs must be 3D")
 
-        self.nproc = comm.Get_size()
-        self.myproc = comm.Get_rank()
+        self.nproc = com_sys.nproc
+        self.myproc = com_sys.myproc
         self.offset = na.array([0, 0, self.myproc * shape[2]])
         FourierRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
-        self.nproc = comm.Get_size()
-        self.myproc = comm.Get_rank()
+        self.nproc = com_sys.nproc
+        self.myproc = com_sys.myproc
         self.offset = na.array([0, 0, self.myproc * shape[2]])
         self._setup_k()
         self._shape = {'kspace': self.data.shape,
@@ -462,7 +462,7 @@ class ParallelFourierRepresentation(FourierRepresentation):
         else:
             raise ValueError("Communcation direction must be forward or backward")
         
-        self.comm.Alltoall([self.sendbuf,MPI.COMPLEX], [self.recvbuf,MPI.COMPLEX])
+        self.comm.Alltoall([self.sendbuf,com_sys.MPI.COMPLEX], [self.recvbuf,com_sys.MPI.COMPLEX])
 
         self.shape = self._shape[space]
         self.length = self._length[space]
@@ -517,8 +517,8 @@ class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierS
                  dealiasing='2/3 cython'):
         ParallelFourierRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
         FourierShearRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
-        self.nproc = comm.Get_size()
-        self.myproc = comm.Get_rank()
+        self.nproc = com_sys.nproc
+        self.myproc = comm.myproc
         self.offset = na.array([0, 0, self.myproc * shape[2]])
 
         
