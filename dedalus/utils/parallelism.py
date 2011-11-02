@@ -73,6 +73,7 @@ def load_all(field, snap_dir):
 
     data_file = os.path.join(snap_dir, 'data.cpu%04i')
     fi = h5py.File(data_file % 0)
+    time = fi['/time'].value
     space = fi['/fields/u/0'].attrs['space']
     local_size = fi['/fields/u/0'].shape
     dtype = fi['/fields/u/0'].dtype
@@ -89,5 +90,7 @@ def load_all(field, snap_dir):
         concat_ax = 2
     else:
         concat_ax = 0
+
+    print "loaded %s at time = %f" % (field, time)
     return np.concatenate(data,axis=concat_ax), space
     
