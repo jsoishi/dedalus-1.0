@@ -18,21 +18,58 @@ def find_fftw():
     if len(l) != 0:
         return path
 
+def get_mercurial_changeset_id(directory):
+    """adapted from a script by Jason F. Harris, published at
+
+    http://jasonfharris.com/blog/2010/05/versioning-your-application-with-the-mercurial-changeset-hash/
+
+    """
+    getChangeset = subprocess.Popen('hg parent --template "{node|short}" --cwd ' + targetDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        
+    if (getChangeset.stderr.read() != ""):
+        print "Error in obtaining current changeset of the Mercurial repository"
+        changeset = None
+        
+    changeset = getChangeset.stdout.read()
+    if (not re.search("^[0-9a-f]{12}$", changeset)):
+        print "Current changeset of the Mercurial repository is malformed"
+        changeset = None
+
+    return changeset
+
+
+def get_hg_version():
+    import os
+    cwd = os.getcwd()
+    filen = os.path.join(cwd,'__hg_version__.py')
+    changeset = get_mercurial_changeset_id(cwd)
+    
+    try:
+        outfile = open(filen,'w')
+        outfile.write("%s\n" % changeset)
+        outfile.close()
+    except:
+        print "Can't open %s for writing." % filen
+        raise IOError
+
+    return filen
+
 setup(
     name='dedalus',
     version='0.1dev',
     author='J. S. Oishi',
     author_email='jsoishi@gmail.com',
     license='GPL3',
-    packages = [#'dedalus.analysis',
-                #'dedalus.data_objects',
-                'dedalus'],
-                #'dedalus.init_cond',
-                #'dedalus.physics',
-                #'dedalus.time_stepping',
-                #'dedalus.utils'],
+    packages = ['dedalus.analysis',
+                'dedalus.data_objects',
+                'dedalus',
+                'dedalus.init_cond',
+                'dedalus.physics',
+                'dedalus.time_stepping',
+                'dedalus.utils'],
     include_dirs = [np.get_include()],
     #cmdclass = {'build_ext': build_ext},
+    package_data={'dedalus': [get_hg_version()]}
     ext_modules = [Extension("dedalus.utils.fftw", ["dedalus/utils/fftw/_fftw.c"],
                              libraries=["fftw3"],
                              library_dirs=[find_fftw()])]
