@@ -69,5 +69,5 @@ from dedalus.utils.api import \
     Timer, \
     setup_parallel_objs, \
     load_all, \
-    comm
+    com_sys
 

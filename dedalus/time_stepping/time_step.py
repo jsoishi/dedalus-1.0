@@ -26,7 +26,7 @@ import time
 import h5py
 import numpy as na
 
-from dedalus.utils.parallelism import comm
+from dedalus.utils.parallelism import com_sys
 from dedalus.funcs import insert_ipython, get_mercurial_changeset_id
 from dedalus.utils.api import Timer
 
@@ -86,16 +86,13 @@ class TimeStepBase(object):
 
     @timer
     def snapshot(self, data):
-        if comm:
-            myproc = comm.Get_rank()
-        else:
-            myproc = 0
+        myproc = com_sys.myproc
 
         pathname = "snap_%05i" % (self._nsnap)
         if not os.path.exists(pathname) and myproc == 0:
             os.mkdir(pathname)
-        if comm:
-            comm.Barrier()
+        if com_sys.comm:
+            com_sys.comm.Barrier()
 
         # first, pickle physics data
         obj_file = open(os.path.join(pathname,'dedalus_obj_%04i.cpkl' % myproc),'w')
@@ -133,10 +130,12 @@ class TimeStepBase(object):
                        
     def final_stats(self):
         self.timer.print_stats()
-        total_wtime = self.timer.timers['advance']
-        print "total advance wall time: %10.5e sec" % total_wtime
-        print "%10.5e sec/step " %(total_wtime/self.iter)
-        print "Simulation complete. Status: awesome"
+        if com_sys.myproc == 0:
+            total_wtime = self.timer.timers['advance']
+            print "total advance wall time: %10.5e sec" % total_wtime
+            print "%10.5e sec/step " %(total_wtime/self.iter)
+            print 
+            print "Simulation complete. Status: awesome"
 
 
 class RK2simple(TimeStepBase):

@@ -21,13 +21,25 @@ License:
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-try:
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-except:
-    print "Cannot import mpi4py. Parallelism disabled" 
+class CommunicationSystem(object):
     comm = None
+    MPI = None
+    def __init__(self):
+        try:
+            from mpi4py import MPI
+            self.comm = MPI.COMM_WORLD
+            self.MPI = MPI
+        except ImportError:
+            print "Cannot import mpi4py. Parallelism disabled" 
+    
+        if self.comm:
+            self.myproc = self.comm.Get_rank()
+            self.nproc = self.comm.Get_size()
+        else:
+            self.myproc = 0
+            self.nproc = 1
 
+com_sys = CommunicationSystem()
 
 def setup_parallel_objs(global_shape, global_len):
     """Helper function for parallel runs. Given a global shape and
@@ -44,9 +56,9 @@ def setup_parallel_objs(global_shape, global_len):
 
     """
     
-    local_shape = (global_shape[0]/comm.Get_size(),) + global_shape[1:]
+    local_shape = (global_shape[0]/com_sys.nproc,) + global_shape[1:]
     
-    local_len = (global_len[0]/comm.Get_size(),) + global_len[1:]
+    local_len = (global_len[0]/com_sys.nproc,) + global_len[1:]
 
     return local_shape, local_len
 

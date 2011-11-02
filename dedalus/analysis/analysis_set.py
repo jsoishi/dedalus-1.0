@@ -31,7 +31,7 @@ from mpl_toolkits.axes_grid1 import AxesGrid
 import numpy as na
 import os
 from functools import wraps
-from dedalus.utils.parallelism import MPI, comm
+from dedalus.utils.parallelism import com_sys
 
 class AnalysisSet(object):
 
@@ -174,7 +174,7 @@ def compute_en_spec(data, field, normalization=1.0, averaging=None):
     # Construct bins by wavevector magnitude (evenly spaced)
     kmag = na.sqrt(f[0].k2())
     k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
-    if comm:
+    if com_sys.comm:
         # note: not the same k-values as serial version
         k = na.linspace(0, na.max(f[0].kny), na.max(data.shape) / 2.)
     
@@ -184,9 +184,11 @@ def compute_en_spec(data, field, normalization=1.0, averaging=None):
         
     nonzero = (power > 0)
 
+    comm = com_sys.comm
+    MPI = com_sys.MPI
     if comm:
         myspec = na.zeros_like(k)
-        myproc = comm.rank
+        myproc = com_sys.myproc
         nk = na.zeros_like(spec)
         mynk = na.zeros_like(spec)
         for i in xrange(k.size):

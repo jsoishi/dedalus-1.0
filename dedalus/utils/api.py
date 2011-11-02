@@ -9,5 +9,5 @@ from .timer import \
 
 from .parallelism import \
     setup_parallel_objs, \
-    comm,\
+    com_sys,\
     load_all

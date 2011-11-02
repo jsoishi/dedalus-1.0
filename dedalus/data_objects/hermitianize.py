@@ -23,7 +23,7 @@ License:
 """
 
 import numpy as na
-from dedalus.utils.parallelism import MPI, comm
+from dedalus.utils.parallelism import com_sys
 
 def enforce_hermitian(data, verbose=False):
     """
@@ -36,9 +36,10 @@ def enforce_hermitian(data, verbose=False):
     if verbose: print n
     
     # parallel version -- never hold entire field (could be several gigabytes)
+    comm = com_sys.comm
     if comm:
-        nproc = comm.size
-        myproc = comm.rank
+        nproc = com_sys.nproc
+        myproc = com_sys.myproc
 
         sz = data.shape[1] / nproc
 
@@ -50,7 +51,7 @@ def enforce_hermitian(data, verbose=False):
         recvleft = comm.recv(source=left)
         recvright = comm.recv(source=right)
 
-        MPI.Request.Waitall([req0, req1])
+        com_sys.MPI.Request.Waitall([req0, req1])
 
         recv = na.concatenate((recvleft, recvright), axis=0)
 

@@ -21,6 +21,7 @@ License:
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import time 
+from dedalus.utils.parallelism import com_sys
 class Timer(object):
     timers = {}
     def __init__(self):
@@ -40,11 +41,12 @@ class Timer(object):
         return wrapper
 
     def print_stats(self):
-        print
-        print "---Timings---"
-        for k,v in self.timers.iteritems():
-            print "%s: %10.5f sec" % (k,v)
-        print
+        if com_sys.myproc == 0:
+            print
+            print "---Timings---"
+            for k,v in self.timers.iteritems():
+                print "%s: %10.5f sec" % (k,v)
+            print
 
 if __name__ == "__main__":
     from time import sleep
