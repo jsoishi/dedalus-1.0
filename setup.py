@@ -1,4 +1,4 @@
-from distutils.core import setup
+Nfrom distutils.core import setup
 from distutils.extension import Extension
 from distutils.command.build_py import build_py
 from Cython.Distutils import build_ext
@@ -41,22 +41,6 @@ def get_mercurial_changeset_id(targetDir):
 
     return changeset
 
-
-def get_hg_version():
-    import os
-    cwd = os.getcwd()
-    filen = os.path.join(cwd,'__hg_version__.py')
-    changeset = get_mercurial_changeset_id(cwd)
-    
-    try:
-        outfile = open(filen,'w')
-        outfile.write("%s\n" % changeset)
-        outfile.close()
-    except:
-        print "Can't open %s for writing." % filen
-        raise IOError
-
-    return filen
 
 class my_build_py(build_py):
     def run(self):
