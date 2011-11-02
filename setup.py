@@ -66,12 +66,15 @@ setup(
                 'dedalus.init_cond',
                 'dedalus.physics',
                 'dedalus.time_stepping',
-                'dedalus.utils'],
+                'dedalus.utils',
+                'dedalus.utils.fftw'],
     include_dirs = [np.get_include()],
-    #cmdclass = {'build_ext': build_ext},
     package_data={'dedalus': [get_hg_version()]}
-    ext_modules = [Extension("dedalus.utils.fftw", ["dedalus/utils/fftw/_fftw.c"],
+    cmdclass = {'build_ext': build_ext},
+    ext_modules = [Extension("dedalus.utils.fftw.fftw",
+                             ["dedalus/utils/fftw/_fftw.pyx"],
                              libraries=["fftw3"],
+                             include_dirs=["dedalus/utils/fftw"],
                              library_dirs=[find_fftw()])]
     
     )
