@@ -30,6 +30,12 @@ from dedalus.utils.parallelism import comm
 from dedalus.funcs import insert_ipython, get_mercurial_changeset_id
 from dedalus.utils.api import Timer
 
+try:
+    from dedalus.__hg_version__ import hg_version
+except ImportError:
+    print "could not find hg_version."
+    hg_version = "unknown"
+
 class TimeStepBase(object):
     timer = Timer()
     def __init__(self, RHS, CFL=0.4, int_factor=None):
@@ -103,7 +109,7 @@ class TimeStepBase(object):
         outfile = h5py.File(filename, mode='w')
         root_grp = outfile.create_group('/fields')
         dset = outfile.create_dataset('time',data=self.time)
-        outfile.attrs['hg_version'] = get_mercurial_changeset_id()
+        outfile.attrs['hg_version'] = hg_version
 
         data.snapshot(root_grp)        
         outfile.close()
