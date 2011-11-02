@@ -1,7 +1,9 @@
 from distutils.core import setup
 from distutils.extension import Extension
+from distutils.command.build_py import build_py
 from Cython.Distutils import build_ext
 import numpy as np
+import os
 # import distribute_setup
 # distribute_setup.use_setuptools()
 # import setuptools
@@ -18,12 +20,14 @@ def find_fftw():
     if len(l) != 0:
         return path
 
-def get_mercurial_changeset_id(directory):
+def get_mercurial_changeset_id(targetDir):
     """adapted from a script by Jason F. Harris, published at
 
     http://jasonfharris.com/blog/2010/05/versioning-your-application-with-the-mercurial-changeset-hash/
 
     """
+    import subprocess
+    import re
     getChangeset = subprocess.Popen('hg parent --template "{node|short}" --cwd ' + targetDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         
     if (getChangeset.stderr.read() != ""):
@@ -54,6 +58,19 @@ def get_hg_version():
 
     return filen
 
+class my_build_py(build_py):
+    def run(self):
+        # honor the --dry-run flag
+        if not self.dry_run:
+            target_dir = os.path.join(self.build_lib,'dedalus')
+            src_dir =  os.getcwd() 
+            changeset = get_mercurial_changeset_id(src_dir)
+            self.mkpath(target_dir)
+            with open(os.path.join(target_dir, '__hg_version__.py'), 'w') as fobj:
+                fobj.write("hg_version = '%s'\n" % changeset)
+
+            build_py.run(self)
+
 setup(
     name='dedalus',
     version='0.1dev',
@@ -69,8 +86,8 @@ setup(
                 'dedalus.utils',
                 'dedalus.utils.fftw'],
     include_dirs = [np.get_include()],
-    package_data={'dedalus': [get_hg_version()]}
-    cmdclass = {'build_ext': build_ext},
+    cmdclass = {'build_ext': build_ext,
+                'build_py': my_build_py},
     ext_modules = [Extension("dedalus.utils.fftw.fftw",
                              ["dedalus/utils/fftw/_fftw.pyx"],
                              libraries=["fftw3"],
