@@ -25,7 +25,7 @@ License:
 """
 
 import matplotlib
-#matplotlib.use('AGG')
+matplotlib.use('AGG')
 import matplotlib.pyplot as P
 from mpl_toolkits.axes_grid1 import AxesGrid
 import numpy as na

@@ -1,5 +1,4 @@
 from dedalus.mods import *
-from scipy.integrate import quad
 import numpy as na
 import pylab as pl
 import os
@@ -22,7 +21,7 @@ a_i = 0.002 # initial scale factor
 t0 = (2./3.)/H_0 # present age of E-dS universe
 t_init = (a_i**(3./2.)) * t0 # time at which a = a_i in this universe
 
-Omega_r = 8.4e-5
+Omega_r = 0#8.4e-5
 Omega_m = 0.276
 Omega_l = 0.724
 
@@ -30,12 +29,12 @@ Omega_l = 0.724
 H = lambda ap: H_0*na.sqrt(Omega_r/ap**4 + Omega_m/ap**3 + 
                            (1-Omega_r-Omega_l-Omega_m)/ap**2 + Omega_l)
 Hint = lambda ap: 1./(ap**3)/(H(ap))**3
-D_unnorm = lambda ap: H_0**2 * H(ap) * quad(Hint, 0, ap, epsabs=1.0e-10)[0]
+D_unnorm = lambda ap: H_0**2 * H(ap) * integrate_simp(Hint, 1e-10, ap, 1e5)
 D0 = D_unnorm(a_i)
 Ddot_i = (H(a_i)*a_i)*(D_unnorm(a_i + 1e-6) - D0)/(1e-6)/D0
 
 a_cross = 0.1
-A = D0/(H_0**2 * H(a_cross) * quad(Hint, 0, a_cross, epsabs=1.0e-10)[0] * k)
+A = D0/(H_0**2 * H(a_cross) * integrate_simp(Hint, 1e-10, a_cross, 1e5) * k)
 ampl = A * a_i * Ddot_i
 
 print "a_cross = ", a_cross
