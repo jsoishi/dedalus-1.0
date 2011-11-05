@@ -28,6 +28,7 @@ License:
 from dedalus.funcs import insert_ipython
 import numpy as na
 from dedalus.data_objects import hermitianize
+from dedalus.utils.misc_numeric import find_zero, integrate_quad, interp_linear
 
 def taylor_green(ux, uy):
     if ux.dim == 2:
@@ -192,42 +193,6 @@ def shearing_wave(data, wampl, kinit):
     data['u']['x']['kspace'] = aux['psi'].deriv('y')
     data['u']['y']['kspace'] = -aux['psi'].deriv('x')
 
-
-def find_zero(func, left, right, eps_abs = 1e-10):
-    """find the zero of a function using the bisection method
-    (binary search). Assumes a single zero.
-
-    Input:
-        func          function to find zeros for
-        left          left endpoint(s) of range to search. If func 
-                      is a function of nvar variables then left should
-                      be an array of length nvar.
-        right         right endpoint(s) of range to search
-        eps_abs       bound on absolute error on solution
-
-    Output:
-        y             solution satisfying f(y) = 0
-
-    """
-    nvar = len(left)
-    err = max(right - left)
-    while err > eps_abs:
-        midpoint = (left + right) / 2.
-        f_left = func(left)
-        f_right = func(right)
-        f_midpoint = func(midpoint)
-        
-        for i in range(nvar):
-            if f_midpoint[i] == 0:
-                left[i] = midpoint[i]
-                right[i] = midpoint[i]
-            elif na.sign(f_midpoint[i]) == na.sign(f_left[i]):
-                left[i] = midpoint[i]
-            else: 
-                right[i] = midpoint[i]
-        err = max(right - left)
-    return midpoint
-
 def zeldovich(data, ampl, A, a_ini, a_cross):
     """velocity wave IC, for testing nonlinear collisionless cosmology
     against the Zeldovich approximation
@@ -280,30 +245,6 @@ def sig2_integrand(Ttot0, akoh, nspect):
     Pk = (akoh**nspect) * (Ttot0*Ttot0)
     return (w*w) * Pk * (akoh*akoh)
 
-def integrate_quad(f,x):
-    """integrates f with quadratic interpolation using sample points x.
-    Relative error of ~2e-6 compared with SciPy's integrate.simps on 
-    typical cosmology normalization data.
-
-    """
-    integral = 0
-    for i in range((len(x)-1)/2):
-        x1 = x[2*i]
-        x2 = x[2*i+1]
-        x3 = x[2*i+2]
-        y1 = f[2*i]
-        y2 = f[2*i+1]
-        y3 = f[2*i+2]
-        a = ((y2-y1)*(x1-x3) + (y3-y1)*(x2-x1))/((x1-x3)*(x2**2-x1**2) + 
-                                                 (x2-x1)*(x3**2-x1**2))
-        b = ((y2-y1) - a*(x2**2-x1**2))/(x2-x1)
-        c = y1 - a*x1**2 - b*x1
-        integral += a/3*(x3**3 - x1**3) + b/2*(x3**2 - x1**2) + c*(x3 - x1)
-    # If we have an even number of points, use trapezoid for the last interval
-    if (len(x) % 2) == 0:
-        integral += (x[len(x)-1]-x[len(x)-2])*(f[len(x)-1]+f[len(x)-2])/2
-    return integral
-
 def get_normalization(Ttot0, ak, sigma_8, nspect, h):
     """calculate the normalization for delta_tot using sigma_8
 
@@ -347,22 +288,6 @@ def cosmo_fields(delta_c, u_c, delta_b, u_b, spec_delta_c, spec_u_c, spec_delta_
         u_b[i]['kspace'] = rand * spec_u_b[i]
         hermitianize.enforce_hermitian(u_b[i]['kspace'])
         u_b[i].dealias()
-
-def interp_linear(x, f):
-    """return function for linear interpolation of f sampled at points x.
-    function returns zero outside interpolation range.
-
-    """
-    piecewise = [lambda z: 0,]*(len(x)-1)
-    xleft = x[0:len(x)-1]
-    xright = x[1:]
-    piecewise = lambda i,z: f[i] + (z - x[i])*(f[i+1]-f[i])/(x[i+1]-x[i])
-    # function to return index of interval containing z
-    in_interval = lambda z: na.nonzero((xleft <= z)&(z < xright))[0]
-    # function to evaluate f at array of points
-    f_lin = lambda zz: na.reshape([piecewise(in_interval(z),z) 
-                                  for z in zz.flatten(1)], zz.shape)
-    return f_lin
 
 def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, baryons=False, f_nl=None):
     """generate spectra for CDM overdensity and velocity from linger++
@@ -433,7 +358,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
         phi = FourierRepresentation(None, kk.shape, sampledata.length, dtype='float128')
         phi['kspace'] = to_phi * ampl * kk**(nspect/2.)/k2
         phi_ng['xspace'] = phi['xspace'] + f_nl(phi['xspace'])
-        f_deltacp = interp1d(ak, deltacp, kind='cubic')
+        f_deltacp = interp_linear(ak, deltacp, kind='cubic')
         spec_delta = k2 * phi_ng['kspace'] * f_deltacp(kk) / to_phi
     else:
         # ... delta = delta_transfer * |k|^(n_s/2)
