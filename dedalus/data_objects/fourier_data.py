@@ -115,13 +115,12 @@ class FourierRepresentation(Representation):
             ki = fpack.fftfreq(S) * 2. * self.kny[i]
             ki.resize(kshape)
             self.k.append(ki)
-        insert_ipython()
         self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
 
     def set_fft(self, method):
         if method == 'fftw':
-            self.fplan = fftw.Plan(self.data, direction='forward', flags=['FFTW_MEASURE'])
-            self.rplan = fftw.Plan(self.data, direction='backward', flags=['FFTW_MEASURE'])
+            self.fplan = fftw.Plan(self.data, direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+            self.rplan = fftw.Plan(self.data, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
             self.fft = self.fwd_fftw
             self.ifft = self.rev_fftw
         if method == 'numpy':
@@ -155,7 +154,7 @@ class FourierRepresentation(Representation):
     def fwd_fftw(self):
         self.fplan()
         self.data /= self.data.size
-
+        
     def rev_fftw(self):
         self.rplan()
         self.data.imag = 0.
@@ -414,10 +413,14 @@ class ParallelFourierRepresentation(FourierRepresentation):
 
     def set_fft(self, method):
         if method == 'fftw':
-            self.fplan_yz = fftw.PlanPlane(self.data, direction='forward', flags=['FFTW_MEASURE'])
-            self.fplan_x = fftw.PlanPencil(self.data, direction='forward', flags=['FFTW_MEASURE'])
-            self.rplan_yz = fftw.PlanPlane(self.data, direction='backward', flags=['FFTW_MEASURE'])
-            self.rplan_x = fftw.PlanPencil(self.data, direction='backward', flags=['FFTW_MEASURE'])
+            self.fplan_yz = fftw.PlanPlane(self.data, 
+                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+            self.fplan_x = fftw.PlanPencil(self.data, 
+                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+            self.rplan_yz = fftw.PlanPlane(self.data, 
+                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+            self.rplan_x = fftw.PlanPencil(self.data, 
+                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
 
             self.fft = self.fwd_fftw
             self.ifft = self.rev_fftw
@@ -470,7 +473,6 @@ class ParallelFourierRepresentation(FourierRepresentation):
 
     def fwd_np(self):
         """xspace to kspace"""
-        
         # yz fft
         self.data = fpack.fftn(self.data, axes=(0,1))
 
@@ -484,7 +486,6 @@ class ParallelFourierRepresentation(FourierRepresentation):
         """kspace to xspace
         
         """
-        
         # x fft
         self.data = fpack.ifft(self.data, axis=2)
 
@@ -501,11 +502,11 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.data.shape = self._shape['kspace']
         self.data[:] = a
         self.fplan_x()
-        self.data /= self.data.size
+        self.data /= (self.data.size * com_sys.nproc)
 
     def rev_fftw(self):
         self.rplan_x()
-        
+
         a = self.communicate('backward')
         self.data.shape = self._shape['xspace']
         self.data[:] = a
