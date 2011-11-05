@@ -27,10 +27,6 @@ License:
 
 from dedalus.funcs import insert_ipython
 import numpy as na
-try:
-    from scipy.interpolate import interp1d
-except ImportError:
-    print "Warning: Scipy not found. Interpolation won't work."
 from dedalus.data_objects import hermitianize
 
 def taylor_green(ux, uy):
@@ -352,6 +348,22 @@ def cosmo_fields(delta_c, u_c, delta_b, u_b, spec_delta_c, spec_u_c, spec_delta_
         hermitianize.enforce_hermitian(u_b[i]['kspace'])
         u_b[i].dealias()
 
+def interp_linear(x, f):
+    """return function for linear interpolation of f sampled at points x.
+    function returns zero outside interpolation range.
+
+    """
+    piecewise = [lambda z: 0,]*(len(x)-1)
+    xleft = x[0:len(x)-1]
+    xright = x[1:]
+    piecewise = lambda i,z: f[i] + (z - x[i])*(f[i+1]-f[i])/(x[i+1]-x[i])
+    # function to return index of interval containing z
+    in_interval = lambda z: na.nonzero((xleft <= z)&(z < xright))[0]
+    # function to evaluate f at array of points
+    f_lin = lambda zz: na.reshape([piecewise(in_interval(z),z) 
+                                  for z in zz.flatten(1)], zz.shape)
+    return f_lin
+
 def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, baryons=False, f_nl=None):
     """generate spectra for CDM overdensity and velocity from linger++
     output. Assumes 3-dimensional fields.
@@ -405,7 +417,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
     ampl = get_normalization(Ttot0, ak, sigma_8, nspect, h)
     ampl = ampl * (2.*na.pi/sampledata.length[0])**1.5 * (sampledata.shape[0])**1.5 # *h**1.5
 
-    f_deltacp = interp1d(na.log10(ak), na.log10(deltacp), kind='linear')
+    f_deltacp = interp_linear(na.log10(ak), na.log10(deltacp))
 
     # ... calculate spectra
     if f_nl is not None:
@@ -428,15 +440,13 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
         spec_delta = kk**(nspect/2.)*(10.**f_deltacp(na.log10(kk)))*ampl
     spec_delta[kzero] = 0.
 
-
-
     vunit = 1.02268944e-6 # km/s in Mpc/Myr
     thetac = thetac * ampl * vunit 
 
 
     # ... calculate spectra    
     # u_j = -i * k_j/|k| * theta * |k|^(n_s/2 - 1)
-    f_thetac = interp1d(na.log10(ak), na.log10(thetac), kind='linear')
+    f_thetac = interp_linear(na.log10(ak), na.log10(thetac), kind='linear')
     spec_vel = 1j*kk**(nspect/2. -1.) * 10.**f_thetac(na.log10(kk)) # isotropic
     spec_vel[kzero] = 0.
 
@@ -451,11 +461,11 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
         deltabp = deltabp * ampl
         thetab  = thetab * ampl * vunit 
         
-        f_deltabp = interp1d(na.log10(ak), na.log10(deltabp), kind='linear')
+        f_deltabp = interp_linear(na.log10(ak), na.log10(deltabp), kind='linear')
         spec_delta_b = kk**(nspect/2.)*10.**f_deltabp(na.log10(kk)) 
         spec_delta_b[kzero] = 0.
         
-        f_thetab = interp1d(na.log10(ak), na.log10(thetab), kind='linear')
+        f_thetab = interp_linear(na.log10(ak), na.log10(thetab), kind='linear')
         spec_vel_b = 1j * kk**(nspect/2. - 1.) * 10.**f_thetab(na.log10(kk))
         spec_vel_b[kzero] = 0.
         
