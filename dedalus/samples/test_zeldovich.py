@@ -1,5 +1,4 @@
 from dedalus.mods import *
-from scipy.optimize import broyden1
 from scipy.integrate import quad
 import numpy as na
 import pylab as pl
@@ -26,7 +25,6 @@ t_init = (a_i**(3./2.)) * t0 # time at which a = a_i in this universe
 Omega_r = 8.4e-5
 Omega_m = 0.276
 Omega_l = 0.724
-
 
 # ... growth factor calculations
 H = lambda ap: H_0*na.sqrt(Omega_r/ap**4 + Omega_m/ap**3 + 

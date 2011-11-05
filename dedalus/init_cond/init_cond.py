@@ -30,7 +30,6 @@ import numpy as na
 try:
     from scipy.interpolate import interp1d
     from scipy.integrate import simps
-    from scipy.optimize import broyden1
 except ImportError:
     print "Warning: Scipy not found. Interpolation won't work."
 from dedalus.data_objects import hermitianize
@@ -198,6 +197,42 @@ def shearing_wave(data, wampl, kinit):
     data['u']['x']['kspace'] = aux['psi'].deriv('y')
     data['u']['y']['kspace'] = -aux['psi'].deriv('x')
 
+
+def find_zero(func, left, right, eps_abs = 1e-10):
+    """find the zero of a function using the bisection method
+    (binary search). Assumes a single zero.
+
+    Input:
+        func          function to find zeros for
+        left          left endpoint(s) of range to search. If func 
+                      is a function of nvar variables then left should
+                      be an array of length nvar.
+        right         right endpoint(s) of range to search
+        eps_abs       bound on absolute error on solution
+
+    Output:
+        y             solution satisfying f(y) = 0
+
+    """
+    nvar = len(left)
+    err = max(right - left)
+    while err > eps_abs:
+        midpoint = (left + right) / 2.
+        f_left = func(left)
+        f_right = func(right)
+        f_midpoint = func(midpoint)
+        
+        for i in range(nvar):
+            if f_midpoint[i] == 0:
+                left[i] = midpoint[i]
+                right[i] = midpoint[i]
+            elif na.sign(f_midpoint[i]) == na.sign(f_left[i]):
+                left[i] = midpoint[i]
+            else: 
+                right[i] = midpoint[i]
+        err = max(right - left)
+    return midpoint
+
 def zeldovich(data, ampl, A, a_ini, a_cross):
     """velocity wave IC, for testing nonlinear collisionless cosmology
     against the Zeldovich approximation
@@ -208,7 +243,10 @@ def zeldovich(data, ampl, A, a_ini, a_cross):
     D = 1.
     #A = a_ini/(a_cross * k) # Only true for EdS
     x = na.array([i - N/2 for i in xrange(N)])*data.length[0]/N
-    q = na.array(broyden1(lambda y: na.array(y) + D*A*na.sin(k*na.array(y)) - x, x))
+    func = lambda y: na.array(y) + D*A*na.sin(k*na.array(y)) - x
+    left = na.array([min(x),]*N)
+    right = na.array([max(x),]*N)
+    q = find_zero(func, left, right)
     delta1d = (1./(1. + D*A*k*na.cos(k*q)) - 1.)
     for i in xrange(N):
         for j in xrange(N):
