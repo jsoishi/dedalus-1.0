@@ -29,7 +29,6 @@ from dedalus.funcs import insert_ipython
 import numpy as na
 try:
     from scipy.interpolate import interp1d
-    from scipy.integrate import simps
 except ImportError:
     print "Warning: Scipy not found. Interpolation won't work."
 from dedalus.data_objects import hermitianize
@@ -285,13 +284,37 @@ def sig2_integrand(Ttot0, akoh, nspect):
     Pk = (akoh**nspect) * (Ttot0*Ttot0)
     return (w*w) * Pk * (akoh*akoh)
 
+def integrate_quad(f,x):
+    """integrates f with quadratic interpolation using sample points x.
+    Relative error of ~2e-6 compared with SciPy's integrate.simps on 
+    typical cosmology normalization data.
+
+    """
+    integral = 0
+    for i in range((len(x)-1)/2):
+        x1 = x[2*i]
+        x2 = x[2*i+1]
+        x3 = x[2*i+2]
+        y1 = f[2*i]
+        y2 = f[2*i+1]
+        y3 = f[2*i+2]
+        a = ((y2-y1)*(x1-x3) + (y3-y1)*(x2-x1))/((x1-x3)*(x2**2-x1**2) + 
+                                                 (x2-x1)*(x3**2-x1**2))
+        b = ((y2-y1) - a*(x2**2-x1**2))/(x2-x1)
+        c = y1 - a*x1**2 - b*x1
+        integral += a/3*(x3**3 - x1**3) + b/2*(x3**2 - x1**2) + c*(x3 - x1)
+    # If we have an even number of points, use trapezoid for the last interval
+    if (len(x) % 2) == 0:
+        integral += (x[len(x)-1]-x[len(x)-2])*(f[len(x)-1]+f[len(x)-2])/2
+    return integral
+
 def get_normalization(Ttot0, ak, sigma_8, nspect, h):
     """calculate the normalization for delta_tot using sigma_8
 
     """
     akoh = ak/h
     integrand = sig2_integrand(Ttot0, akoh, nspect)
-    sig2 = 4.*na.pi*simps(integrand, akoh)
+    sig2 = 4.*na.pi*integrate_quad(integrand, akoh)
     ampl = sigma_8/na.sqrt(sig2)
     return ampl
 
