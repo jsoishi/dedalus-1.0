@@ -64,4 +64,8 @@ from dedalus.time_stepping.api import \
 
 from dedalus.utils.api import \
     restart, \
-    Timer
+    Timer, \
+    integrate_quad, \
+    integrate_simp, \
+    interp_linear, \
+    find_zero

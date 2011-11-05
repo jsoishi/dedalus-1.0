@@ -1,5 +1,4 @@
 from dedalus.mods import *
-from scipy.optimize import broyden1
 import numpy as na
 import pylab as pl
 import os
@@ -13,7 +12,6 @@ shape = (16,16,16)
 RHS = CollisionlessCosmology(shape, FourierRepresentation)
 data = RHS.create_fields(0.)
 H_0 = 7.185e-5 # 70.3 km/s/Mpc in Myr^-1 (2.27826587e-18 seconds^-1) 
-ampl = 5e-5 # amplitude of initial velocity wave
 
 L = 2*na.pi # size of box
 N_p = 128 # resolution of analytic solution
@@ -23,17 +21,30 @@ a_i = 0.002 # initial scale factor
 t0 = (2./3.)/H_0 # present age of E-dS universe
 t_init = (a_i**(3./2.)) * t0 # time at which a = a_i in this universe
 
-Ddot_i = (2./3.) * ((1./t0)**(2./3.)) * (t_init**(-1./3.)) / a_i
-A = ampl / a_i / Ddot_i
-a_cross = a_i / (A * k)
-print "a_cross = ", a_cross
-tcross = (a_cross**(3./2.))*t0
+Omega_r = 0#8.4e-5
+Omega_m = 0.276
+Omega_l = 0.724
 
-RHS.parameters['Omega_r'] = 0#8.4e-5
-RHS.parameters['Omega_m'] = 1#0.276
-RHS.parameters['Omega_l'] = 0#0.724
+# ... growth factor calculations
+H = lambda ap: H_0*na.sqrt(Omega_r/ap**4 + Omega_m/ap**3 + 
+                           (1-Omega_r-Omega_l-Omega_m)/ap**2 + Omega_l)
+Hint = lambda ap: 1./(ap**3)/(H(ap))**3
+D_unnorm = lambda ap: H_0**2 * H(ap) * integrate_simp(Hint, 1e-10, ap, 1e5)
+D0 = D_unnorm(a_i)
+Ddot_i = (H(a_i)*a_i)*(D_unnorm(a_i + 1e-6) - D0)/(1e-6)/D0
+
+a_cross = 0.1
+A = D0/(H_0**2 * H(a_cross) * integrate_simp(Hint, 1e-10, a_cross, 1e5) * k)
+ampl = A * a_i * Ddot_i
+
+print "a_cross = ", a_cross
+tcross = (a_cross**(3./2.))*t0 # valid for Einsten-de Sitter 
+
+RHS.parameters['Omega_r'] = Omega_r
+RHS.parameters['Omega_m'] = Omega_m
+RHS.parameters['Omega_l'] = Omega_l
 RHS.parameters['H0'] = H_0
-zeldovich(data, ampl, a_i, a_cross)
+zeldovich(data, ampl, A, a_i, a_cross)
 
 Myr = 1 # 3.15e13 seconds
 tstop = tcross - t_init
@@ -93,32 +104,25 @@ a_snapshots.append(RHS.aux_eqns['a'].value)
 print "a_stop = ", RHS.aux_eqns['a'].value
 
 x_grid = na.array([i for i in xrange(shape[0])])*data.length[0]/shape[0]
-#pl.figure()
-#for delta in ddelta:
-#    pl.plot(x_grid, reorder(delta),hold=True)
-#
-#pl.figure()
-#for u in uu:
-#    pl.plot(x_grid, reorder(u),hold=True)
-#
-#pl.figure()
-#for u in uk:
-#    pl.plot(reorder(u)[(len(u)/2):],hold=True)
-#
-#pl.show()
 
 if not os.path.exists('frames'):
     os.mkdir('frames')
 
 fig = pl.figure()
 for i,a in enumerate(a_snapshots):
+
     # Compare to smooth analytic solution
     outfile = "frames/cmp_a%05f.png" % a
-    t = a**(3./2.) * t0
-    D = a / a_i
+
+    # ... growth factor
+    Da = D_unnorm(a)
+    D = Da/D0
+    da = 1e-6
+    Ddot = (H(a)*a)*(D_unnorm(a + da) - Da)/da/D0
+
+    # ... analytic solution
     x = q + D*A*na.sin(k*q)
-    Ddot = (2./3.) * ((1./t0)**(2./3.)) * (t**(-1./3.)) / a_i
-    #delta = 1./(1.+D*A*k*na.cos(k*q))-1.
+    delta = 1./(1.+D*A*k*na.cos(k*q))-1.
     v = a * Ddot * A * na.sin(k*q)
     #phi = 3/2/a * ( (q**2 - x**2)/2 + 
     #                D * A * k * (k*q*na.sin(k*q) + na.cos(k*q) - 1) )
@@ -127,15 +131,21 @@ for i,a in enumerate(a_snapshots):
     pl.title('a = %05f' % a)
     fig.savefig(outfile)
     fig.clf()
+
+    pl.plot(x, delta)
+    pl.plot(x_grid, reorder(ddelta[i]), '.', hold=True)
+    pl.title('a = %05f' % a)
+    fig.savefig("frames/delta_a%05f.png" % a)
+    fig.clf()
     
     # Residuals
-    q_grid = na.array(broyden1(lambda y: na.array(y) + 
-                              D*A*na.sin(k*na.array(y)) - x_grid,x_grid))
-    v_grid = a * Ddot * A * na.sin(k*q_grid)
-    resid = v_grid - reorder(uu[i])
+    #q_grid = na.array(broyden1(lambda y: na.array(y) + 
+    #                          D*A*na.sin(k*na.array(y)) - x_grid,x_grid))
+    #v_grid = a * Ddot * A * na.sin(k*q_grid)
+    #resid = v_grid - reorder(uu[i])
     
-    pl.plot(x_grid, resid, '.')
-    outfile = "frames/res_a%05f.png" % a
-    pl.title('a = %05f' % a)
-    fig.savefig(outfile)
-    fig.clf()
+    #pl.plot(x_grid, resid, '.')
+    #outfile = "frames/res_a%05f.png" % a
+    #pl.title('a = %05f' % a)
+    #fig.savefig(outfile)
+    #fig.clf()

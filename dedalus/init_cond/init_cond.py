@@ -27,13 +27,8 @@ License:
 
 from dedalus.funcs import insert_ipython
 import numpy as na
-try:
-    from scipy.interpolate import interp1d
-    from scipy.integrate import simps
-    from scipy.optimize import broyden1
-except ImportError:
-    print "Warning: Scipy not found. Interpolation won't work."
 from dedalus.data_objects import hermitianize
+from dedalus.utils.misc_numeric import find_zero, integrate_quad, interp_linear
 
 def taylor_green(ux, uy):
     if ux.dim == 2:
@@ -198,18 +193,21 @@ def shearing_wave(data, wampl, kinit):
     data['u']['x']['kspace'] = aux['psi'].deriv('y')
     data['u']['y']['kspace'] = -aux['psi'].deriv('x')
 
-def zeldovich(data, ampl, a_ini, a_cross):
+def zeldovich(data, ampl, A, a_ini, a_cross):
     """velocity wave IC, for testing nonlinear collisionless cosmology
     against the Zeldovich approximation
     """
     k = 2*na.pi/data.length[0]
     N = data['delta'].shape[0]
-    volfac = 1./N**1.5
+    volfac = N**1.5
     D = 1.
-    A = a_ini/(a_cross * k)
+    #A = a_ini/(a_cross * k) # Only true for EdS
     x = na.array([i - N/2 for i in xrange(N)])*data.length[0]/N
-    q = na.array(broyden1(lambda y: na.array(y) + D*A*na.sin(k*na.array(y)) - x, x))
-    delta1d = (1./(1. + D*A*k*na.cos(k*q)) - 1.)*volfac
+    func = lambda y: na.array(y) + D*A*na.sin(k*na.array(y)) - x
+    left = na.array([min(x),]*N)
+    right = na.array([max(x),]*N)
+    q = find_zero(func, left, right)
+    delta1d = (1./(1. + D*A*k*na.cos(k*q)) - 1.)
     for i in xrange(N):
         for j in xrange(N):
             data['delta']['xspace'][i,j,:] = delta1d
@@ -253,7 +251,7 @@ def get_normalization(Ttot0, ak, sigma_8, nspect, h):
     """
     akoh = ak/h
     integrand = sig2_integrand(Ttot0, akoh, nspect)
-    sig2 = 4.*na.pi*simps(integrand, akoh)
+    sig2 = 4.*na.pi*integrate_quad(integrand, akoh)
     ampl = sigma_8/na.sqrt(sig2)
     return ampl
 
@@ -264,7 +262,7 @@ def collisionless_cosmo_fields(delta, u, spec_delta, spec_u, mean=0., stdev=1.):
 
     """
     shape = spec_delta.shape
-    rand = (na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape))/na.sqrt(2)
+    rand = (na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape))
     delta['kspace'] = spec_delta * rand
     hermitianize.enforce_hermitian(delta['kspace'])
     delta.dealias()
@@ -344,7 +342,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
     ampl = get_normalization(Ttot0, ak, sigma_8, nspect, h)
     ampl = ampl * (2.*na.pi/sampledata.length[0])**1.5 * (sampledata.shape[0])**1.5 # *h**1.5
 
-    f_deltacp = interp1d(na.log10(ak), na.log10(deltacp), kind='linear')
+    f_deltacp = interp_linear(na.log10(ak), na.log10(deltacp))
 
     # ... calculate spectra
     if f_nl is not None:
@@ -360,14 +358,12 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
         phi = FourierRepresentation(None, kk.shape, sampledata.length, dtype='float128')
         phi['kspace'] = to_phi * ampl * kk**(nspect/2.)/k2
         phi_ng['xspace'] = phi['xspace'] + f_nl(phi['xspace'])
-        f_deltacp = interp1d(ak, deltacp, kind='cubic')
+        f_deltacp = interp_linear(ak, deltacp, kind='cubic')
         spec_delta = k2 * phi_ng['kspace'] * f_deltacp(kk) / to_phi
     else:
         # ... delta = delta_transfer * |k|^(n_s/2)
         spec_delta = kk**(nspect/2.)*(10.**f_deltacp(na.log10(kk)))*ampl
     spec_delta[kzero] = 0.
-
-
 
     vunit = 1.02268944e-6 # km/s in Mpc/Myr
     thetac = thetac * ampl * vunit 
@@ -375,7 +371,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
 
     # ... calculate spectra    
     # u_j = -i * k_j/|k| * theta * |k|^(n_s/2 - 1)
-    f_thetac = interp1d(na.log10(ak), na.log10(thetac), kind='linear')
+    f_thetac = interp_linear(na.log10(ak), na.log10(thetac), kind='linear')
     spec_vel = 1j*kk**(nspect/2. -1.) * 10.**f_thetac(na.log10(kk)) # isotropic
     spec_vel[kzero] = 0.
 
@@ -390,11 +386,11 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
         deltabp = deltabp * ampl
         thetab  = thetab * ampl * vunit 
         
-        f_deltabp = interp1d(na.log10(ak), na.log10(deltabp), kind='linear')
+        f_deltabp = interp_linear(na.log10(ak), na.log10(deltabp), kind='linear')
         spec_delta_b = kk**(nspect/2.)*10.**f_deltabp(na.log10(kk)) 
         spec_delta_b[kzero] = 0.
         
-        f_thetab = interp1d(na.log10(ak), na.log10(thetab), kind='linear')
+        f_thetab = interp_linear(na.log10(ak), na.log10(thetab), kind='linear')
         spec_vel_b = 1j * kk**(nspect/2. - 1.) * 10.**f_thetab(na.log10(kk))
         spec_vel_b[kzero] = 0.
         
