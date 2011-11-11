@@ -151,18 +151,17 @@ class FourierRepresentation(Representation):
 
     def fwd_fftw(self):
         self.fplan()
-        self.data /= na.sqrt(self.data.size)
+        self.data /= self.data.size
 
     def rev_fftw(self):
         self.rplan()
-        self.data /= na.sqrt(self.data.size)
         self.data.imag = 0.
 
     def fwd_np(self):
-        self.data = fpack.fftn(self.data / na.sqrt(self.data.size))
+        self.data = fpack.fftn(self.data / self.data.size)
 
     def rev_np(self):
-        self.data = fpack.ifftn(self.data) * na.sqrt(self.data.size)
+        self.data = fpack.ifftn(self.data) * self.data.size
         self.data.imag = 0
 
     def forward(self):
