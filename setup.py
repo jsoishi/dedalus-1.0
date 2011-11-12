@@ -11,14 +11,18 @@ import os
 def find_fftw():
     import glob
     import os
-    path = "/usr/lib"
-    l = glob.glob(os.path.join(path,"*fftw*"))
-    if len(l) != 0:
+    try:
+        path = os.environ['FFTW_PATH']
         return path
-    path = os.path.expanduser("~/build/lib")
-    l = glob.glob(os.path.join(path,"*fftw*"))
-    if len(l) != 0:
-        return path
+    except KeyError:
+        path = "/usr/lib"
+        l = glob.glob(os.path.join(path,"*fftw*"))
+        if len(l) != 0:
+            return path
+        path = os.path.expanduser("~/build/lib")
+        l = glob.glob(os.path.join(path,"*fftw*"))
+        if len(l) != 0:
+            return path
 
 def get_mercurial_changeset_id(targetDir):
     """adapted from a script by Jason F. Harris, published at
