@@ -144,7 +144,7 @@ cdef class PlanPencil(Plan):
             self.flags = self.flags | fftw_flags[f]
         self._data = data
 
-        cdef np.ndarray n = np.array(data.shape, dtype='int32')
+        cdef np.ndarray n = np.array(data.shape[2], dtype='int32')
         cdef int rank = 1
         cdef int howmany = data.shape[0]*data.shape[1]
         cdef int istride = 1
@@ -155,10 +155,10 @@ cdef class PlanPencil(Plan):
         self._fftw_plan = fftw_plan_many_dft(rank, <int *> n.data,
                                              howmany,
                                              <complex *> self._data.data,
-                                             <int *> n. data,
+                                             <int *> n.data,
                                              istride, idist,
                                              <complex *> self._data.data,
-                                             <int *> n. data,
+                                             <int *> n.data,
                                              ostride, odist,
                                              self.direction,
                                              self.flags)
