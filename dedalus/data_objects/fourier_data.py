@@ -45,8 +45,6 @@ class FourierRepresentation(Representation):
     """Container for data that can be Fourier transformed. Includes a
     wrapped and specifiable method for performing the FFT. 
 
-    Parallelization will go here?
-
     """
 
     def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
@@ -381,14 +379,6 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.myproc = com_sys.myproc
         self.offset = na.array([0, 0, self.myproc * shape[2]])
         self._setup_k()
-        self._shape = {'kspace': self.data.shape,
-                       'xspace': (self.data.shape[0]*self.nproc,
-                                  self.data.shape[1],
-                                  self.data.shape[2]/self.nproc)}
-        self._length = {'kspace': [self.length[0], self.length[1], self.length[2]],
-                       'xspace': [self.length[0]*self.nproc,
-                                  self.length[1],
-                                  self.length[2]/self.nproc]}
         self.sendbuf = na.empty((self.nproc,) + (self._shape['kspace'][0],) + tuple(self._shape['xspace'][1:]), dtype=dtype)
         self.recvbuf = na.empty_like(self.sendbuf)
 
@@ -412,15 +402,27 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self._curr_space = space
 
     def set_fft(self, method):
+        self._shape = {'kspace': self.data.shape,
+                       'xspace': (self.data.shape[0]*self.nproc,
+                                  self.data.shape[1],
+                                  self.data.shape[2]/self.nproc)}
+        self._length = {'kspace': [self.length[0], self.length[1], self.length[2]],
+                       'xspace': [self.length[0]*self.nproc,
+                                  self.length[1],
+                                  self.length[2]/self.nproc]}
+
         if method == 'fftw':
+            self.data.shape = self._shape['xspace']
             self.fplan_yz = fftw.PlanPlane(self.data, 
-                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
-            self.fplan_x = fftw.PlanPencil(self.data, 
                                            direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
             self.rplan_yz = fftw.PlanPlane(self.data, 
                                            direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+            self.data.shape = self._shape['kspace']
+            self.fplan_x = fftw.PlanPencil(self.data, 
+                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
             self.rplan_x = fftw.PlanPencil(self.data, 
                                            direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+
 
             self.fft = self.fwd_fftw
             self.ifft = self.rev_fftw
@@ -481,6 +483,7 @@ class ParallelFourierRepresentation(FourierRepresentation):
 
         # x fft
         self.data = fpack.fft(recvbuf, axis=2)
+        self.data /= (self.data.size * com_sys.nproc)
 
     def rev_np(self):
         """kspace to xspace
@@ -494,13 +497,14 @@ class ParallelFourierRepresentation(FourierRepresentation):
 
         # yz fft
         self.data = fpack.ifftn(recvbuf, axes=(0,1))
+        self.data *= (self.data.size * com_sys.nproc)
 
     def fwd_fftw(self):
         self.fplan_yz()
         a = self.communicate('forward')
 
         self.data.shape = self._shape['kspace']
-        self.data[:] = a
+        self.data[:] = a[:]
         self.fplan_x()
         self.data /= (self.data.size * com_sys.nproc)
 
@@ -509,7 +513,8 @@ class ParallelFourierRepresentation(FourierRepresentation):
 
         a = self.communicate('backward')
         self.data.shape = self._shape['xspace']
-        self.data[:] = a
+        self.data[:] = a[:]
+
         self.rplan_yz()
         self.data.imag = 0.
 
