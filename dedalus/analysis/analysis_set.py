@@ -127,7 +127,7 @@ def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', save
     tstr = 't = %5.2f' % data.time
     grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
     
-    if not os.path.exists('frames'):
+    if not os.path.exists('frames') and com_sys.myproc == 0:
         os.mkdir('frames')
     if space == 'kspace':
         outfile = "frames/k_" + saveas + "_%07i.png" % it
@@ -264,7 +264,7 @@ def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', outp
     k, spec_f1 = compute_en_spec(data, f1, averaging='nonzero')
     k, spec_f2 = compute_en_spec(data, f2, averaging='nonzero')
 
-    if comm and comm.Get_rank() != 0:
+    if com_sys.myproc != 0:
         return
 
     if not os.path.exists('frames'):
