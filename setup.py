@@ -80,6 +80,8 @@ setup(
                              ["dedalus/utils/fftw/_fftw.pyx"],
                              libraries=["fftw3"],
                              include_dirs=["dedalus/utils/fftw"],
-                             library_dirs=[find_fftw()])]
+                             library_dirs=[find_fftw()]),
+                   Extension("dedalus.data_objects.dealias_cy_2d", ["dedalus/data_objects/dealias_cy_2d.pyx"]),
+                   Extension("dedalus.data_objects.dealias_cy_3d", ["dedalus/data_objects/dealias_cy_3d.pyx"])]
     
     )
