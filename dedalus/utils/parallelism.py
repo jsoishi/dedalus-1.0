@@ -105,4 +105,46 @@ def load_all(field, snap_dir):
 
     print "loaded %s at time = %f" % (field, time)
     return np.concatenate(data,axis=concat_ax), space
+
+######
+# these reduction operators are light wrappers around mpi functions
+def reduce_mean(data):
+    if com_sys.comm != None:
+        return data.mean()
+    else:
+        local_sum = data.sum()
+        total = com_sys.MPI.reduce(local_sum,op=com_sys.MPI.SUM)
+        # this should be cached, but should work.
+        global_size = com_sys.MPI.reduce(data.size,op=com_sys.MPI.SUM)
+
+    if com_sys.my_proc == 0:
+        return total/global_size
+
+def reduce_sum(data):
+    local_sum = data.sum()
+    if com_sys.comm != None:
+        return local_sum
+
+    total = com_sys.MPI.reduce(local_sum,op=com_sys.MPI.SUM)
+    if com_sys.my_proc == 0:
+        return total
+
+def reduce_min(data):
+    local_min = data.min()
+    if com_sys.comm != None:
+        return local_min
+    
+    global_min = com_sys.MPI.reduce(local_min,op=com_sys.MPI.MIN)
+    if com_sys.my_proc == 0:
+        return global_min
+    
+def reduce_max(data):
+    local_max = data.max()
+    if com_sys.comm != None:
+        return local_max
+    
+    global_max = com_sys.MPI.reduce(local_max,op=com_sys.MPI.MAX)
+    if com_sys.my_proc == 0:
+        return global_max
+
     

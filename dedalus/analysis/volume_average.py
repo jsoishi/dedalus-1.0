@@ -23,7 +23,7 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
+from dedalus.utils.parallelism import com_sys, reduce_sum
 import numpy as na
 
 class VolumeAverageSet(object):
@@ -35,24 +35,30 @@ class VolumeAverageSet(object):
         self.data = data
         self.filename = filename
         self.tasks = []
-        self.outfile = open(self.filename,'a')
-        self.outfile.write("# Dedalus Volume Average\n")
-        self.outfile.write("# Column 0: time\n")
+        if com_sys.myproc == 0:
+            self.outfile = open(self.filename,'a')
+            self.outfile.write("# Dedalus Volume Average\n")
+            self.outfile.write("# Column 0: time\n")
 
     def add(self, name, fmt, options={}):
         self.tasks.append((self.known_analysis[name], fmt, options))
-        self.outfile.write("# Column %i: %s\n" % (len(self.tasks), name))
+        if com_sys.myproc == 0:
+            self.outfile.write("# Column %i: %s\n" % (len(self.tasks), name))
         
     def run(self):
-        line = []
-        line.append("%10.5f" % self.data.time)
+        if com_sys.myproc == 0:
+            line = []
+            line.append("%10.5f" % self.data.time)
         for f, fmt, kwargs in self.tasks:
             if len(kwargs) == 0:
-                line.append(fmt % f(self.data))
+                retval = f(self.data)
             else:
-                line.append(fmt % f(self.data, **kwargs))
-        self.outfile.write("\t".join(line)+"\n")
-        self.outfile.flush()
+                retval = f(self.data, **kwargs)
+            if com_sys.myproc == 0:
+                line.append(fmt % retval)
+        if com_sys.myproc == 0:
+            self.outfile.write("\t".join(line)+"\n")
+            self.outfile.flush()
 
     @classmethod
     def register_task(cls, func):
@@ -64,7 +70,7 @@ def ekin(data):
     for i in xrange(data['u'].ncomp):
         en += 0.5 * na.abs(data['u'][i]['kspace']) ** 2
 
-    return en.sum()
+    return reduce_sum(en.sum())
     
 @VolumeAverageSet.register_task
 def emag(data):
@@ -72,7 +78,7 @@ def emag(data):
     for i in xrange(data['B'].ncomp):
         en += 0.5 * na.abs(data['B'][i]['kspace']) ** 2
 
-    return en.sum()
+    return reduce_sum(en.sum())
     
 @VolumeAverageSet.register_task
 def mode_track(data, k=(1, 0, 0)):
