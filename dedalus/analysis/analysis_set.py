@@ -247,6 +247,9 @@ def en_spec(data, it, flist=['u']):
     outfile = "frames/enspec_%04i.png" %it
     P.savefig(outfile)
     P.clf()
+    txtout = open("power.dat",'a')
+    txtout.write(' '.join([str(i) for i in spectrum.tolist()])+'\n')
+    txtout.close()
 
 @AnalysisSet.register_task
 def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', output_columns=True):
