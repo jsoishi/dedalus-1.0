@@ -220,36 +220,39 @@ def compute_en_spec(data, field, normalization=1.0, averaging=None):
 def en_spec(data, it, flist=['u']):
     """Record power spectrum of specified fields."""
     N = len(flist)
-    fig = P.figure(2, figsize=(8 * N, 8))
+    if com_sys.myproc == 0:
+        fig = P.figure(2, figsize=(8 * N, 8))
     
     for i,f in enumerate(flist):
         k, spectrum = compute_en_spec(data, f)
 
-        # Plotting, skip if all modes are zero
-        if spectrum[1:].nonzero()[0].size == 0:
-            return
-        
-        ax = fig.add_subplot(1, N, i+1)
-        ax.semilogy(k[1:], spectrum[1:], 'o-')
-        
-        print "%s E total power = %10.5e" %(f, spectrum.sum())
-        print "%s E0 power = %10.5e" %(f, spectrum[0])
-        ax.set_xlabel(r"$k$")
-        ax.set_ylabel(r"$E(k)$")
-        ax.set_title('%s Power, time = %5.2f' %(f, data.time))
+        if com_sys.myproc == 0:
+            # Plotting, skip if all modes are zero
+            if spectrum[1:].nonzero()[0].size == 0:
+                return
 
-    # Add timestamp
-    #tstr = 't = %5.2f' % data.time
-    #P.text(-0.3,1.,tstr, transform=P.gca().transAxes,size=24,color='black')
+            ax = fig.add_subplot(1, N, i+1)
+            ax.semilogy(k[1:], spectrum[1:], 'o-')
+
+            print "%s E total power = %10.5e" %(f, spectrum.sum())
+            print "%s E0 power = %10.5e" %(f, spectrum[0])
+            ax.set_xlabel(r"$k$")
+            ax.set_ylabel(r"$E(k)$")
+            ax.set_title('%s Power, time = %5.2f' %(f, data.time))
+
+    if com_sys.myproc == 0:
+        # Add timestamp
+        #tstr = 't = %5.2f' % data.time
+        #P.text(-0.3,1.,tstr, transform=P.gca().transAxes,size=24,color='black')
        
-    if not os.path.exists('frames'):
-        os.mkdir('frames')
-    outfile = "frames/enspec_%04i.png" %it
-    P.savefig(outfile)
-    P.clf()
-    txtout = open("power.dat",'a')
-    txtout.write(' '.join([str(i) for i in spectrum.tolist()])+'\n')
-    txtout.close()
+        if not os.path.exists('frames'):
+            os.mkdir('frames')
+        outfile = "frames/enspec_%04i.png" %it
+        P.savefig(outfile)
+        P.clf()
+        txtout = open("power.dat",'a')
+        txtout.write(' '.join([str(i) for i in spectrum.tolist()])+'\n')
+        txtout.close()
 
 @AnalysisSet.register_task
 def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', output_columns=True):
