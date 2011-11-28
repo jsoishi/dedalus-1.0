@@ -24,6 +24,8 @@ def find_fftw():
         if len(l) != 0:
             return path
 
+        print "FFTW_PATH is not set, and we can't find FFTW in any of the standard places. If FFTW isn't in your LD_LIBRARY_PATH, compilation will likely fail."
+        
 def get_mercurial_changeset_id(targetDir):
     """adapted from a script by Jason F. Harris, published at
 
