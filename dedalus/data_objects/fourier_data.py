@@ -132,13 +132,6 @@ class FourierRepresentation(Representation):
             self.fft = self.fwd_cufft
             self.ifft = self.rev_cufft
             
-            
-    def set_dealiasing(self, dealiasing):
-        if dealiasing == '2/3':
-            self.dealias = self.dealias_23
-        else:
-            self.dealias = None
-
     def fwd_cufft(self):
         self.data_gpu = gpuarray.to_gpu(self.data)
         cu_fft.fft(self.data_gpu, self.data_gpu, self.fplan)
