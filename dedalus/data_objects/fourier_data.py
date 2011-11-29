@@ -290,34 +290,29 @@ class FourierShearRepresentation(FourierRepresentation):
         self.kx = self.k['x'].copy()
         
         # For now, only numpy's fft is supported
-        self.fft = fpack.fft
-        self.ifft = fpack.ifft
+        self.fft = self.fwd_np
+        self.ifft = self.rev_np
 
-
-    def backward(self):
+    def rev_np(self):
         """IFFT method to go from kspace to xspace."""
         
         deltay = self.shear_rate * self.sd.time 
         x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
         
-        self.dealias()
-        
         # Do x fft
-        self.data = self.ifft(self.data, axis=-1) * na.sqrt(self.shape[-1])
+        self.data = fpack.ifft(self.data, axis=-1) * na.sqrt(self.shape[-1])
         
         # Phase shift
         self.data *= na.exp(-1j * self.k['y'] * x * deltay)
         
         # Do y fft
-        self.data = self.ifft(self.data, axis=-2) * na.sqrt(self.shape[-2])
+        self.data = fpack.ifft(self.data, axis=-2) * na.sqrt(self.shape[-2])
         
         # Do z fft
         if self.ndim == 3:
-            self.data = self.ifft(self.data, axis=0) * na.sqrt(self.shape[0])
+            self.data = fpack.ifft(self.data, axis=0) * na.sqrt(self.shape[0])
         
-        self._curr_space = 'xspace'
-
-    def forward(self):
+    def fwd_np(self):
         """FFT method to go from xspace to kspace."""
         
         deltay = self.shear_rate * self.sd.time
@@ -326,19 +321,16 @@ class FourierShearRepresentation(FourierRepresentation):
 
         # Do z fft
         if self.ndim == 3:
-            self.data = self.fft(self.data / na.sqrt(self.shape[0]), axis=0)
+            self.data = fpack.fft(self.data / na.sqrt(self.shape[0]), axis=0)
 
         # Do y fft
-        self.data = self.fft(self.data / na.sqrt(self.shape[-2]), axis=-2)
+        self.data = fpack.fft(self.data / na.sqrt(self.shape[-2]), axis=-2)
 
         # Phase shift
         self.data *= na.exp(1j * self.k['y'] * x * deltay)
         
         # Do x fft
-        self.data = self.fft(self.data / na.sqrt(self.shape[-1]), axis=-1)
-        
-        self._curr_space = 'kspace'
-        self.dealias()
+        self.data = fpack.fft(self.data / na.sqrt(self.shape[-1]), axis=-1)
         
     def _update_k(self):
         """Evolve modes due to shear."""
