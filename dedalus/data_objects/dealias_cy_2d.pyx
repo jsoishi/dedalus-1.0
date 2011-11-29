@@ -24,13 +24,13 @@ def dealias_23(np.ndarray[DTYPE1_t, ndim=2] data not None,
     if kx.shape[0] == 1:
         for y in range(ymax):
             for x in range(xmax):
-                if ((kx[0, x] >= 2 / 3. * knyquist[1]) or (kx[0, x] <= -2 / 3. * knyquist[1])) or \
-                   ((ky[y, 0] >= 2 / 3. * knyquist[0]) or (ky[y, 0] <= -2 / 3. * knyquist[0])):
+                if ((kx[0, x] > 2 / 3. * knyquist[1]) or (kx[0, x] < -2 / 3. * knyquist[1])) or \
+                   ((ky[y, 0] > 2 / 3. * knyquist[0]) or (ky[y, 0] < -2 / 3. * knyquist[0])):
                     data[y, x] = 0.
 
     else:
         for y in range(ymax):
             for x in range(xmax):
-                if ((kx[y, x] >= 2 / 3. * knyquist[1]) or (kx[y, x] <= -2 / 3. * knyquist[1])) or \
-                   ((ky[y, 0] >= 2 / 3. * knyquist[0]) or (ky[y, 0] <= -2 / 3. * knyquist[0])):
+                if ((kx[y, x] > 2 / 3. * knyquist[1]) or (kx[y, x] < -2 / 3. * knyquist[1])) or \
+                   ((ky[y, 0] > 2 / 3. * knyquist[0]) or (ky[y, 0] < -2 / 3. * knyquist[0])):
                     data[y, x] = 0.
