@@ -289,9 +289,22 @@ class FourierShearRepresentation(FourierRepresentation):
         self.shear_rate = self.sd.parameters['S'] * self.sd.parameters['Omega']
         self.kx = self.k['x'].copy()
         
-        # For now, only numpy's fft is supported
-        self.fft = self.fwd_np
-        self.ifft = self.rev_np
+    def set_fft(self, method):
+        if method == 'fftw':
+            self.fplan_yz = fftw.PlanPlane(self.data, 
+                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+            self.rplan_yz = fftw.PlanPlane(self.data, 
+                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+            self.fplan_x = fftw.PlanPencil(self.data, 
+                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+            self.rplan_x = fftw.PlanPencil(self.data, 
+                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+
+            self.fft = self.fwd_fftw
+            self.ifft = self.rev_fftw
+        if method == 'numpy':
+            self.fft = self.fwd_np
+            self.ifft = self.rev_np
 
     def rev_np(self):
         """IFFT method to go from kspace to xspace."""
@@ -331,7 +344,36 @@ class FourierShearRepresentation(FourierRepresentation):
         
         # Do x fft
         self.data = fpack.fft(self.data / na.sqrt(self.shape[-1]), axis=-1)
+
+    def fwd_fftw(self):
+        deltay = self.shear_rate * self.sd.time
+        x = (na.linspace(0., self.length[-1], self.shape[-1], endpoint=False) +
+             na.zeros(self.shape))
+
+        # do y-z fft
+        self.fplan_yz()
+
+        # Phase shift
+        self.data *= na.exp(1j * self.k['y'] * x * deltay)
         
+        # Do x fft
+        self.fplan_x()
+        self.data /= (self.data.size * com_sys.nproc)
+
+    def rev_fftw(self):
+        deltay = self.shear_rate * self.sd.time 
+        x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
+        
+        # Do x fft
+        self.rplan_x()
+
+        # Phase shift
+        self.data *= na.exp(-1j * self.k['y'] * x * deltay)
+        
+        # Do y-z fft
+        self.rplan_yz()
+        self.data.imag = 0.
+
     def _update_k(self):
         """Evolve modes due to shear."""
 
@@ -504,16 +546,15 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.data.imag = 0.
 
 class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierShearRepresentation):
-    def __init__(self, sd, shape, length, dtype='complex128', method='numpy',
+    def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
                  dealiasing='2/3 cython'):
         ParallelFourierRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
         FourierShearRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
         self.nproc = com_sys.nproc
-        self.myproc = comm.myproc
+        self.myproc = com_sys.myproc
         self.offset = na.array([0, 0, self.myproc * shape[2]])
 
-        
-    def forward(self):
+    def fwd_np(self):
         """FFT method to go from xspace to kspace."""
         
         deltay = self.shear_rate * self.sd.time
@@ -521,7 +562,6 @@ class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierS
              na.zeros(self._shape['kspace']))
 
         # Do y-z fft
-        
         self.data = fpack.fftn(self.data, axes=(0,1))
 
         # communicate
@@ -532,17 +572,12 @@ class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierS
         
         # Do x fft
         self.data = fpack.fft(recvbuf, axis=2)
-        
-        self._curr_space = 'kspace'
-        self.dealias()
 
-    def backward(self):
+    def rev_np(self):
         """IFFT method to go from kspace to xspace."""
         
         deltay = self.shear_rate * self.sd.time 
         x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
-        
-        self.dealias()
         
         # Do x fft
         self.data = fpack.ifft(self.data, axis=2)
@@ -556,7 +591,43 @@ class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierS
         # Do y-z fft
         self.data = fpack.ifftn(recvbuf, axes=(0,1))
 
-        self._curr_space = 'xspace'
+
+    def fwd_fftw(self):
+        deltay = self.shear_rate * self.sd.time
+        x = (na.linspace(0., self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False) +
+             na.zeros(self._shape['kspace']))
+
+        # do y-z fft
+        self.fplan_yz()
+        a = self.communicate('forward')
+        self.data.shape = self._shape['kspace']
+        self.data[:] = a[:]
+
+        # Phase shift
+        self.data *= na.exp(1j * self.k['y'] * x * deltay)
+        
+        # Do x fft
+        self.fplan_x()
+        self.data /= (self.data.size * com_sys.nproc)
+
+    def rev_fftw(self):
+        deltay = self.shear_rate * self.sd.time
+        x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
+
+        # Do x fft
+        self.rplan_x()
+
+        # Phase shift
+        self.data *= na.exp(-1j * self.k['y'] * x * deltay)
+        
+        # Communicate
+        a = self.communicate('backward')
+        self.data.shape = self._shape['xspace']
+        self.data[:] = a[:]
+
+        # Do y-z fft
+        self.rplan_yz()
+        self.data.imag = 0.
 
 class SphericalHarmonicRepresentation(FourierRepresentation):
     """Dedalus should eventually support spherical and cylindrical geometries.
