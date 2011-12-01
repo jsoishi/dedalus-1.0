@@ -111,14 +111,22 @@ cdef class PlanPlane(Plan):
         cdef fftw_iodim *howmany_dims = <fftw_iodim *> libc.stdlib.malloc(sizeof(fftw_iodim) * howmany_rank)
 
         # setup transforms
-        dims[0].n = data.shape[0]
-        dims[0].ins = data.shape[1]*data.shape[2]
-        dims[0].ous = data.shape[1]*data.shape[2]
-        dims[1].n = data.shape[1]
-        dims[1].ins = data.shape[2]
-        dims[1].ous = data.shape[2]
+        if len(data.shape) == 2:
+            nz = 1
+            ny = data.shape[0]
+            nx = data.shape[1]
+        else:
+            nz = data.shape[0]
+            ny = data.shape[1]
+            nx = data.shape[2]
+        dims[0].n = nz #data.shape[0]
+        dims[0].ins = ny*nx # data.shape[1]*data.shape[2]
+        dims[0].ous = ny*nx # data.shape[1]*data.shape[2]
+        dims[1].n = ny # data.shape[1]
+        dims[1].ins = nx # data.shape[2]
+        dims[1].ous = nx # data.shape[2]
 
-        howmany_dims[0].n = data.shape[2]
+        howmany_dims[0].n = nx #data.shape[2]
         howmany_dims[0].ins = 1
         howmany_dims[0].ous = 1
         
@@ -144,12 +152,19 @@ cdef class PlanPencil(Plan):
             self.flags = self.flags | fftw_flags[f]
         self._data = data
 
-        cdef np.ndarray n = np.array(data.shape[2], dtype='int32')
+        nx = data.shape[-1]
+        ny = data.shape[-2]
+        try:
+            nz = data.shape[-3]
+        except IndexError:
+            nz = 1
+
+        cdef np.ndarray n = np.array(nx, dtype='int32')
         cdef int rank = 1
-        cdef int howmany = data.shape[0]*data.shape[1]
+        cdef int howmany = nz*ny
         cdef int istride = 1
         cdef int ostride = istride
-        cdef int idist = data.shape[2]
+        cdef int idist = nx
         cdef int odist = idist
 
         self._fftw_plan = fftw_plan_many_dft(rank, <int *> n.data,
