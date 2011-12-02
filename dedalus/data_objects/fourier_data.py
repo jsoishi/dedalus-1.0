@@ -24,6 +24,7 @@ import numpy as na
 import numpy.fft as fpack
 from dedalus.utils.parallelism import com_sys
 from dedalus.utils.fftw import fftw
+from dedalus.utils.timer import Timer
 from dedalus.funcs import insert_ipython
 try:
     import pycuda.autoinit
@@ -46,7 +47,7 @@ class FourierRepresentation(Representation):
     wrapped and specifiable method for performing the FFT. 
 
     """
-
+    #timer = Timer()
     def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
                  dealiasing='2/3 cython'):
         """
@@ -384,6 +385,7 @@ class FourierShearRepresentation(FourierRepresentation):
             self.k['x'][self.k['x'] >= self.kny[-1]] -= 2 * self.kny[-1]
             
 class ParallelFourierRepresentation(FourierRepresentation):
+    timer = Timer()
     def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
                  dealiasing='2/3'):
         """
@@ -473,6 +475,7 @@ class ParallelFourierRepresentation(FourierRepresentation):
         self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
         self.k['z'] = self.k['z'][self.myproc*self.shape[0]:(self.myproc+1)*self.shape[0]]
 
+    @timer
     def communicate(self, direction):
         """Handles the communication.
 
