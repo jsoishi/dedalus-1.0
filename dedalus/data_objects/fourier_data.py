@@ -496,12 +496,16 @@ class ParallelFourierRepresentation(FourierRepresentation):
             space = 'xspace'
         else:
             raise ValueError("Communcation direction must be forward or backward")
-        
-        self.comm.Alltoall([self.sendbuf,com_sys.MPI.COMPLEX], [self.recvbuf,com_sys.MPI.COMPLEX])
+
+        self.alltoall()
 
         self.shape = self._shape[space]
         self.length = self._length[space]
         return na.concatenate(self.recvbuf, axis=concat_axis)
+
+    @timer
+    def alltoall(self):
+        self.comm.Alltoall([self.sendbuf,com_sys.MPI.COMPLEX], [self.recvbuf,com_sys.MPI.COMPLEX])
 
     def fwd_np(self):
         """xspace to kspace"""
