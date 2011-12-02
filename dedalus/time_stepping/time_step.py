@@ -65,13 +65,16 @@ class TimeStepBase(object):
     @property
     def ok(self):
         if self.iter >= self._stop_iter:
-            print "Maximum number of iterations reached. Done."
+            if com_sys.myproc == 0:
+                print "Maximum number of iterations reached. Done."
             self._is_ok = False
         if self.time >= self._stop_time:
-            print "Time > stop time. Done"
+            if com_sys.myproc == 0:
+                print "Time > stop time. Done"
             self._is_ok = False
         if (time.time() - self._start_time) >= self._stop_wall:
-            print "Wall clock time exceeded. Done."
+            if com_sys.myproc == 0:
+                print "Wall clock time exceeded. Done."
             self._is_ok = False
 
         return self._is_ok
@@ -136,6 +139,14 @@ class TimeStepBase(object):
             print "%10.5e sec/step " %(total_wtime/self.iter)
             print 
             print "Simulation complete. Status: awesome"
+
+    def finalize(self, data):
+        """helper function to call at the end of a run to clean up,
+        write final output, and print stats.
+
+        """
+        self.snapshot(data)
+        self.final_stats()
 
 
 class RK2simple(TimeStepBase):
