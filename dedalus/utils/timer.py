@@ -32,12 +32,14 @@ class Timer(object):
     def __call__(self, func):
         def wrapper(*args, **kwargs):
             start = time.time()
-            func(*args, **kwargs)
+            retval = func(*args, **kwargs)
             stop = time.time()
             try:
                 self.timers[func.func_name] += (stop-start)
             except KeyError:
                 self.timers[func.func_name] = (stop-start)
+
+            return retval
         return wrapper
 
     def print_stats(self):
