@@ -408,8 +408,8 @@ def k_plot(data, it, zcut=0):
         for j in xrange(f.ncomp):
             I = i * ncol + j
         
-            x = f[j].k['x'][0] + z_
-            y = f[j].k['y'][0] + z_
+            x = f[j].k['x'] + z_
+            y = f[j].k['y'] + z_
 
             if f[j].ndim == 3:
                 plot_array = f[j]['kspace'][zcut]
