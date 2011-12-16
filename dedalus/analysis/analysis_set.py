@@ -417,12 +417,12 @@ def k_plot(data, it, zcut=0):
                 plot_array = f[j]['kspace']
                 
             plot_array = na.abs(plot_array)
-            plot_array[plot_array == 0] = 1e-40
             plot_array = na.log10(plot_array)
-            
+            mask = ~na.isnan(plot_array)
+
             # Plot
-            im = grid[I].scatter(x, y, c=plot_array, linewidth=0, 
-                                 vmax=na.max([plot_array.max(), -39]))
+            im = grid[I].scatter(x[mask], y[mask], c=plot_array[mask], linewidth=0, 
+                                 vmax=na.max([plot_array[mask].max(), -39]))
             
             # Nyquist boundary
             nysquarex = na.array([-ny[-1], -ny[-1], ny[-1], ny[-1], -ny[-1]])
