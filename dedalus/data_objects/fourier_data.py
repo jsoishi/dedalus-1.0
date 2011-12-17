@@ -22,8 +22,10 @@ License:
 """
 import numpy as na
 import numpy.fft as fpack
-import fftw3
-
+from dedalus.utils.parallelism import com_sys
+from dedalus.utils.fftw import fftw
+from dedalus.utils.timer import Timer
+from dedalus.funcs import insert_ipython
 try:
     import pycuda.autoinit
     import pycuda.gpuarray as gpuarray
@@ -44,20 +46,22 @@ class FourierRepresentation(Representation):
     """Container for data that can be Fourier transformed. Includes a
     wrapped and specifiable method for performing the FFT. 
 
-    Parallelization will go here?
-
     """
-
+    #timer = Timer()
     def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
-                 dealiasing='2/3'):
+                 dealiasing='2/3 cython'):
         """
         Inputs:
+            sd          state data object
             shape       The shape of the data, tuple of ints
             length      The length of the data, tuple of floats (default: 2 pi)
             
         """
         self.sd = sd
         self.shape = shape
+        self._shape = {'kspace': shape,
+                       'xspace': shape
+            }
         self.length = length
         self.ndim = len(self.shape)
         self.data = na.zeros(self.shape, dtype=dtype)
@@ -66,18 +70,7 @@ class FourierRepresentation(Representation):
         self.trans = {'x': 0, 'y': 1, 'z': 2,
                       0:'x', 1:'y', 2:'z'} # for vector fields
         
-        # Get Nyquist wavenumbers
-        self.kny = na.pi * na.array(self.shape) / na.array(self.length)
-
-        # Setup wavenumbers
-        self.k = []
-        for i,S in enumerate(self.shape):
-            kshape = i * (1,) + (S,) + (self.ndim - i - 1) * (1,)
-            ki = fpack.fftfreq(S) * 2. * self.kny[i]
-            ki.resize(kshape)
-            self.k.append(ki)
-        self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
-
+        self._setup_k()
         self.set_fft(method)
         self.set_dealiasing(dealiasing)
 
@@ -110,15 +103,23 @@ class FourierRepresentation(Representation):
 
         self._curr_space = space
 
-    def initialize(self, data, space):
-        """should provide some way to initialize data
-        """
-        pass
-        
+    def _setup_k(self):
+        # Get Nyquist wavenumbers
+        self.kny = na.pi * na.array(self.shape) / na.array(self.length)
+
+        # Setup wavenumbers
+        self.k = []
+        for i,S in enumerate(self.shape):
+            kshape = i * (1,) + (S,) + (self.ndim - i - 1) * (1,)
+            ki = fpack.fftfreq(S) * 2. * self.kny[i]
+            ki.resize(kshape)
+            self.k.append(ki)
+        self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
+
     def set_fft(self, method):
         if method == 'fftw':
-            self.fplan = fftw3.Plan(self.data, direction='forward', flags=['measure'])
-            self.rplan = fftw3.Plan(self.data, direction='backward', flags=['measure'])
+            self.fplan = fftw.Plan(self.data, direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+            self.rplan = fftw.Plan(self.data, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
             self.fft = self.fwd_fftw
             self.ifft = self.rev_fftw
         if method == 'numpy':
@@ -132,13 +133,6 @@ class FourierRepresentation(Representation):
             self.fft = self.fwd_cufft
             self.ifft = self.rev_cufft
             
-            
-    def set_dealiasing(self, dealiasing):
-        if dealiasing == '2/3':
-            self.dealias = self.dealias_23
-        else:
-            self.dealias = None
-
     def fwd_cufft(self):
         self.data_gpu = gpuarray.to_gpu(self.data)
         cu_fft.fft(self.data_gpu, self.data_gpu, self.fplan)
@@ -152,7 +146,7 @@ class FourierRepresentation(Representation):
     def fwd_fftw(self):
         self.fplan()
         self.data /= self.data.size
-
+        
     def rev_fftw(self):
         self.rplan()
         self.data.imag = 0.
@@ -199,11 +193,11 @@ class FourierRepresentation(Representation):
         """Orszag 2/3 dealiasing rule"""
         
         # Zeroing mask   
-        dmask = ((na.abs(self.k['x']) >= 2/3. * self.kny[-1]) | 
-                 (na.abs(self.k['y']) >= 2/3. * self.kny[-2]))
+        dmask = ((na.abs(self.k['x']) > 2/3. * self.kny[-1]) | 
+                 (na.abs(self.k['y']) > 2/3. * self.kny[-2]))
 
         if self.ndim == 3:
-            dmask = dmask | (na.abs(self.k['z']) >= 2/3. * self.kny[-3])
+            dmask = dmask | (na.abs(self.k['z']) > 2/3. * self.kny[-3])
 
         self['kspace'] # Dummy call to switch spaces
         self.data[dmask] = 0.
@@ -241,7 +235,7 @@ class FourierRepresentation(Representation):
         """returns k**2. if no_zero is set, will set the mean mode to
         1. useful for division when the mean is not important.
         """
-        k2 = na.zeros(self.data.shape)
+        k2 = na.zeros(self._shape['kspace'])
         for k in self.k.values():
             k2 += k**2
         if no_zero:
@@ -296,35 +290,43 @@ class FourierShearRepresentation(FourierRepresentation):
         self.shear_rate = self.sd.parameters['S'] * self.sd.parameters['Omega']
         self.kx = self.k['x'].copy()
         
-        # For now, only numpy's fft is supported
-        self.fft = fpack.fft
-        self.ifft = fpack.ifft
+    def set_fft(self, method):
+        if method == 'fftw':
+            self.fplan_yz = fftw.PlanPlane(self.data, 
+                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+            self.rplan_yz = fftw.PlanPlane(self.data, 
+                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+            self.fplan_x = fftw.PlanPencil(self.data, 
+                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+            self.rplan_x = fftw.PlanPencil(self.data, 
+                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
 
+            self.fft = self.fwd_fftw
+            self.ifft = self.rev_fftw
+        if method == 'numpy':
+            self.fft = self.fwd_np
+            self.ifft = self.rev_np
 
-    def backward(self):
+    def rev_np(self):
         """IFFT method to go from kspace to xspace."""
         
         deltay = self.shear_rate * self.sd.time 
         x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
         
-        self.dealias()
-        
         # Do x fft
-        self.data = self.ifft(self.data, axis=-1) * na.sqrt(self.shape[-1])
+        self.data = fpack.ifft(self.data, axis=-1) * na.sqrt(self.shape[-1])
         
         # Phase shift
         self.data *= na.exp(-1j * self.k['y'] * x * deltay)
         
         # Do y fft
-        self.data = self.ifft(self.data, axis=-2) * na.sqrt(self.shape[-2])
+        self.data = fpack.ifft(self.data, axis=-2) * na.sqrt(self.shape[-2])
         
         # Do z fft
         if self.ndim == 3:
-            self.data = self.ifft(self.data, axis=0) * na.sqrt(self.shape[0])
+            self.data = fpack.ifft(self.data, axis=0) * na.sqrt(self.shape[0])
         
-        self._curr_space = 'xspace'
-
-    def forward(self):
+    def fwd_np(self):
         """FFT method to go from xspace to kspace."""
         
         deltay = self.shear_rate * self.sd.time
@@ -333,20 +335,46 @@ class FourierShearRepresentation(FourierRepresentation):
 
         # Do z fft
         if self.ndim == 3:
-            self.data = self.fft(self.data / na.sqrt(self.shape[0]), axis=0)
+            self.data = fpack.fft(self.data / na.sqrt(self.shape[0]), axis=0)
 
         # Do y fft
-        self.data = self.fft(self.data / na.sqrt(self.shape[-2]), axis=-2)
+        self.data = fpack.fft(self.data / na.sqrt(self.shape[-2]), axis=-2)
 
         # Phase shift
         self.data *= na.exp(1j * self.k['y'] * x * deltay)
         
         # Do x fft
-        self.data = self.fft(self.data / na.sqrt(self.shape[-1]), axis=-1)
+        self.data = fpack.fft(self.data / na.sqrt(self.shape[-1]), axis=-1)
+
+    def fwd_fftw(self):
+        deltay = self.shear_rate * self.sd.time
+        x = (na.linspace(0., self.length[-1], self.shape[-1], endpoint=False) +
+             na.zeros(self.shape))
+
+        # do y-z fft
+        self.fplan_yz()
+
+        # Phase shift
+        self.data *= na.exp(1j * self.k['y'] * x * deltay)
         
-        self._curr_space = 'kspace'
-        self.dealias()
+        # Do x fft
+        self.fplan_x()
+        self.data /= (self.data.size * com_sys.nproc)
+
+    def rev_fftw(self):
+        deltay = self.shear_rate * self.sd.time 
+        x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
         
+        # Do x fft
+        self.rplan_x()
+
+        # Phase shift
+        self.data *= na.exp(-1j * self.k['y'] * x * deltay)
+        
+        # Do y-z fft
+        self.rplan_yz()
+        self.data.imag = 0.
+
     def _update_k(self):
         """Evolve modes due to shear."""
 
@@ -356,8 +384,262 @@ class FourierShearRepresentation(FourierRepresentation):
         while self.k['x'].max() >= self.kny[-1]:
             self.k['x'][self.k['x'] >= self.kny[-1]] -= 2 * self.kny[-1]
             
-            
-    
+class ParallelFourierRepresentation(FourierRepresentation):
+    timer = Timer()
+    def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
+                 dealiasing='2/3'):
+        """
+        Inputs:
+            sd          state data object
+            shape       The shape of the data, tuple of ints
+            length      The length of the data, tuple of floats (default: 2 pi)
+        """
+        self.comm = com_sys.comm
+        if not self.comm:
+            raise ValueError("mpi4py cannot be loaded. A parallel run cannot be initialized.")
+        if len(shape) != 3:
+            raise ValueError("Parallel runs must be 3D")
+
+        self.nproc = com_sys.nproc
+        self.myproc = com_sys.myproc
+        self.offset = na.array([0, 0, self.myproc * shape[2]])
+        FourierRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
+        self.nproc = com_sys.nproc
+        self.myproc = com_sys.myproc
+        self.offset = na.array([0, 0, self.myproc * shape[2]])
+        self._setup_k()
+        self.sendbuf = na.empty((self.nproc,) + (self._shape['kspace'][0],) + tuple(self._shape['xspace'][1:]), dtype=dtype)
+        self.recvbuf = na.empty_like(self.sendbuf)
+
+
+    def __setitem__(self, space, data):
+        """this needs to ensure the pointer for the field's data
+        member doesn't change for FFTW. Currently, we do that by
+        slicing the entire data array. 
+        """
+        if space != self._curr_space:
+            self.shape = self._shape[space]
+            self.data.shape = self.shape
+
+        if data.size < self.data.size:
+            sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
+            self.data[sli] = data
+        else:
+            sli = [slice(i) for i in self.data.shape]
+            self.data[:] = data[sli]
+
+        self._curr_space = space
+
+    def set_fft(self, method):
+        self._shape = {'kspace': self.data.shape,
+                       'xspace': (self.data.shape[0]*self.nproc,
+                                  self.data.shape[1],
+                                  self.data.shape[2]/self.nproc)}
+        self._length = {'kspace': [self.length[0], self.length[1], self.length[2]],
+                       'xspace': [self.length[0]*self.nproc,
+                                  self.length[1],
+                                  self.length[2]/self.nproc]}
+
+        if method == 'fftw':
+            self.data.shape = self._shape['xspace']
+            self.fplan_yz = fftw.PlanPlane(self.data, 
+                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+            self.rplan_yz = fftw.PlanPlane(self.data, 
+                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+            self.data.shape = self._shape['kspace']
+            self.fplan_x = fftw.PlanPencil(self.data, 
+                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+            self.rplan_x = fftw.PlanPencil(self.data, 
+                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+
+
+            self.fft = self.fwd_fftw
+            self.ifft = self.rev_fftw
+        if method == 'numpy':
+            self.fft = self.fwd_np
+            self.ifft = self.rev_np
+
+    def _setup_k(self):
+        global_shape = na.array(self.shape)*na.array([self.nproc, 1, 1])
+        global_length = na.array(self.length)*na.array([self.nproc, 1, 1])
+        # Get Nyquist wavenumbers
+        self.kny = na.pi * na.array(self.shape) / na.array(self.length)
+
+        # Setup wavenumbers
+        self.k = []
+        for i,S in enumerate(global_shape):
+            kshape = i * (1,) + (S,) + (self.ndim - i - 1) * (1,)
+            ki = fpack.fftfreq(S) * 2. * self.kny[i]
+            ki.resize(kshape)
+            self.k.append(ki)
+        self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
+        self.k['z'] = self.k['z'][self.myproc*self.shape[0]:(self.myproc+1)*self.shape[0]]
+
+    @timer
+    def communicate(self, direction):
+        """Handles the communication.
+
+        """
+        # concatenate assumes a list of arrays, so concat_axis is
+        # actually indexing into data, not recvbuf; 0 --> z, 2 --> x
+        if direction == 'forward':
+            sz = self.shape[0] / self.nproc
+            for i in xrange(self.nproc):
+                self.sendbuf[i] = self.data[i * sz:(i + 1) * sz, :, :]
+            concat_axis = 2
+            space = 'kspace'
+        elif direction == 'backward':
+            sx = self.shape[2] / self.nproc
+            for i in xrange(self.nproc):
+                self.sendbuf[i] = self.data[:, :, i * sx:(i + 1) * sx]
+            concat_axis = 0
+            space = 'xspace'
+        else:
+            raise ValueError("Communcation direction must be forward or backward")
+
+        self.alltoall()
+
+        self.shape = self._shape[space]
+        self.length = self._length[space]
+        return self.do_concatenate(concat_axis)
+
+    @timer
+    def do_concatenate(self, concat_axis):
+        return na.concatenate(self.recvbuf, axis=concat_axis)
+
+    @timer
+    def alltoall(self):
+        self.comm.Alltoall([self.sendbuf,com_sys.MPI.COMPLEX], [self.recvbuf,com_sys.MPI.COMPLEX])
+
+    def fwd_np(self):
+        """xspace to kspace"""
+        # yz fft
+        self.data = fpack.fftn(self.data, axes=(0,1))
+
+        # transform
+        recvbuf = self.communicate('forward')
+
+        # x fft
+        self.data = fpack.fft(recvbuf, axis=2)
+        self.data /= (self.data.size * com_sys.nproc)
+
+    def rev_np(self):
+        """kspace to xspace
+        
+        """
+        # x fft
+        self.data = fpack.ifft(self.data, axis=2)
+
+        # Transpose
+        recvbuf = self.communicate('backward')
+
+        # yz fft
+        self.data = fpack.ifftn(recvbuf, axes=(0,1))
+        self.data *= (self.data.size * com_sys.nproc)
+
+    def fwd_fftw(self):
+        self.fplan_yz()
+        a = self.communicate('forward')
+
+        self.data.shape = self._shape['kspace']
+        self.data[:] = a[:]
+        self.fplan_x()
+        self.data /= (self.data.size * com_sys.nproc)
+
+    def rev_fftw(self):
+        self.rplan_x()
+
+        a = self.communicate('backward')
+        self.data.shape = self._shape['xspace']
+        self.data[:] = a[:]
+
+        self.rplan_yz()
+        self.data.imag = 0.
+
+class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierShearRepresentation):
+    def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
+                 dealiasing='2/3 cython'):
+        ParallelFourierRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
+        FourierShearRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
+        self.nproc = com_sys.nproc
+        self.myproc = com_sys.myproc
+        self.offset = na.array([0, 0, self.myproc * shape[2]])
+
+    def fwd_np(self):
+        """FFT method to go from xspace to kspace."""
+        
+        deltay = self.shear_rate * self.sd.time
+        x = (na.linspace(0., self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False) +
+             na.zeros(self._shape['kspace']))
+
+        # Do y-z fft
+        self.data = fpack.fftn(self.data, axes=(0,1))
+
+        # communicate
+        recvbuf = self.communicate('forward')
+
+        # Phase shift
+        recvbuf *= na.exp(1j * self.k['y'] * x * deltay)
+        
+        # Do x fft
+        self.data = fpack.fft(recvbuf, axis=2)
+
+    def rev_np(self):
+        """IFFT method to go from kspace to xspace."""
+        
+        deltay = self.shear_rate * self.sd.time 
+        x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
+        
+        # Do x fft
+        self.data = fpack.ifft(self.data, axis=2)
+        
+        # Phase shift
+        self.data *= na.exp(-1j * self.k['y'] * x * deltay)
+
+        # communicate
+        recvbuf = self.communicate('backward')
+        
+        # Do y-z fft
+        self.data = fpack.ifftn(recvbuf, axes=(0,1))
+
+
+    def fwd_fftw(self):
+        deltay = self.shear_rate * self.sd.time
+        x = (na.linspace(0., self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False) +
+             na.zeros(self._shape['kspace']))
+
+        # do y-z fft
+        self.fplan_yz()
+        a = self.communicate('forward')
+        self.data.shape = self._shape['kspace']
+        self.data[:] = a[:]
+
+        # Phase shift
+        self.data *= na.exp(1j * self.k['y'] * x * deltay)
+        
+        # Do x fft
+        self.fplan_x()
+        self.data /= (self.data.size * com_sys.nproc)
+
+    def rev_fftw(self):
+        deltay = self.shear_rate * self.sd.time
+        x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
+
+        # Do x fft
+        self.rplan_x()
+
+        # Phase shift
+        self.data *= na.exp(-1j * self.k['y'] * x * deltay)
+        
+        # Communicate
+        a = self.communicate('backward')
+        self.data.shape = self._shape['xspace']
+        self.data[:] = a[:]
+
+        # Do y-z fft
+        self.rplan_yz()
+        self.data.imag = 0.
+
 class SphericalHarmonicRepresentation(FourierRepresentation):
     """Dedalus should eventually support spherical and cylindrical geometries.
 

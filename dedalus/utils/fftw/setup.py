@@ -6,6 +6,7 @@ import numpy as np
 setup(
     cmdclass = {'build_ext': build_ext},
     include_dirs = [np.get_include()],
-    ext_modules = [Extension("dealias_cy_2d", ["dealias_cy_2d.pyx"]),
-                   Extension("dealias_cy_3d", ["dealias_cy_3d.pyx"])]
+    ext_modules = [Extension("fftw", ["_fftw.pyx"],
+                              libraries=["fftw3"],
+                              include_dirs=["."])]
 )

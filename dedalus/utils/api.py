@@ -12,3 +12,8 @@ from .misc_numeric import \
     integrate_simp, \
     interp_linear, \
     find_zero
+
+from .parallelism import \
+    setup_parallel_objs, \
+    com_sys,\
+    load_all

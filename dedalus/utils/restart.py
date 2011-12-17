@@ -25,17 +25,19 @@ import cPickle
 import h5py
 import time
 from dedalus.funcs import insert_ipython
-OBJECT_FILENAME='dedalus_obj.cpkl'
+from dedalus.utils.parallelism import com_sys
+OBJECT_FILENAME='dedalus_obj_%04i.cpkl'
 
 def restart(snap_dir):
-    obj_file = open(os.path.join(snap_dir,OBJECT_FILENAME), 'r')
+    myproc = com_sys.myproc
+    obj_file = open(os.path.join(snap_dir,OBJECT_FILENAME % myproc), 'r')
     RHS = cPickle.load(obj_file)
     data = cPickle.load(obj_file)
     ti = cPickle.load(obj_file)
     
     RHS._setup_aux_fields(data.time, RHS._aux_fields)
     # now load data from hdf5 file...
-    DATA_FILENAME = 'data.cpu%04i' % 0
+    DATA_FILENAME = 'data.cpu%04i' % myproc
     filename = os.path.join(snap_dir, DATA_FILENAME)
     load_all_data(data, filename)
     ti.RHS = RHS

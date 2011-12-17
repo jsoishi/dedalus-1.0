@@ -153,14 +153,15 @@ class Physics(object):
             self.gradX(Y, gradY)
 
         # Setup temporary data container
-        sampledata = X[0]
-        tmp = na.zeros_like(sampledata.data)
-        
+        sampledata = output[0]
+        output.zero_all()
+        tmp = na.zeros_like(sampledata['xspace'])
+
         # Construct XgradY
         for i in xrange(Y.ncomp):
             for j in self.dims:
                 tmp += X[j]['xspace'] * gradY[N * i + j]['xspace']
-            output[i]['xspace'] = tmp.real                    
+            output[i]['xspace'] += tmp.real                    
             tmp *= 0+0j
             
     def XlistgradY(self, Xlist, Y, tmp, outlist):
@@ -514,7 +515,7 @@ class MHD(Hydro):
 
         # Setup temporary data container
         sampledata = data['u']['x']
-        tmp = na.zeros_like(sampledata.data)
+        tmp = data.create_tmp_data('kspace')
         k2 = sampledata.k2(no_zero=True)
 
         # Construct k * ugradu - k * BgradB / (4 pi rho0)
@@ -581,7 +582,7 @@ class ShearMHD(MHD):
 
         # Setup temporary data container
         sampledata = data['u']['x']
-        tmp = na.zeros_like(sampledata.data)
+        tmp = data.create_tmp_data('kspace')
         k2 = sampledata.k2(no_zero=True)
 
         # Construct k * ugradu - k * BgradB / (4 pi rho0)
@@ -696,7 +697,9 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         divu = self.aux_fields['divu']
         if compute_divu:
             self.divX(data['u'], divu)
+        divu = self.aux_fields['divu']
         deltadivu = self.aux_fields['deltadivu']
+
         deltadivu.zero()
         deltadivu['xspace'] += divu['xspace'] * data['delta']['xspace']
 
@@ -710,8 +713,8 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         a = self.aux_eqns['a'].value
         divu = self.aux_fields['divu']
         self.divX(data['u'], divu)
-        self.XlistgradY([data['u'],], data['delta'], 
-                        self.aux_fields['math_tmp'], 
+        self.XlistgradY([data['u'],], data['delta'],
+                        self.aux_fields['math_tmp'],
                         [self.aux_fields['ugraddelta'],])
         self.delta_div_u(data)
         ugraddelta = self.aux_fields['ugraddelta']
@@ -728,7 +731,8 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         a = self.aux_eqns['a'].value
         adot = self.aux_eqns['a'].RHS(a)
 
-        self.XlistgradY([data['u'],], data['u'], self.aux_fields['math_tmp'], 
+        self.XlistgradY([data['u'],], data['u'], 
+                        self.aux_fields['math_tmp'], 
                         [self.aux_fields['ugradu'],]) 
         
         ugradu = self.aux_fields['ugradu'] 
@@ -928,6 +932,7 @@ class BaryonCDMCosmology(Physics):
         self._aux_fields.append(('divu_c', 'ScalarField'))
         self._aux_fields.append(('deltadivu_b', 'ScalarField'))
         self._aux_fields.append(('deltadivu_c', 'ScalarField'))
+        self._aux_fields.append(('math_tmp', 'ScalarField'))
         self._aux_fields.append(('ugradu_b', 'VectorField'))
         self._aux_fields.append(('ugradu_c', 'VectorField'))
         self._aux_fields.append(('math_tmp', 'ScalarField'))
@@ -995,8 +1000,10 @@ class BaryonCDMCosmology(Physics):
         deltadivu = self.aux_fields['deltadivu_b']
 
         self.divX(u, divu)
+        # compute both graddelta and ugraddelta
         self.XgradY(u, delta, graddelta, ugraddelta)
-        deltadivu['xspace'] = divu['xspace'] * delta['xspace']
+        deltadivu.zero()
+        deltadivu['xspace'] += divu['xspace'] * delta['xspace']
 
         self._RHS['delta_b']['kspace'] = -(divu['kspace'] +
                                            deltadivu['kspace'] + 
@@ -1013,7 +1020,8 @@ class BaryonCDMCosmology(Physics):
 
         self.divX(u, divu)
         self.XlistgradY([u,], delta, math_tmp, [ugraddelta,])
-        deltadivu['xspace'] = divu['xspace'] * delta['xspace']
+        deltadivu.zero()
+        deltadivu['xspace'] += divu['xspace'] * delta['xspace']
 
         self._RHS['delta_c']['kspace'] = -(divu['kspace'] +
                                            deltadivu['kspace'] + 
@@ -1065,7 +1073,6 @@ class BaryonCDMCosmology(Physics):
         u = data['u_c']
         math_tmp = self.aux_fields['math_tmp']
         ugradu = self.aux_fields['ugradu_c']
-        
         self.XlistgradY([u,], u, math_tmp, [ugradu,])
         for i in self.dims:
             self._RHS['u_c'][i]['kspace'] = -(gradphi[i]['kspace'] +

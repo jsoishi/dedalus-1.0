@@ -1,5 +1,4 @@
-"""The Main Dedalus data object. This is dynamically created with a
-given representation when the physics class is initialized.
+"""Custom FFTW wrappers for Dedalus
 
 Author: J. S. Oishi <jsoishi@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
@@ -21,20 +20,3 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from .field_object import \
-    create_field_classes
-
-from .state_data import \
-    StateData
-
-from .fourier_data import \
-    FourierRepresentation, \
-    FourierShearRepresentation, \
-    ParallelFourierRepresentation, \
-    ParallelFourierShearRepresentation
-
-from .hermitianize import \
-    enforce_hermitian
-    
-from .aux_equation import \
-    AuxEquation
