@@ -501,6 +501,10 @@ class ParallelFourierRepresentation(FourierRepresentation):
 
         self.shape = self._shape[space]
         self.length = self._length[space]
+        return self.do_concatenate(concat_axis)
+
+    @timer
+    def do_concatenate(self, concat_axis):
         return na.concatenate(self.recvbuf, axis=concat_axis)
 
     @timer
