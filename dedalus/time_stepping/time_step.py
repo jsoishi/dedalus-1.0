@@ -25,8 +25,16 @@ import cPickle
 import time
 import h5py
 import numpy as na
+
+from dedalus.utils.parallelism import com_sys
 from dedalus.funcs import insert_ipython, get_mercurial_changeset_id
 from dedalus.utils.api import Timer
+
+try:
+    from dedalus.__hg_version__ import hg_version
+except ImportError:
+    print "could not find hg_version."
+    hg_version = "unknown"
 
 class TimeStepBase(object):
     timer = Timer()
@@ -57,13 +65,16 @@ class TimeStepBase(object):
     @property
     def ok(self):
         if self.iter >= self._stop_iter:
-            print "Maximum number of iterations reached. Done."
+            if com_sys.myproc == 0:
+                print "Maximum number of iterations reached. Done."
             self._is_ok = False
         if self.time >= self._stop_time:
-            print "Time > stop time. Done"
+            if com_sys.myproc == 0:
+                print "Time > stop time. Done"
             self._is_ok = False
         if (time.time() - self._start_time) >= self._stop_wall:
-            print "Wall clock time exceeded. Done."
+            if com_sys.myproc == 0:
+                print "Wall clock time exceeded. Done."
             self._is_ok = False
 
         return self._is_ok
@@ -78,23 +89,27 @@ class TimeStepBase(object):
 
     @timer
     def snapshot(self, data):
+        myproc = com_sys.myproc
+
         pathname = "snap_%05i" % (self._nsnap)
-        if not os.path.exists(pathname):
+        if not os.path.exists(pathname) and myproc == 0:
             os.mkdir(pathname)
-        
+        if com_sys.comm:
+            com_sys.comm.Barrier()
+
         # first, pickle physics data
-        obj_file = open(os.path.join(pathname,'dedalus_obj.cpkl'),'w')
+        obj_file = open(os.path.join(pathname,'dedalus_obj_%04i.cpkl' % myproc),'w')
         cPickle.dump(self.RHS, obj_file)
         cPickle.dump(data, obj_file)
         cPickle.dump(self, obj_file)
         obj_file.close()
 
         # now save fields
-        filename = os.path.join(pathname, "data.cpu%04i" % 0)
+        filename = os.path.join(pathname, "data.cpu%04i" % myproc)
         outfile = h5py.File(filename, mode='w')
         root_grp = outfile.create_group('/fields')
         dset = outfile.create_dataset('time',data=self.time)
-        outfile.attrs['hg_version'] = get_mercurial_changeset_id()
+        outfile.attrs['hg_version'] = hg_version
 
         data.snapshot(root_grp)        
         outfile.close()
@@ -118,10 +133,20 @@ class TimeStepBase(object):
                        
     def final_stats(self):
         self.timer.print_stats()
-        total_wtime = self.timer.timers['advance']
-        print "total advance wall time: %10.5e sec" % total_wtime
-        print "%10.5e sec/step " %(total_wtime/self.iter)
-        print "Simulation complete. Status: awesome"
+        if com_sys.myproc == 0:
+            total_wtime = self.timer.timers['advance']
+            print "total advance wall time: %10.5e sec" % total_wtime
+            print "%10.5e sec/step " %(total_wtime/self.iter)
+            print 
+            print "Simulation complete. Status: awesome"
+
+    def finalize(self, data):
+        """helper function to call at the end of a run to clean up,
+        write final output, and print stats.
+
+        """
+        self.snapshot(data)
+        self.final_stats()
 
 
 class RK2simple(TimeStepBase):

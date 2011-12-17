@@ -31,6 +31,7 @@ from mpl_toolkits.axes_grid1 import AxesGrid
 import numpy as na
 import os
 from functools import wraps
+from dedalus.utils.parallelism import com_sys
 
 class AnalysisSet(object):
 
@@ -126,7 +127,7 @@ def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', save
     tstr = 't = %5.2f' % data.time
     grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
     
-    if not os.path.exists('frames'):
+    if not os.path.exists('frames') and com_sys.myproc == 0:
         os.mkdir('frames')
     if space == 'kspace':
         outfile = "frames/k_" + saveas + "_%07i.png" % it
@@ -165,7 +166,7 @@ def compute_en_spec(data, field, normalization=1.0, averaging=None):
         spec             Power spectrum of f
     """
     f = data[field]
-    power = na.zeros(f[0].data.shape)
+    power = na.zeros(f[0]['kspace'].shape)
     for i in xrange(f.ncomp):
         power += 0.5 * na.abs(f[i]['kspace']) ** 2
     power *= normalization
@@ -173,53 +174,85 @@ def compute_en_spec(data, field, normalization=1.0, averaging=None):
     # Construct bins by wavevector magnitude (evenly spaced)
     kmag = na.sqrt(f[0].k2())
     k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
+    if com_sys.comm:
+        # note: not the same k-values as serial version
+        k = na.linspace(0, na.max(f[0].kny), na.max(data.shape) / 2.)
     
     kbottom = k - k[1] / 2.
     ktop = k + k[1] / 2.
     spec = na.zeros_like(k)
         
     nonzero = (power > 0)
-    for i in xrange(k.size):
-        kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
-        spec[i] = (power[kshell]).sum()
-        if averaging == 'nonzero':
-            spec[i] /= (kshell & nonzero).sum()
-        elif averaging == 'all':
-            spec[i] /= kshell.sum()
 
-    return k, spec
+    comm = com_sys.comm
+    MPI = com_sys.MPI
+    if comm:
+        myspec = na.zeros_like(k)
+        myproc = com_sys.myproc
+        nk = na.zeros_like(spec)
+        mynk = na.zeros_like(spec)
+        for i in xrange(k.size):
+            kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
+            myspec[i] = (power[kshell]).sum()
+            if averaging == 'all':
+                mynk[i] = kshell.sum()
+            elif averaging == 'nonzero':
+                mynk[i] = (kshell & nonzero).sum()
+        spec = comm.reduce(myspec, op=MPI.SUM, root=0)
+        nk = comm.reduce(mynk, op=MPI.SUM, root=0)
+        if myproc != 0: return None, None
+        if averaging is None:
+            return k, spec
+        else:
+            nk[(nk==0)] = 1.
+            return k, spec/nk
+    else:
+        for i in xrange(k.size):
+            kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
+            spec[i] = (power[kshell]).sum()
+            if averaging == 'nonzero':
+                spec[i] /= (kshell & nonzero).sum()
+            elif averaging == 'all':
+                spec[i] /= kshell.sum()
+        return k, spec
 
 @AnalysisSet.register_task
 def en_spec(data, it, flist=['u']):
     """Record power spectrum of specified fields."""
     N = len(flist)
-    fig = P.figure(2, figsize=(8 * N, 8))
+    if com_sys.myproc == 0:
+        fig = P.figure(2, figsize=(8 * N, 8))
     
     for i,f in enumerate(flist):
         k, spectrum = compute_en_spec(data, f)
 
-        # Plotting, skip if all modes are zero
-        if spectrum[1:].nonzero()[0].size == 0:
-            return
-        
-        ax = fig.add_subplot(1, N, i+1)
-        ax.semilogy(k[1:], spectrum[1:], 'o-')
-        
-        print "%s E total power = %10.5e" %(f, spectrum.sum())
-        print "%s E0 power = %10.5e" %(f, spectrum[0])
-        ax.set_xlabel(r"$k$")
-        ax.set_ylabel(r"$E(k)$")
-        ax.set_title('%s Power, time = %5.2f' %(f, data.time))
+        if com_sys.myproc == 0:
+            # Plotting, skip if all modes are zero
+            if spectrum[1:].nonzero()[0].size == 0:
+                return
 
-    # Add timestamp
-    #tstr = 't = %5.2f' % data.time
-    #P.text(-0.3,1.,tstr, transform=P.gca().transAxes,size=24,color='black')
+            ax = fig.add_subplot(1, N, i+1)
+            ax.semilogy(k[1:], spectrum[1:], 'o-')
+
+            print "%s E total power = %10.5e" %(f, spectrum.sum())
+            print "%s E0 power = %10.5e" %(f, spectrum[0])
+            ax.set_xlabel(r"$k$")
+            ax.set_ylabel(r"$E(k)$")
+            ax.set_title('%s Power, time = %5.2f' %(f, data.time))
+
+    if com_sys.myproc == 0:
+        # Add timestamp
+        #tstr = 't = %5.2f' % data.time
+        #P.text(-0.3,1.,tstr, transform=P.gca().transAxes,size=24,color='black')
        
-    if not os.path.exists('frames'):
-        os.mkdir('frames')
-    outfile = "frames/enspec_%04i.png" %it
-    P.savefig(outfile)
-    P.clf()
+        if not os.path.exists('frames'):
+            os.mkdir('frames')
+        outfile = "frames/enspec_%04i.png" %it
+        P.savefig(outfile)
+        P.clf()
+        txtout = open("power.dat",'a')
+        txtout.write(' '.join([str(i) for i in spectrum.tolist()])+'\n')
+        txtout.close()
 
 @AnalysisSet.register_task
 def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', output_columns=True):
@@ -236,6 +269,9 @@ def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', outp
     """
     k, spec_f1 = compute_en_spec(data, f1, averaging='nonzero')
     k, spec_f2 = compute_en_spec(data, f2, averaging='nonzero')
+
+    if com_sys.myproc != 0:
+        return
 
     if not os.path.exists('frames'):
         os.mkdir('frames')
@@ -372,8 +408,8 @@ def k_plot(data, it, zcut=0):
         for j in xrange(f.ncomp):
             I = i * ncol + j
         
-            x = f[j].k['x'][0] + z_
-            y = f[j].k['y'][0] + z_
+            x = f[j].k['x'] + z_
+            y = f[j].k['y'] + z_
 
             if f[j].ndim == 3:
                 plot_array = f[j]['kspace'][zcut]
@@ -381,12 +417,12 @@ def k_plot(data, it, zcut=0):
                 plot_array = f[j]['kspace']
                 
             plot_array = na.abs(plot_array)
-            plot_array[plot_array == 0] = 1e-40
             plot_array = na.log10(plot_array)
-            
+            mask = ~na.isnan(plot_array)
+
             # Plot
-            im = grid[I].scatter(x, y, c=plot_array, linewidth=0, 
-                                 vmax=na.max([plot_array.max(), -39]))
+            im = grid[I].scatter(x[mask], y[mask], c=plot_array[mask], linewidth=0, 
+                                 vmax=na.max([plot_array[mask].max(), -39]))
             
             # Nyquist boundary
             nysquarex = na.array([-ny[-1], -ny[-1], ny[-1], ny[-1], -ny[-1]])
