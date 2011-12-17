@@ -70,7 +70,7 @@ from dedalus.utils.api import \
     integrate_quad, \
     integrate_simp, \
     interp_linear, \
-    find_zero
+    find_zero, \
     setup_parallel_objs, \
     load_all, \
     com_sys
