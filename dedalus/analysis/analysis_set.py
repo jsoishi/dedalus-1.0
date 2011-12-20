@@ -303,7 +303,7 @@ def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', outp
     P.clf()
     
 @AnalysisSet.register_task
-def mode_track(data, it, flist=[], klist=[], log=True):
+def mode_track(data, it, flist=[], klist=[], log=True, write=True):
     """
     Plot amplification of specified modes.
     
@@ -312,9 +312,36 @@ def mode_track(data, it, flist=[], klist=[], log=True):
         it          Iteration number
         flist       List of fields to track: ['u', ...]
         klist       List of wavevectors given as tuples: [(1,0,0), (1,1,1), ...]
-    
+        log         (default True) plot a log-log plot
+        write       (default False) do not plot; instead write to mode tracking files.
     """
-    
+    if write:
+        for f in flist:
+            for i in xrange(data[f].ncomp):
+                if com_sys.myproc == 0:
+                    outfile = open('mode_amplitudes_%s_%i.dat' % (f, i), 'a')
+                    amplitudes = []
+                for k in klist:
+                    kampl = data[f][i].has_mode(k)
+                    try:
+                        tot_kampl = com_sys.comm.reduce(kampl,root=0)
+                    except AttributeError:
+                        pass
+
+                    if com_sys.myproc == 0:
+                        amplitudes.append(abs(tot_kampl))
+                    
+                if com_sys.myproc == 0:
+                    if it == 0:
+                        outfile.write("# Dedalus Mode Amplitudes\n")
+                        outfile.write("# Column 0: time\n")
+                        for nk,k in enumerate(klist):
+                            outfile.write("# Column %i: %s\n" % (nk, na.array(k)))
+                    outstring = '\t'.join([str(i) for i in amplitudes])
+                    outfile.write("%s\t%s\n" % (data.time,outstring))
+                    outfile.close()
+                
+        return
     if it == 0:
         # Construct container on first pass
         data._save_modes = {}

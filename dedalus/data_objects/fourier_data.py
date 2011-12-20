@@ -116,6 +116,41 @@ class FourierRepresentation(Representation):
             self.k.append(ki)
         self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
 
+    def has_mode(self, mode):
+        """tests to see if we have a given mode. if we do, return the
+        amplitude of that mode, otherwise, return None.
+
+        inputs
+        ------
+
+        mode -- (tuple) (kz, ky, kx).if ints, will check if mode with
+        this index is present (global if in parallel), if floats, find
+        the bin from k < mode < k+dk that contains mode
+
+        """
+        if self._curr_space == 'xspace':
+            self.forward()
+
+        if na.array(mode).dtype == 'int':
+            global_shape = na.array(self.shape)*na.array([com_sys.nproc, 1, 1])
+            global_length = na.array(self.length)*na.array([com_sys.nproc, 1, 1])
+        
+            keys = self.k.keys()
+            keys.sort(reverse=True) # get keys in z-y-x order
+            has = []
+            for i,k in enumerate(keys):
+                has.append(mode[i] in self.k[k])
+            
+            if all(has):
+                return self.data[mode]
+            
+        elif na.array(mode).dtype == 'float':
+            raise NotImplementedError("Floating point mode indexing not yet implemented.")
+        else:
+            raise ValueError("mode must be a tuple of ints or floats but is %s instead."  % (na.array(mode).dtype))
+
+        return 0.
+
     def set_fft(self, method):
         if method == 'fftw':
             self.fplan = fftw.Plan(self.data, direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
