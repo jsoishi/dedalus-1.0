@@ -30,17 +30,53 @@ import numpy as na
 from dedalus.data_objects import hermitianize
 from dedalus.utils.misc_numeric import find_zero, integrate_quad, interp_linear
 
-def taylor_green(ux, uy):
-    if ux.dim == 2:
-        ux.data[1,1] = -1j/4.
-        ux.data[-1,-1] = 1j/4.
-        ux.data[-1,1] = -1j/4.
-        ux.data[1,-1] = 1j/4.
+def taylor_green(data):
+    ndim = data['u'].ndim
+    if ndim == 2:
+        data['u']['x'].data[1,1] = -1j/4.
+        data['u']['x'].data[-1,-1] = 1j/4.
+        data['u']['x'].data[-1,1] = -1j/4.
+        data['u']['x'].data[1,-1] = 1j/4.
 
-        uy.data[1,1] = 1j/4.
-        uy.data[-1,-1] = -1j/4.
-        uy.data[-1,1] = -1j/4.
-        uy.data[1,-1] = 1j/4.
+        data['u']['y'].data[1,1] = 1j/4.
+        data['u']['y'].data[-1,-1] = -1j/4.
+        data['u']['y'].data[-1,1] = -1j/4.
+        data['u']['y'].data[1,-1] = 1j/4.
+    elif ndim == 3:
+        if data['u']['x'].has_mode((1,1,1)):
+            data['u']['x'][1,1,1] = -1j
+        if data['u']['x'].has_mode((1,1,-1)):
+            data['u']['x'][1,1,-1] = 1j
+        if data['u']['x'].has_mode((-1,1,1)):
+            data['u']['x'][-1,1,1] = -1j
+        if data['u']['x'].has_mode((-1,1,-1)):
+            data['u']['x'][-1,1,-1] = 1j
+        if data['u']['x'].has_mode((1,-1,1)):
+            data['u']['x'][1,-1,1] = -1j
+        if data['u']['x'].has_mode((1,-1,-1)):
+            data['u']['x'][1,-1,-1] = 1j
+        if data['u']['x'].has_mode((-1,-1,1)):
+            data['u']['x'][-1,-1,1] = -1j
+        if data['u']['x'].has_mode((-1,-1,-1)):
+            data['u']['x'][-1,-1,-1] = 1j
+
+        if data['u']['y'].has_mode((1,1,1)):
+            data['u']['y'][1,1,1] = -1j
+        if data['u']['y'].has_mode((1,1,-1)):
+            data['u']['y'][1,1,1] = -1j
+        if data['u']['y'].has_mode((-1,1,1)):
+            data['u']['y'][-1,1,1] = -1j
+        if data['u']['y'].has_mode((-1,1,-1)):
+            data['u']['y'][-1,1,-1] = -1j
+        if data['u']['y'].has_mode((1,-1,1)):
+            data['u']['y'][1,-1,1] = 1j
+        if data['u']['y'].has_mode((1,-1,-1)):
+            data['u']['y'][1,-1,-1] = 1j
+        if data['u']['y'].has_mode((-1,-1,1)):
+            data['u']['y'][-1,-1,1] = 1j
+        if data['u']['y'].has_mode((-1,-1,-1)):
+            data['u']['y'][-1,-1,-1] = 1j
+
 
 def sin_x(f,ampl=1.):
     f.data[0,1] = ampl*1j
