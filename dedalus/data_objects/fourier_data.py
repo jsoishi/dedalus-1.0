@@ -604,8 +604,7 @@ class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierS
         """FFT method to go from xspace to kspace."""
         
         deltay = self.shear_rate * self.sd.time
-        x = (na.linspace(0., self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False) +
-             na.zeros(self._shape['kspace']))
+        x = na.linspace(0., self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False)
 
         # Do y-z fft
         self.data = fpack.fftn(self.data, axes=(0,1))
@@ -618,13 +617,13 @@ class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierS
         
         # Do x fft
         self.data = fpack.fft(recvbuf, axis=2)
+        self.data /= (self.data.size * com_sys.nproc)
 
     def rev_np(self):
         """IFFT method to go from kspace to xspace."""
-        
         deltay = self.shear_rate * self.sd.time 
         x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
-        
+
         # Do x fft
         self.data = fpack.ifft(self.data, axis=2)
         
@@ -636,12 +635,11 @@ class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierS
         
         # Do y-z fft
         self.data = fpack.ifftn(recvbuf, axes=(0,1))
-
+        self.data *= (self.data.size * com_sys.nproc)
 
     def fwd_fftw(self):
         deltay = self.shear_rate * self.sd.time
-        x = (na.linspace(0., self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False) +
-             na.zeros(self._shape['kspace']))
+        x = na.linspace(0., self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False)
 
         # do y-z fft
         self.fplan_yz()
