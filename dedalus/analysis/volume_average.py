@@ -127,3 +127,31 @@ def ux_imag_max(data):
 @VolumeAverageSet.register_task
 def uy_imag_max(data):
     return data['u']['y']['xspace'].imag.max()
+
+@VolumeAverageSet.register_task
+def energy_dissipation(data):
+    """energy dissipation rate: 2 nu vorticity**2
+
+    """
+    aux = data.clone()
+    aux.add_field('enstr', 'ScalarField')
+
+    aux['enstr']['kspace'] = (na.abs(data['u']['z'].deriv('y') - data['u']['y'].deriv('z')))**2 \
+        + (na.abs(data['u']['x'].deriv('z') - data['u']['z'].deriv('x')))**2 \
+        + (na.abs(data['u']['y'].deriv('x') - data['u']['x'].deriv('y')))**2 
+    
+    en_dis = 2*data.parameters['nu']*(aux['enstr']['kspace']).real
+
+    return reduce_sum(en_dis.sum())    
+
+@VolumeAverageSet.register_task
+def divergence(data):
+    aux = data.clone()
+    aux.add_field('div','ScalarField')
+
+    aux['div']['kspace'] = data['u']['x'].deriv('x') \
+        + data['u']['y'].deriv('y') \
+        + data['u']['z'].deriv('z')
+
+    div = (aux['div']['kspace'].sum()).real
+    return reduce_sum(div)
