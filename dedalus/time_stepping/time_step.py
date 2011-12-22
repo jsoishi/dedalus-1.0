@@ -259,7 +259,7 @@ class RK4simplevisc(RK2simple):
         for k,f in data.fields.iteritems():
             for i in xrange(f.ncomp):
                 self.tmp_final[k][i]['kspace'] = self.field_dt[k][i]['kspace'] / 6.
-                
+        integrating_factor_step(data, self.field_dt, dt / 2., self.tmp_stage)                
         for a in self.RHS.aux_eqns.values():
             # OK if we only have one aux eqn...
             # need to update actual value so RHS can use it
@@ -268,36 +268,36 @@ class RK4simplevisc(RK2simple):
             a.value = a_old + dt / 2. * a.RHS(a.value)
                 
         # Second stage
-        integrating_factor_step(data, self.field_dt, dt / 2., self.tmp_stage)
         self.field_dt = self.RHS.RHS(self.tmp_stage)
         
         for k,f in data.fields.iteritems():
             for i in xrange(f.ncomp):
                 self.tmp_final[k][i]['kspace'] += self.field_dt[k][i]['kspace'] / 3.
-                
+        integrating_factor_step(data, self.field_dt, dt / 2., self.tmp_stage)                
         for a in self.RHS.aux_eqns.values():
             a_final_dt += a.RHS(a.value) / 3.
             a.value = a_old + dt / 2. * a.RHS(a.value)
                 
         # Third stage
-        integrating_factor_step(data, self.field_dt, dt / 2., self.tmp_stage)
         self.field_dt = self.RHS.RHS(self.tmp_stage)
                        
         for k,f in data.fields.iteritems():
             for i in xrange(f.ncomp):
                 self.tmp_final[k][i]['kspace'] += self.field_dt[k][i]['kspace'] / 3.
-                
+
+        integrating_factor_step(data, self.field_dt, dt, self.tmp_stage)                
         for a in self.RHS.aux_eqns.values():
             a_final_dt += a.RHS(a.value) / 3.
             a.value = a_old + dt * a.RHS(a.value)
                 
         # Fourth stage
-        integrating_factor_step(data, self.field_dt, dt, self.tmp_stage)
         self.field_dt = self.RHS.RHS(self.tmp_stage)
-                               
+
         for k,f in data.fields.iteritems():
+            self.tmp_final[k].integrating_factor = self.field_dt[k].integrating_factor
             for i in xrange(f.ncomp):
                 self.tmp_final[k][i]['kspace'] += self.field_dt[k][i]['kspace'] / 6.
+
                 
         for a in self.RHS.aux_eqns.values():
             a_final_dt += a.RHS(a.value) / 6.
@@ -371,14 +371,13 @@ def integrating_factor_step(start, deriv, dt, output):
     for k,f in start.fields.iteritems():
         # Exponentiate the integrating factor
         IF = deriv[k].integrating_factor
-        
+
         # Turn zeros into small numbers: to first order, reduces to linear step
         if IF == None:
             IF = 1e-10
         else:
             IF[IF == 0] = 1e-10
         EIF = na.exp(IF * dt)
-            
         for i in xrange(f.ncomp):
             output[k][i]['kspace'] = (start[k][i]['kspace'] + deriv[k][i]['kspace'] / IF * (EIF - 1.)) / EIF
             output[k][i].dealias()
