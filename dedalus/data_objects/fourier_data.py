@@ -117,8 +117,7 @@ class FourierRepresentation(Representation):
         self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
 
     def has_mode(self, mode):
-        """tests to see if we have a given mode. if we do, return the
-        amplitude of that mode, otherwise, return None.
+        """tests to see if we have a given mode. 
 
         inputs
         ------
@@ -142,14 +141,14 @@ class FourierRepresentation(Representation):
                 has.append(mode[i] in self.k[k])
             
             if all(has):
-                return self.data[mode]
+                return True
             
         elif na.array(mode).dtype == 'float':
             raise NotImplementedError("Floating point mode indexing not yet implemented.")
         else:
             raise ValueError("mode must be a tuple of ints or floats but is %s instead."  % (na.array(mode).dtype))
 
-        return 0.
+        return False
 
     def set_fft(self, method):
         if method == 'fftw':

@@ -322,7 +322,10 @@ def mode_track(data, it, flist=[], klist=[], log=True, write=True):
                     outfile = open('mode_amplitudes_%s_%i.dat' % (f, i), 'a')
                     amplitudes = []
                 for k in klist:
-                    kampl = data[f][i].has_mode(k)
+                    if data[f][i].has_mode(k):
+                        kampl = data[f][i]['kspace'][k]
+                    else:
+                        kampl = 0.
                     try:
                         tot_kampl = com_sys.comm.reduce(kampl,root=0)
                     except AttributeError:
