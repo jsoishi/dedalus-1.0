@@ -27,6 +27,7 @@ import numpy as na
 from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
 from dedalus.utils.api import a_friedmann
 from dedalus.funcs import insert_ipython
+from dedalus.utils.parallelism import com_sys
 
 def _reconstruct_object(*args, **kwargs):
     new_args = [args[1]['shape'], args[1]['_representation'], args[1]['length']]
@@ -353,6 +354,7 @@ class Hydro(Physics):
         
         # Setup temporary data container
         sampledata = data['u']['x']
+        sampledata['kspace']
         tmp = na.zeros_like(sampledata.data)
         k2 = sampledata.k2(no_zero=True)
         
