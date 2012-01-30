@@ -31,6 +31,12 @@ from dedalus.data_objects import hermitianize
 from dedalus.utils.misc_numeric import find_zero, integrate_quad, interp_linear
 
 def taylor_green(data):
+    """The famous Taylor-Green vortex in 2 or 3D.
+    
+    Inputs:
+        data: StateData object
+
+    """
     ndim = data['u'].ndim
     if ndim == 2:
         data['u']['x'].data[1,1] = -1j/4.
@@ -77,6 +83,45 @@ def taylor_green(data):
         if data['u']['y'].has_mode((-1,-1,-1)):
             data['u']['y']['kspace'][-1,-1,-1] = -1j/8.
 
+def kida_vortex(data, a, chi=None):
+    """Generate ICs for the Kida steady-state vortex.
+    
+    Inputs:
+        data: StateData object
+        a: semi-minor axis of ellipse
+        chi: (default None) aspect ratio. if None, will use the aspect ratio of the x-y plane to set the vortex
+    
+    """
+    try:
+        Omega = data.parameters['Omega']
+    except KeyError:
+        raise KeyError("Kida vortex requires shearing box!")
+
+    vort_ampl = 1.5 * (1 + chi**2) * Omega/(chi * (chi - 1.))
+    if chi is None:
+        if hasattr(data, '_shape'):
+            x = data._shape['kspace'][0]
+            y = data._shape['kspace'][1]
+        else:
+            x = data.shape[0]
+            y = data.shape[0]
+        chi = y/x
+    b = chi * a
+    
+    sh = data['u']['x']['kspace'].shape
+
+    aux = data.clone()
+    aux.add_field('w','ScalarField')
+    aux.add_field('psi','ScalarField')
+
+    # use tanh to smooth vortex edge...
+    xx, yy = na.meshgrid(na.r_[0:sh[0]]*2*na.pi/sh[0],na.r_[0:sh[1]]*2*na.pi/sh[1])
+    ff = xx**2/a**2 + yy**2/b**2 - 1
+    aux['w']['xspace'] = -(na.tanh(ff/0.05) + 1)/2.
+    aux['psi']['kspace'] = aux['w']['kspace']/aux['w'].k2(no_zero=True)
+
+    data['u']['x']['kspace'] = aux['psi'].deriv('y')
+    data['u']['y']['kspace'] = -aux['psi'].deriv('x')
 
 def sin_x(f,ampl=1.):
     f.data[0,1] = ampl*1j
