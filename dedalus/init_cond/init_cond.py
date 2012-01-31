@@ -97,7 +97,6 @@ def kida_vortex(data, a, chi=None):
     except KeyError:
         raise KeyError("Kida vortex requires shearing box!")
 
-
     if chi is None:
         if hasattr(data, '_shape'):
             x = data._shape['kspace'][0]
@@ -109,6 +108,7 @@ def kida_vortex(data, a, chi=None):
 
     b = chi * a
     vort_ampl = 1.5 * (1 + chi**2) * Omega/(chi * (chi - 1.))    
+    print "adding vortex with vorticity = %10.5f" % vort_ampl
     sh = data['u']['x']['kspace'].shape
     le = data['u']['x'].length
     aux = data.clone()
@@ -118,7 +118,7 @@ def kida_vortex(data, a, chi=None):
     # use tanh to smooth vortex edge...
     xx, yy = na.meshgrid(na.r_[0:sh[1]]*le[1]/sh[1],na.r_[0:sh[0]]*le[0]/sh[0])
     ff = (xx - le[1]/2.)**2/a**2 + (yy - le[0]/2.)**2/b**2 - 1
-    aux['w']['xspace'] = (na.tanh(ff/0.3) + 1)/2.
+    aux['w']['xspace'] = -vort_ampl*(1-na.tanh(ff/0.3))/2.
     aux['psi']['kspace'] = aux['w']['kspace']/aux['w'].k2(no_zero=True)
 
     data['u']['x']['kspace'] = aux['psi'].deriv('y')
