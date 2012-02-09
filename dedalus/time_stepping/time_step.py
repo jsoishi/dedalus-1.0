@@ -33,6 +33,8 @@ from dedalus.utils.api import Timer
 try:
     from dedalus.__hg_version__ import hg_version
 except ImportError:
+    hg_version = get_mercurial_changeset_id()
+except:
     print "could not find hg_version."
     hg_version = "unknown"
 
