@@ -34,7 +34,8 @@ from .init_cond import \
     cosmo_fields, \
     cosmo_spectra, \
     alfven, \
-    zeldovich
+    zeldovich, \
+    kida_vortex
 
 from .turb_spectra import \
     mcwilliams_spec
