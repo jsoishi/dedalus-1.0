@@ -44,7 +44,8 @@ from dedalus.init_cond.api import \
     cosmo_fields, \
     cosmo_spectra, \
     alfven, \
-    zeldovich
+    zeldovich, \
+    kida_vortex
 
 from dedalus.physics.api import \
     Hydro, \
