@@ -309,7 +309,7 @@ class FourierShearRepresentation(FourierRepresentation):
     """
 
     """
-    def __init__(self, sd, shape, length, **kwargs):    
+    def __init__(self, sd, shape, length, left_edge=[0,0,-na.pi],**kwargs):    
         """
         Shearing box implementation.
 
@@ -323,7 +323,8 @@ class FourierShearRepresentation(FourierRepresentation):
         FourierRepresentation.__init__(self, sd, shape, length, **kwargs)
         self.shear_rate = self.sd.parameters['S'] * self.sd.parameters['Omega']
         self.kx = self.k['x'].copy()
-        
+        self.left_edge = left_edge
+
     def set_fft(self, method):
         if method == 'fftw':
             self.fplan_yz = fftw.PlanPlane(self.data, 
@@ -345,7 +346,7 @@ class FourierShearRepresentation(FourierRepresentation):
         """IFFT method to go from kspace to xspace."""
         
         deltay = self.shear_rate * self.sd.time 
-        x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
+        x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
         
         # Do x fft
         self.data = fpack.ifft(self.data, axis=-1) * na.sqrt(self.shape[-1])
@@ -364,7 +365,7 @@ class FourierShearRepresentation(FourierRepresentation):
         """FFT method to go from xspace to kspace."""
         
         deltay = self.shear_rate * self.sd.time
-        x = (na.linspace(0., self.length[-1], self.shape[-1], endpoint=False) +
+        x = (na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False) +
              na.zeros(self.shape))
 
         # Do z fft
@@ -382,7 +383,7 @@ class FourierShearRepresentation(FourierRepresentation):
 
     def fwd_fftw(self):
         deltay = self.shear_rate * self.sd.time
-        x = (na.linspace(0., self.length[-1], self.shape[-1], endpoint=False) +
+        x = (na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False) +
              na.zeros(self.shape))
 
         # do y-z fft
@@ -397,7 +398,7 @@ class FourierShearRepresentation(FourierRepresentation):
 
     def rev_fftw(self):
         deltay = self.shear_rate * self.sd.time 
-        x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
+        x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
         
         # Do x fft
         self.rplan_x()
@@ -603,7 +604,7 @@ class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierS
         """FFT method to go from xspace to kspace."""
         
         deltay = self.shear_rate * self.sd.time
-        x = na.linspace(0., self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False)
+        x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False)
 
         # Do y-z fft
         self.data = fpack.fftn(self.data, axes=(0,1))
@@ -621,7 +622,7 @@ class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierS
     def rev_np(self):
         """IFFT method to go from kspace to xspace."""
         deltay = self.shear_rate * self.sd.time 
-        x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
+        x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
 
         # Do x fft
         self.data = fpack.ifft(self.data, axis=2)
@@ -638,7 +639,7 @@ class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierS
 
     def fwd_fftw(self):
         deltay = self.shear_rate * self.sd.time
-        x = na.linspace(0., self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False)
+        x = na.linspace(self.left_edge[-1], self.left_edge[-1] + self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False)
 
         # do y-z fft
         self.fplan_yz()
@@ -655,7 +656,7 @@ class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierS
 
     def rev_fftw(self):
         deltay = self.shear_rate * self.sd.time
-        x = na.linspace(0., self.length[-1], self.shape[-1], endpoint=False)
+        x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
 
         # Do x fft
         self.rplan_x()
