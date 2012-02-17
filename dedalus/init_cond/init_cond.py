@@ -83,7 +83,7 @@ def taylor_green(data):
         if data['u']['y'].has_mode((-1,-1,-1)):
             data['u']['y']['kspace'][-1,-1,-1] = -1j/8.
 
-def kida_vortex(data, a, chi=None):
+def kida_vortex(data, a, chi=None, smooth=False):
     """Generate ICs for the Kida steady-state vortex.
     
     Inputs:
@@ -107,7 +107,7 @@ def kida_vortex(data, a, chi=None):
         chi = float(y/x)
 
     b = chi * a
-    vort_ampl = 1.5 * (1 + chi**2) * Omega/(chi * (chi - 1.))    
+    vort_ampl = data.parameters['S'] * (1 + chi) * Omega/(chi * (chi - 1.))    
     print "adding vortex with vorticity = %10.5f" % vort_ampl
     sh = data['u']['x']['kspace'].shape
     le = data['u']['x'].length
@@ -115,10 +115,19 @@ def kida_vortex(data, a, chi=None):
     aux.add_field('w','ScalarField')
     aux.add_field('psi','ScalarField')
 
-    # use tanh to smooth vortex edge...
+
     xx, yy = na.meshgrid(na.r_[0:sh[1]]*le[1]/sh[1],na.r_[0:sh[0]]*le[0]/sh[0])
     ff = (xx - le[1]/2.)**2/a**2 + (yy - le[0]/2.)**2/b**2 - 1
-    aux['w']['xspace'] = -vort_ampl*(1-na.tanh(ff/0.3))/2.
+
+    if smooth:
+        # use tanh to smooth vortex edge...
+        aux['w']['xspace'] = vort_ampl*(1-na.tanh(ff/0.3))/2.
+    else:
+        # or not...
+        v = na.zeros_like(ff)
+        v[ff < 0] = vort_ampl
+        aux['w']['xspace'] = v 
+
     aux['psi']['kspace'] = aux['w']['kspace']/aux['w'].k2(no_zero=True)
 
     data['u']['x']['kspace'] = aux['psi'].deriv('y')
