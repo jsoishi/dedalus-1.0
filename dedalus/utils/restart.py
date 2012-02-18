@@ -29,6 +29,11 @@ from dedalus.utils.parallelism import com_sys
 OBJECT_FILENAME='dedalus_obj_%04i.cpkl'
 
 def restart(snap_dir):
+    """restarts a run from the snapshot in snap_dir.
+
+    returns a tuple of (Physics (RHS), data, time integrator)
+    
+    """
     myproc = com_sys.myproc
     obj_file = open(os.path.join(snap_dir,OBJECT_FILENAME % myproc), 'r')
     RHS = cPickle.load(obj_file)
