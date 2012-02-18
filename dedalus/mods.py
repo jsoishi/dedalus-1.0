@@ -28,6 +28,7 @@ from dedalus.analysis.api import \
 
 from dedalus.data_objects.api import \
     FourierRepresentation, \
+    FourierRepresentationReal, \
     FourierShearRepresentation, \
     ParallelFourierRepresentation, \
     ParallelFourierShearRepresentation
