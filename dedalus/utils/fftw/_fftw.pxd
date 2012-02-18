@@ -67,6 +67,30 @@ cdef extern from "fftw3.h":
                                  int sign,
                                  unsigned flags)
 
+    fftw_plan fftw_plan_dft_r2c_2d(int n0,
+                                   int n1,
+                                   double* in_,
+                                   complex* out_,
+                                   unsigned flags)
+    fftw_plan fftw_plan_dft_r2c_3d(int n0,
+                                   int n1,
+                                   int n2,
+                                   double* in_,
+                                   complex* out_,
+                                   unsigned flags)
+    fftw_plan fftw_plan_dft_c2r_2d(int n0,
+                                   int n1,
+                                   complex* in_,
+                                   double* out_,
+                                   unsigned flags)
+    fftw_plan fftw_plan_dft_c2r_3d(int n0,
+                                   int n1,
+                                   int n2,
+                                   complex* in_,
+                                   double* out_,
+                                   unsigned flags)
+
+
     void fftw_execute(fftw_plan plan)
     void fftw_destroy_plan(fftw_plan plan)
 
