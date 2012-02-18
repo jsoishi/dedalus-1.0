@@ -305,6 +305,122 @@ class FourierRepresentation(Representation):
         dataset[:] = self.data
         dataset.attrs['space'] = self._curr_space
 
+class FourierRepresentationReal(FourierRepresentation):
+    def __init__(self, sd, shape, length, method='fftw',
+                 dealiasing='2/3 cython'):
+        """
+        Inputs:
+            sd          state data object
+            shape       The shape of the data, tuple of ints
+            length      The length of the data, tuple of floats (default: 2 pi)
+            
+        """
+        self.sd = sd
+        self.shape = na.array(shape)
+        self._shape = {'kspace': self.shape.copy(),
+                       'xspace': self.shape.copy()
+                       }
+        self._shape['kspace'][-1]  = self._shape['kspace'][-1]/2 + 1
+        self.length = length
+        self.ndim = len(self.shape)
+        dtype = 'complex128'
+        self.kdata = na.zeros(self._shape['kspace'], dtype=dtype)
+        self.xdata = na.zeros(self._shape['xspace'])
+        self.__eps = na.finfo(dtype).eps
+        self._curr_space = 'kspace'
+        self.data = self.kdata
+        self.trans = {'x': 0, 'y': 1, 'z': 2,
+                      0:'x', 1:'y', 2:'z'} # for vector fields
+        
+        self._setup_k()
+        self.set_fft(method)
+        self.set_dealiasing(dealiasing)
+
+    def set_fft(self, method):
+        if method == 'fftw':
+            self.fplan = fftw.rPlan(self.xdata, self.kdata, direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+            self.rplan = fftw.rPlan(self.xdata, self.kdata, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+            self.fft = self.fwd_fftw
+            self.ifft = self.rev_fftw
+        else:
+            raise NotImplementedError("Only FFTW supported for real transforms.")
+
+    def fwd_fftw(self):
+        self.fplan()
+        self.kdata /= self.xdata.size
+        
+    def rev_fftw(self):
+        self.rplan()
+
+    def _setup_k(self):
+        # Get Nyquist wavenumbers
+        self.kny = na.pi * na.array(self.shape) / na.array(self.length)
+
+        # Setup wavenumbers
+        self.k = []
+        for i,S in enumerate(self.shape):
+            kshape = i * (1,) + (S,) + (self.ndim - i - 1) * (1,)
+            ki = fpack.fftfreq(S) * 2. * self.kny[i]
+            ki.resize(kshape)
+            self.k.append(ki)
+        trim = kshape[-1]/2 + 1
+        self.k[-1] = self.k[-1][...,:trim]
+        self.k[-1][...,trim-1] *= -1
+        self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
+        
+    def __getitem__(self,space):
+        """returns data in either xspace or kspace, transforming as necessary.
+
+        """
+        if space == self._curr_space:
+            pass
+        elif space == 'xspace':
+            self.backward()
+            self.data = self.xdata
+        elif space == 'kspace':
+            self.forward()
+            self.data = self.kdata
+        else:
+            raise KeyError("space must be either xspace or kspace")
+        
+        return self.data
+
+    def __setitem__(self, space, data):
+        """this needs to ensure the pointer for the field's data
+        member doesn't change for FFTW. Currently, we do that by
+        slicing the entire data array. 
+        """
+        if space == 'xspace':
+            self.data = self.xdata
+        elif space == 'kspace':
+            self.data = self.kdata
+        if data.size < self.data.size:
+            sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
+            self.data[sli] = data
+        else:
+            sli = [slice(i) for i in self.data.shape]
+            self.data[:] = data[sli]
+
+        self._curr_space = space
+
+    def forward(self):
+        """FFT method to go from xspace to kspace."""
+        
+        self.fft()
+        self._curr_space = 'kspace'
+        self.data = self.kdata
+        self.dealias()
+        #self.zero_under_eps()
+
+    def backward(self):
+        """IFFT method to go from kspace to xspace."""
+        
+        self.dealias()
+        self.ifft()
+        self.data = self.xdata
+        self._curr_space = 'xspace'
+
+
 class FourierShearRepresentation(FourierRepresentation):
     """
 
