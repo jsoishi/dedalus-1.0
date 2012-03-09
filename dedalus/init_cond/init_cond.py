@@ -82,7 +82,7 @@ def taylor_green(data):
             data['u']['y']['kspace'][-1,-1,1] = -1j/8.
         if data['u']['y'].has_mode((-1,-1,-1)):
             data['u']['y']['kspace'][-1,-1,-1] = -1j/8.
-
+            
 def kida_vortex(data, a, chi=None, smooth=False):
     """Generate ICs for the Kida steady-state vortex.
     
