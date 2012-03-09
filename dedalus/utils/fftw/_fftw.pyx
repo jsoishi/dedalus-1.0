@@ -73,10 +73,6 @@ cdef class Plan:
         if self._fftw_plan == NULL:
             raise RuntimeError("FFTW could not create plan.")
 
-            
-    def __init__(self, data, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
-        pass
-
     def __call__(self):
         if self._fftw_plan != NULL:
             fftw_execute(self._fftw_plan)
