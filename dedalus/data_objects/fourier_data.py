@@ -206,8 +206,7 @@ class FourierRepresentation(Representation):
         self.dealias()
         self.ifft()
         self._curr_space = 'xspace'
-        
-                
+                        
     def set_dealiasing(self, dealiasing):
         if dealiasing == '2/3':
             self.dealias = self.dealias_23
