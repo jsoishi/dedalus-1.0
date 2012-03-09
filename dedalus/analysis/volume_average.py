@@ -136,9 +136,9 @@ def energy_dissipation(data):
     aux = data.clone()
     aux.add_field('enstr', 'ScalarField')
 
-    aux['enstr']['kspace'] = (na.abs(data['u']['z'].deriv('y') - data['u']['y'].deriv('z')))**2 \
+    aux['enstr']['kspace'] = 0.5 * ((na.abs(data['u']['z'].deriv('y') - data['u']['y'].deriv('z')))**2 \
         + (na.abs(data['u']['x'].deriv('z') - data['u']['z'].deriv('x')))**2 \
-        + (na.abs(data['u']['y'].deriv('x') - data['u']['x'].deriv('y')))**2 
+        + (na.abs(data['u']['y'].deriv('x') - data['u']['x'].deriv('y')))**2)
     
     en_dis = 2*data.parameters['nu']*(aux['enstr']['kspace']).real
 
