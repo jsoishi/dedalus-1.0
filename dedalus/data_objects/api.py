@@ -29,7 +29,6 @@ from .state_data import \
 
 from .fourier_data import \
     FourierRepresentation, \
-    FourierRepresentationReal, \
     FourierShearRepresentation, \
     ParallelFourierRepresentation, \
     ParallelFourierShearRepresentation
