@@ -223,3 +223,55 @@ cdef class rPlan(Plan):
         if self._fftw_plan == NULL:
             raise RuntimeError("FFTW could not create plan.")
 
+cdef class rPlanPencil(Plan):
+    cdef np.ndarray _xdata, _kdata
+    def __init__(self, xdata, kdata, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
+        """PlanPencil returns a FFTW plan that will take a 1D
+        FFT along the x pencils of a 3D, row-major data array.
+        """
+        if direction == 'FFTW_FORWARD':
+            self.direction = FFTW_FORWARD
+        else:
+            self.direction = FFTW_BACKWARD
+        for f in flags:
+            self.flags = self.flags | fftw_flags[f]
+        self._xdata = xdata
+        self._kdata = kdata
+
+        nx = data.shape[-1]
+        ny = data.shape[-2]
+        try:
+            nz = data.shape[-3]
+        except IndexError:
+            nz = 1
+
+        cdef np.ndarray n = np.array(nx, dtype='int32')
+        cdef int rank = 1
+        cdef int howmany = nz*ny
+        cdef int istride = 1
+        cdef int ostride = istride
+        cdef int idist = nx
+        cdef int odist = idist
+        
+        if self.direction == FFTW_FORWARD:
+            self._fftw_plan = fftw_plan_many_r2c(rank, <int *> n.data,
+                                                 howmany,
+                                                 <double *> self._xdata.data,
+                                                 <int *> n.data,
+                                                 istride, idist,
+                                                 <complex *> self._kdata.data,
+                                                 <int *> n.data,
+                                                 ostride, odist,
+                                                 self.direction,
+                                                 self.flags)
+        else:
+            self._fftw_plan = fftw_plan_many_c2r(rank, <int *> n.data,
+                                                 howmany,
+                                                 <complex *> self._kdata.data,
+                                                 <int *> n.data,
+                                                 istride, idist,
+                                                 <double *> self._xdata.data,
+                                                 <int *> n.data,
+                                                 ostride, odist,
+                                                 self.direction,
+                                                 self.flags)
