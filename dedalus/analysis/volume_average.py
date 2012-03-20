@@ -64,6 +64,15 @@ class VolumeAverageSet(object):
     def register_task(cls, func):
         cls.known_analysis[func.func_name] = func
 
+def compute_volume_average(data, space='kspace'):
+    """computes a volume average using either kspace or xspace. in
+    kspace, must make sure to compute properly for kx = 0 zero plane.
+
+    """
+    raise ImplementationError("compute_volume_average not implemented yet!")
+    #if space == 'kspace':
+    #    data['kspace']
+
 @VolumeAverageSet.register_task
 def ekin(data):
     en = na.zeros(data['u']['x']['kspace'].shape)
