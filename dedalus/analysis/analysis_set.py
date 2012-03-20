@@ -173,11 +173,12 @@ def compute_en_spec(data, field, normalization=1.0, averaging=None):
 
     # Construct bins by wavevector magnitude (evenly spaced)
     kmag = na.sqrt(f[0].k2())
-    k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
+
     if com_sys.comm:
         # note: not the same k-values as serial version
         k = na.linspace(0, na.max(f[0].kny), na.max(data.shape) / 2.)
-    
+    else:
+        k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
     kbottom = k - k[1] / 2.
     ktop = k + k[1] / 2.
     spec = na.zeros_like(k)
