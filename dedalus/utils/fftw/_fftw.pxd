@@ -90,9 +90,11 @@ cdef extern from "fftw3.h":
                                    double* out_,
                                    unsigned flags)
 
-
+    double* fftw_alloc_real(int n)
+    complex* fftw_alloc_complex(int n)
     void fftw_execute(fftw_plan plan)
     void fftw_destroy_plan(fftw_plan plan)
+    void fftw_free(void *mem)
 
 cdef enum:
     FFTW_FORWARD = -1

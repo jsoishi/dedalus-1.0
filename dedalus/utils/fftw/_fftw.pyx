@@ -36,6 +36,61 @@ fftw_flags = {'FFTW_FORWARD': FFTW_FORWARD,
               'FFTW_ESTIMATE': FFTW_ESTIMATE
               }
 
+from cpython cimport Py_INCREF
+
+cdef extern from "numpy/arrayobject.h":
+    object PyArray_NewFromDescr(object subtype, np.dtype descr,
+                                int nd, np.npy_intp* dims, np.npy_intp* strides,
+                                void* data, int flags, object obj)
+
+cdef extern from "stdlib.h":
+    void free(void *ptr)
+
+DTYPEi = np.int64
+ctypedef np.int64_t DTYPEi_t
+
+cdef class fftwMemoryReleaser:
+    cdef void* memory
+
+    def __cinit__(self):
+        self.memory = NULL
+                  
+    def __dealloc__(self):
+        if self.memory:
+            #release memory
+            fftw_free(self.memory)
+            print "memory released", hex(<long>self.memory)
+
+cdef fftwMemoryReleaser MemoryReleaserFactory(void* ptr):
+    cdef fftwMemoryReleaser mr = fftwMemoryReleaser.__new__(fftwMemoryReleaser)
+    mr.memory = ptr
+    return mr
+
+def create_data(np.ndarray[DTYPEi_t, ndim=1] shape not None):
+    """this allocates data using fftw's allocate routines. This is not
+    terribly useful in itself, as it only ensures SIMD alignment, but
+    it is important as a way to allow FFTW to choose MPI data array
+    layouts and then create the correctly sized arrays.
+
+    """
+    np.import_array()
+    cdef np.ndarray array
+
+    cdef np.dtype dtype = np.dtype('complex128')
+    Py_INCREF(dtype)
+    cdef complex *data
+    cdef double *xdata
+    n = shape.prod()
+    rank = len(shape)
+    strides = None
+    data = fftw_alloc_complex(n)
+
+    #array = PyArray_NewFromDescr(np.ndarray, np.dtype('complex'), rank, <np.npy_intp *> shape.data, NULL, <void *> data, np.NPY_DEFAULT, None)
+    array = np.PyArray_SimpleNewFromData(rank, <np.npy_intp *> shape.data, np.NPY_FLOAT64, <void *> data)
+    np.set_array_base(array, MemoryReleaserFactory(data))
+
+    return array
+
 cdef class Plan:
     cdef fftw_plan _fftw_plan
     cdef np.ndarray _data
@@ -223,55 +278,55 @@ cdef class rPlan(Plan):
         if self._fftw_plan == NULL:
             raise RuntimeError("FFTW could not create plan.")
 
-cdef class rPlanPencil(Plan):
-    cdef np.ndarray _xdata, _kdata
-    def __init__(self, xdata, kdata, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
-        """PlanPencil returns a FFTW plan that will take a 1D
-        FFT along the x pencils of a 3D, row-major data array.
-        """
-        if direction == 'FFTW_FORWARD':
-            self.direction = FFTW_FORWARD
-        else:
-            self.direction = FFTW_BACKWARD
-        for f in flags:
-            self.flags = self.flags | fftw_flags[f]
-        self._xdata = xdata
-        self._kdata = kdata
+# cdef class rPlanPencil(Plan):
+#     cdef np.ndarray _xdata, _kdata
+#     def __init__(self, xdata, kdata, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
+#         """PlanPencil returns a FFTW plan that will take a 1D
+#         FFT along the x pencils of a 3D, row-major data array.
+#         """
+#         if direction == 'FFTW_FORWARD':
+#             self.direction = FFTW_FORWARD
+#         else:
+#             self.direction = FFTW_BACKWARD
+#         for f in flags:
+#             self.flags = self.flags | fftw_flags[f]
+#         self._xdata = xdata
+#         self._kdata = kdata
 
-        nx = data.shape[-1]
-        ny = data.shape[-2]
-        try:
-            nz = data.shape[-3]
-        except IndexError:
-            nz = 1
+#         nx = data.shape[-1]
+#         ny = data.shape[-2]
+#         try:
+#             nz = data.shape[-3]
+#         except IndexError:
+#             nz = 1
 
-        cdef np.ndarray n = np.array(nx, dtype='int32')
-        cdef int rank = 1
-        cdef int howmany = nz*ny
-        cdef int istride = 1
-        cdef int ostride = istride
-        cdef int idist = nx
-        cdef int odist = idist
+#         cdef np.ndarray n = np.array(nx, dtype='int32')
+#         cdef int rank = 1
+#         cdef int howmany = nz*ny
+#         cdef int istride = 1
+#         cdef int ostride = istride
+#         cdef int idist = nx
+#         cdef int odist = idist
         
-        if self.direction == FFTW_FORWARD:
-            self._fftw_plan = fftw_plan_many_r2c(rank, <int *> n.data,
-                                                 howmany,
-                                                 <double *> self._xdata.data,
-                                                 <int *> n.data,
-                                                 istride, idist,
-                                                 <complex *> self._kdata.data,
-                                                 <int *> n.data,
-                                                 ostride, odist,
-                                                 self.direction,
-                                                 self.flags)
-        else:
-            self._fftw_plan = fftw_plan_many_c2r(rank, <int *> n.data,
-                                                 howmany,
-                                                 <complex *> self._kdata.data,
-                                                 <int *> n.data,
-                                                 istride, idist,
-                                                 <double *> self._xdata.data,
-                                                 <int *> n.data,
-                                                 ostride, odist,
-                                                 self.direction,
-                                                 self.flags)
+#         if self.direction == FFTW_FORWARD:
+#             self._fftw_plan = fftw_plan_many_r2c(rank, <int *> n.data,
+#                                                  howmany,
+#                                                  <double *> self._xdata.data,
+#                                                  <int *> n.data,
+#                                                  istride, idist,
+#                                                  <complex *> self._kdata.data,
+#                                                  <int *> n.data,
+#                                                  ostride, odist,
+#                                                  self.direction,
+#                                                  self.flags)
+#         else:
+#             self._fftw_plan = fftw_plan_many_c2r(rank, <int *> n.data,
+#                                                  howmany,
+#                                                  <complex *> self._kdata.data,
+#                                                  <int *> n.data,
+#                                                  istride, idist,
+#                                                  <double *> self._xdata.data,
+#                                                  <int *> n.data,
+#                                                  ostride, odist,
+#                                                  self.direction,
+#                                                  self.flags)
