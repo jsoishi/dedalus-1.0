@@ -47,7 +47,7 @@ class FourierRepresentation(Representation):
     wrapped and specifiable method for performing the FFT. 
 
     """
-    def __init__(self, sd, shape, length, method='numpy',
+    def __init__(self, sd, shape, length, method='fftw',
                  dealiasing='2/3 cython'):
         """
         Inputs:
@@ -58,16 +58,11 @@ class FourierRepresentation(Representation):
         """
         self.sd = sd
         self.shape = na.array(shape)
-        self._shape = {'kspace': self.shape.copy(),
-                       'xspace': self.shape.copy()
-                       }
-        self._shape['kspace'][-1]  = self._shape['kspace'][-1]/2 + 1
-        self.length = length
         self.ndim = len(self.shape)
-        dtype = 'complex128'
-        self.kdata = na.zeros(self._shape['kspace'], dtype=dtype)
-        self.xdata = na.zeros(self._shape['xspace'])
-        self.__eps = na.finfo(dtype).eps
+        self.length = length
+        self.dtype = 'complex128'
+        self._allocate_memory(method)
+        self.__eps = na.finfo(self.dtype).eps
         self._curr_space = 'kspace'
         self.data = self.kdata
         self.trans = {'x': 0, 'y': 1, 'z': 2,
@@ -76,6 +71,20 @@ class FourierRepresentation(Representation):
         self._setup_k()
         self.set_fft(method)
         self.set_dealiasing(dealiasing)
+
+    def _allocate_memory(self, method):
+        self._shape = {'kspace': self.shape.copy(),
+                       'xspace': self.shape.copy()
+                       }
+        self._shape['kspace'][-1]  = self._shape['kspace'][-1]/2 + 1
+
+        if method == 'fftw':
+            self.kdata = fftw.create_data(self.shape)
+            self.xdata = self.kdata.view(dtype='float64')
+        else:
+            self.kdata = na.zeros(self._shape['kspace'], dtype=self.dtype)
+            self.xdata = na.zeros(self._shape['xspace'])
+            
 
     def __getitem__(self,space):
         """returns data in either xspace or kspace, transforming as necessary.
@@ -164,8 +173,8 @@ class FourierRepresentation(Representation):
 
     def set_fft(self, method):
         if method == 'fftw':
-            self.fplan = fftw.rPlan(self.xdata, self.kdata, direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
-            self.rplan = fftw.rPlan(self.xdata, self.kdata, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+            self.fplan = fftw.rPlan(self.xdata, self.kdata, shape=self.shape, direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+            self.rplan = fftw.rPlan(self.xdata, self.kdata, shape=self.shape, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
             self.fft = self.fwd_fftw
             self.ifft = self.rev_fftw
         elif method == 'numpy':
@@ -176,7 +185,7 @@ class FourierRepresentation(Representation):
 
     def fwd_fftw(self):
         self.fplan()
-        self.kdata /= self.xdata.size
+        self.kdata /= self.shape.prod()
         
     def rev_fftw(self):
         self.rplan()
