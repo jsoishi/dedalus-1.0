@@ -72,6 +72,13 @@ def create_data(np.ndarray[DTYPEi_t, ndim=1] shape not None):
     it is important as a way to allow FFTW to choose MPI data array
     layouts and then create the correctly sized arrays.
 
+    create_data allocates shape[-1]/2 + 1 complex arrays. 
+
+    inputs
+    ------
+
+    shape -- numpy array of int64 giving the *global* logical shape in grid points. 
+
     """
     np.import_array()
     cdef np.ndarray array
@@ -79,16 +86,18 @@ def create_data(np.ndarray[DTYPEi_t, ndim=1] shape not None):
     cdef np.dtype dtype = np.dtype('complex128')
     Py_INCREF(dtype)
     cdef complex *data
-    cdef double *xdata
-    n = shape.prod()
-    rank = len(shape)
-    strides = None
+    cdef np.ndarray[DTYPEi_t, ndim=1] modshape = shape.copy()
+    modshape[-1] = modshape[-1]/2 + 1
+    n = modshape.prod()
     data = fftw_alloc_complex(n)
-
+    print "allocated %i complex numbers" % n
+    rank = len(modshape)
+    strides = None
     #array = PyArray_NewFromDescr(np.ndarray, np.dtype('complex'), rank, <np.npy_intp *> shape.data, NULL, <void *> data, np.NPY_DEFAULT, None)
-    array = np.PyArray_SimpleNewFromData(rank, <np.npy_intp *> shape.data, np.NPY_FLOAT64, <void *> data)
+    array = np.PyArray_SimpleNewFromData(rank, <np.npy_intp *> modshape.data, np.NPY_COMPLEX128, <void *> data)
     np.set_array_base(array, MemoryReleaserFactory(data))
 
+    array[:] = 0j
     return array
 
 cdef class Plan:
@@ -230,7 +239,7 @@ cdef class PlanPencil(Plan):
                                              self.flags)
 cdef class rPlan(Plan):
     cdef np.ndarray _xdata, _kdata
-    def __init__(self, xdata, kdata, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
+    def __init__(self, xdata, kdata, shape=None,direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
         """rPlan implements out-of-place, real-to-complex,
         complex-to-real transforms.
 
@@ -243,32 +252,34 @@ cdef class rPlan(Plan):
             self.flags = self.flags | fftw_flags[f]
         self._xdata = xdata
         self._kdata = kdata
-        if len(xdata.shape) == 2:
+        if shape == None:
+            shape = xdata.shape
+        if len(shape) == 2:
             if self.direction == FFTW_FORWARD:
-                self._fftw_plan = fftw_plan_dft_r2c_2d(xdata.shape[0],
-                                                       xdata.shape[1],
+                self._fftw_plan = fftw_plan_dft_r2c_2d(shape[0],
+                                                       shape[1],
                                                        <double *> self._xdata.data,
                                                        <complex *> self._kdata.data,
                                                        self.flags)
             else:
-                self._fftw_plan = fftw_plan_dft_c2r_2d(xdata.shape[0],
-                                                       xdata.shape[1],
+                self._fftw_plan = fftw_plan_dft_c2r_2d(shape[0],
+                                                       shape[1],
                                                        <complex *> self._kdata.data,
                                                        <double *> self._xdata.data,
                                                        self.flags)
 
-        elif len(xdata.shape) == 3:
+        elif len(shape) == 3:
             if self.direction == FFTW_FORWARD:
-                self._fftw_plan = fftw_plan_dft_r2c_3d(xdata.shape[0],
-                                                       xdata.shape[1],
-                                                       xdata.shape[2],
+                self._fftw_plan = fftw_plan_dft_r2c_3d(shape[0],
+                                                       shape[1],
+                                                       shape[2],
                                                        <double *> self._xdata.data,
                                                        <complex *> self._kdata.data,
                                                        self.flags)
             else:
-                self._fftw_plan = fftw_plan_dft_c2r_3d(xdata.shape[0],
-                                                       xdata.shape[1],
-                                                       xdata.shape[2],
+                self._fftw_plan = fftw_plan_dft_c2r_3d(shape[0],
+                                                       shape[1],
+                                                       shape[2],
                                                        <complex *> self._kdata.data,
                                                        <double *> self._xdata.data,
                                                        self.flags)
