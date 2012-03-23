@@ -80,7 +80,9 @@ class FourierRepresentation(Representation):
 
         if method == 'fftw':
             self.kdata = fftw.create_data(self.shape)
-            self.xdata = self.kdata.view(dtype='float64')
+            strides = self.kdata.strides[:-1] + (self.kdata.strides[-1]/2,)
+            self.xdata = na.ndarray(buffer=self.kdata.data,shape=self.shape,
+                                    strides=strides,dtype='float64')
         else:
             self.kdata = na.zeros(self._shape['kspace'], dtype=self.dtype)
             self.xdata = na.zeros(self._shape['xspace'])
