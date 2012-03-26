@@ -3,6 +3,7 @@ from distutils.extension import Extension
 from distutils.command.build_py import build_py
 from Cython.Distutils import build_ext
 import numpy as np
+import mpi4py
 import os
 # import distribute_setup
 # distribute_setup.use_setuptools()
@@ -80,9 +81,10 @@ setup(
                 'build_py': my_build_py},
     ext_modules = [Extension("dedalus.utils.fftw.fftw",
                              ["dedalus/utils/fftw/_fftw.pyx"],
-                             libraries=["fftw3"],
-                             include_dirs=["dedalus/utils/fftw"],
-                             library_dirs=[find_fftw()]),
+                             libraries=["fftw3_mpi","mpi", "open-rte", "open-pal","dl", "nsl", "util", "fftw3" ,"m"],
+                             include_dirs=["dedalus/utils/fftw", mpi4py.get_include(), "/usr/include/mpi", "/home/jsoishi/build/include"],
+                             library_dirs=[find_fftw()],
+                             extra_compile_args=["-Wl,--export-dynamic"]),
                    Extension("dedalus.data_objects.dealias_cy_2d", ["dedalus/data_objects/dealias_cy_2d.pyx"]),
                    Extension("dedalus.data_objects.dealias_cy_3d", ["dedalus/data_objects/dealias_cy_3d.pyx"])]
     

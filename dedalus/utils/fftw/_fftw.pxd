@@ -20,6 +20,7 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+from mpi4py cimport MPI
 cdef extern from "complex.h":
     pass
 
@@ -90,11 +91,19 @@ cdef extern from "fftw3.h":
                                    double* out_,
                                    unsigned flags)
 
-    double* fftw_alloc_real(int n)
-    complex* fftw_alloc_complex(int n)
+    double* fftw_alloc_real(size_t n)
+    complex* fftw_alloc_complex(size_t n)
     void fftw_execute(fftw_plan plan)
     void fftw_destroy_plan(fftw_plan plan)
     void fftw_free(void *mem)
+
+cdef extern from "fftw3-mpi.h":
+    size_t fftw_mpi_local_size_2d(size_t n0, size_t n1, MPI.MPI_Comm comm,
+                                     size_t *local_n0, size_t *local_0_start)
+    size_t fftw_mpi_local_size_3d(size_t n0, size_t n1, size_t n2, MPI.MPI_Comm comm,
+                                     size_t *local_n0, size_t *local_0_start)
+    void fftw_mpi_init()
+    void fftw_mpi_cleanup()
 
 cdef enum:
     FFTW_FORWARD = -1
