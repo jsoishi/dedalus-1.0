@@ -16,14 +16,18 @@ License:
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
-
+v
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from _fftw cimport *
+#from _fftw cimport *
+from _fftw cimport fftw_iodim, FFTW_FORWARD, FFTW_BACKWARD,FFTW_MEASURE,FFTW_DESTROY_INPUT,FFTW_UNALIGNED,FFTW_CONSERVE_MEMORY,FFTW_EXHAUSTIVE,FFTW_PRESERVE_INPUT,FFTW_PATIENT,FFTW_ESTIMATE, fftw_plan
+cimport _fftw as fftw
 cimport libc
 cimport numpy as np
 import numpy as np
+from mpi4py cimport MPI
+from mpi4py.mpi_c cimport *
 fftw_flags = {'FFTW_FORWARD': FFTW_FORWARD,
               'FFTW_BACKWARD': FFTW_BACKWARD,        
               'FFTW_MEASURE': FFTW_MEASURE,
@@ -58,7 +62,7 @@ cdef class fftwMemoryReleaser:
     def __dealloc__(self):
         if self.memory:
             #release memory
-            fftw_free(self.memory)
+            fftw.fftw_free(self.memory)
             print "memory released", hex(<long>self.memory)
 
 cdef fftwMemoryReleaser MemoryReleaserFactory(void* ptr):
@@ -66,7 +70,10 @@ cdef fftwMemoryReleaser MemoryReleaserFactory(void* ptr):
     mr.memory = ptr
     return mr
 
-def create_data(np.ndarray[DTYPEi_t, ndim=1] shape not None):
+def fftw_mpi_init():
+    fftw.fftw_mpi_init()
+
+def create_data(np.ndarray[DTYPEi_t, ndim=1] shape not None, com_sys):
     """this allocates data using fftw's allocate routines. This is not
     terribly useful in itself, as it only ensures SIMD alignment, but
     it is important as a way to allow FFTW to choose MPI data array
@@ -82,24 +89,45 @@ def create_data(np.ndarray[DTYPEi_t, ndim=1] shape not None):
     """
     np.import_array()
     cdef np.ndarray array
-
     cdef np.dtype dtype = np.dtype('complex128')
     Py_INCREF(dtype)
+
     cdef complex *data
+    cdef size_t local_n0, local_n0_start, n
     cdef np.ndarray[DTYPEi_t, ndim=1] modshape = shape.copy()
+    cdef MPI.Comm comm = com_sys.comm
+    cdef MPI_Comm c_comm = comm.ob_mpi
     modshape[-1] = modshape[-1]/2 + 1
-    n = modshape.prod()
-    data = fftw_alloc_complex(n)
-    print "allocated %i complex numbers" % n
+
+    if shape.size == 2:
+        n = fftw.fftw_mpi_local_size_2d(<size_t> modshape[0], <size_t> modshape[1],
+                                        c_comm, &local_n0, &local_n0_start)
+    elif shape.size == 3:
+        n = fftw.fftw_mpi_local_size_3d(<size_t> modshape[0], <size_t> modshape[1], <size_t> modshape[2],
+                                        c_comm, &local_n0, &local_n0_start)
+    else:
+        raise ValueError("Data must be > 1 dimensional for MPI.")
+    modshape[0] = local_n0
+    data = fftw.fftw_alloc_complex(n)
+
+    print "proc %i: allocated %i complex numbers" % (com_sys.myproc, n)
+    print "local_n0: %i, local_n0_start: %i" % (local_n0, local_n0_start)
     rank = len(modshape)
     strides = None
-    #array = PyArray_NewFromDescr(np.ndarray, np.dtype('complex'), rank, <np.npy_intp *> shape.data, NULL, <void *> data, np.NPY_DEFAULT, None)
     array = np.PyArray_SimpleNewFromData(rank, <np.npy_intp *> modshape.data, np.NPY_COMPLEX128, <void *> data)
     np.set_array_base(array, MemoryReleaserFactory(data))
 
     array[:] = 0j
-    return array
+    return array, local_n0, local_n0_start
 
+def fftw_mpi_allocate(comm):
+    """Allocates memory for local data block. fftw provides the load
+    balancing, and so this needs to be done before arrays of local k
+    and local x are created.
+
+    """
+    pass
+    
 cdef class Plan:
     cdef fftw_plan _fftw_plan
     cdef np.ndarray _data
@@ -117,14 +145,14 @@ cdef class Plan:
             self.flags = self.flags | fftw_flags[f]
         self._data = data
         if len(data.shape) == 2:
-            self._fftw_plan = fftw_plan_dft_2d(data.shape[0],
+            self._fftw_plan = fftw.fftw_plan_dft_2d(data.shape[0],
                                                data.shape[1],
                                                <complex *> self._data.data,
                                                <complex *> self._data.data,
                                                self.direction,
                                                self.flags)
         elif len(data.shape) == 3:
-            self._fftw_plan = fftw_plan_dft_3d(data.shape[0],
+            self._fftw_plan = fftw.fftw_plan_dft_3d(data.shape[0],
                                                data.shape[1],
                                                data.shape[2],
                                                <complex *> self._data.data,
@@ -139,10 +167,10 @@ cdef class Plan:
 
     def __call__(self):
         if self._fftw_plan != NULL:
-            fftw_execute(self._fftw_plan)
+            fftw.fftw_execute(self._fftw_plan)
 
     def __dealloc__(self):
-        fftw_destroy_plan(self._fftw_plan)
+        fftw.fftw_destroy_plan(self._fftw_plan)
 
     property data:
         def __get__(self):
@@ -190,7 +218,7 @@ cdef class PlanPlane(Plan):
         howmany_dims[0].ins = 1
         howmany_dims[0].ous = 1
         
-        self._fftw_plan = fftw_plan_guru_dft(rank, dims,
+        self._fftw_plan = fftw.fftw_plan_guru_dft(rank, dims,
                                              howmany_rank, howmany_dims,
                                              <complex *> self._data.data,
                                              <complex *> self._data.data,
@@ -227,7 +255,7 @@ cdef class PlanPencil(Plan):
         cdef int idist = nx
         cdef int odist = idist
 
-        self._fftw_plan = fftw_plan_many_dft(rank, <int *> n.data,
+        self._fftw_plan = fftw.fftw_plan_many_dft(rank, <int *> n.data,
                                              howmany,
                                              <complex *> self._data.data,
                                              <int *> n.data,
@@ -256,13 +284,13 @@ cdef class rPlan(Plan):
             shape = xdata.shape
         if len(shape) == 2:
             if self.direction == FFTW_FORWARD:
-                self._fftw_plan = fftw_plan_dft_r2c_2d(shape[0],
+                self._fftw_plan = fftw.fftw_plan_dft_r2c_2d(shape[0],
                                                        shape[1],
                                                        <double *> self._xdata.data,
                                                        <complex *> self._kdata.data,
                                                        self.flags)
             else:
-                self._fftw_plan = fftw_plan_dft_c2r_2d(shape[0],
+                self._fftw_plan = fftw.fftw_plan_dft_c2r_2d(shape[0],
                                                        shape[1],
                                                        <complex *> self._kdata.data,
                                                        <double *> self._xdata.data,
@@ -270,14 +298,14 @@ cdef class rPlan(Plan):
 
         elif len(shape) == 3:
             if self.direction == FFTW_FORWARD:
-                self._fftw_plan = fftw_plan_dft_r2c_3d(shape[0],
+                self._fftw_plan = fftw.fftw_plan_dft_r2c_3d(shape[0],
                                                        shape[1],
                                                        shape[2],
                                                        <double *> self._xdata.data,
                                                        <complex *> self._kdata.data,
                                                        self.flags)
             else:
-                self._fftw_plan = fftw_plan_dft_c2r_3d(shape[0],
+                self._fftw_plan = fftw.fftw_plan_dft_c2r_3d(shape[0],
                                                        shape[1],
                                                        shape[2],
                                                        <complex *> self._kdata.data,
