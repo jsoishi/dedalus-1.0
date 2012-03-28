@@ -57,8 +57,8 @@ class FourierRepresentation(Representation):
             
         """
         self.sd = sd
-        self.shape = na.array(shape)
-        self.ndim = len(self.shape)
+        self.global_modes = na.array(shape)
+        self.ndim = len(self.global_modes)
         self.length = length
         self.dtype = 'complex128'
         self._allocate_memory(method)
@@ -73,20 +73,29 @@ class FourierRepresentation(Representation):
         self.set_dealiasing(dealiasing)
 
     def _allocate_memory(self, method):
-        self._shape = {'kspace': self.shape.copy(),
-                       'xspace': self.shape.copy()
+        self._global_shape = {'kspace': self.global_modes.copy(),
+                       'xspace': self.global_modes.copy()
                        }
-        self._shape['kspace'][-1]  = self._shape['kspace'][-1]/2 + 1
+        self._global_shape['kspace'][-1]  = self._global_shape['kspace'][-1]/2 + 1
 
         if method == 'fftw':
-            self.kdata, local_n0, local_n0_start = fftw.create_data(self.shape, com_sys)
+            self.kdata, local_n0, local_n0_start, local_n1, local_n1_start = fftw.create_data(self.global_modes, com_sys)
             strides = self.kdata.strides[:-1] + (self.kdata.strides[-1]/2,)
-            self.xdata = na.ndarray(buffer=self.kdata.data,shape=self.shape,
+            self.local_shape = {'kspace': self._global_shape['kspace'].copy(),
+                                'xspace': self._global_shape['xspace'].copy()}
+            self.local_shape['kspace'][0] = local_n1
+            self.local_shape['kspace'][1] = self._global_shape['kspace'][0]
+            self.local_shape['xspace'][0] = local_n0
+            self.offset = {'xspace': local_n0_start,
+                           'kspace': local_n1_start}
+
+            self.xdata = na.ndarray(buffer=self.kdata.data,shape=self.local_shape['xspace'],
                                     strides=strides,dtype='float64')
         else:
-            self.kdata = na.zeros(self._shape['kspace'], dtype=self.dtype)
-            self.xdata = na.zeros(self._shape['xspace'])
-            
+            self.kdata = na.zeros(self._global_shape['kspace'], dtype=self.dtype)
+            self.xdata = na.zeros(self._global_shape['xspace'])
+            self.local_shape = self.global_modes
+            self.n0_offset = 0
 
     def __getitem__(self,space):
         """returns data in either xspace or kspace, transforming as necessary.
@@ -125,11 +134,11 @@ class FourierRepresentation(Representation):
 
     def _setup_k(self):
         # Get Nyquist wavenumbers
-        self.kny = na.pi * na.array(self.shape) / na.array(self.length)
+        self.kny = na.pi * na.array(self.global_modes) / na.array(self.length)
 
         # Setup wavenumbers
         self.k = []
-        for i,S in enumerate(self.shape):
+        for i,S in enumerate(self.global_modes):
             kshape = i * (1,) + (S,) + (self.ndim - i - 1) * (1,)
             ki = fpack.fftfreq(S) * 2. * self.kny[i]
             ki.resize(kshape)
@@ -138,7 +147,8 @@ class FourierRepresentation(Representation):
         self.k[-1] = self.k[-1][...,:trim]
         self.k[-1][...,trim-1] *= -1
         self.k = dict(zip(['z','y','x'][3-self.ndim:], self.k))
-        
+        self.k['z'] = self.k['z'][self.offset['kspace']:self.offset['kspace']+self.local_shape['kspace'][0]]
+
     def has_mode(self, mode):
         """tests to see if we have a given mode. 
 
@@ -154,8 +164,8 @@ class FourierRepresentation(Representation):
             self.forward()
 
         if na.array(mode).dtype == 'int':
-            global_shape = na.array(self.shape)*na.array([com_sys.nproc, 1, 1])
-            global_length = na.array(self.length)*na.array([com_sys.nproc, 1, 1])
+            #global_shape = na.array(self.shape)*na.array([com_sys.nproc, 1, 1])
+            #global_length = na.array(self.length)*na.array([com_sys.nproc, 1, 1])
         
             keys = self.k.keys()
             keys.sort(reverse=True) # get keys in z-y-x order
@@ -175,8 +185,8 @@ class FourierRepresentation(Representation):
 
     def set_fft(self, method):
         if method == 'fftw':
-            self.fplan = fftw.rPlan(self.xdata, self.kdata, shape=self.shape, direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
-            self.rplan = fftw.rPlan(self.xdata, self.kdata, shape=self.shape, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+            self.fplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_modes, direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+            self.rplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_modes, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
             self.fft = self.fwd_fftw
             self.ifft = self.rev_fftw
         elif method == 'numpy':
@@ -187,7 +197,7 @@ class FourierRepresentation(Representation):
 
     def fwd_fftw(self):
         self.fplan()
-        self.kdata /= self.shape.prod()
+        self.kdata /= self.global_modes.prod()
         
     def rev_fftw(self):
         self.rplan()
@@ -276,7 +286,7 @@ class FourierRepresentation(Representation):
         """returns k**2. if no_zero is set, will set the mean mode to
         1. useful for division when the mean is not important.
         """
-        k2 = na.zeros(self._shape['kspace'])
+        k2 = na.zeros(self.local_shape['kspace'])
         for k in self.k.values():
             k2 += k**2
         if no_zero:
