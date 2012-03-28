@@ -21,7 +21,7 @@ v
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 #from _fftw cimport *
-from _fftw cimport fftw_iodim, FFTW_FORWARD, FFTW_BACKWARD,FFTW_MEASURE,FFTW_DESTROY_INPUT,FFTW_UNALIGNED,FFTW_CONSERVE_MEMORY,FFTW_EXHAUSTIVE,FFTW_PRESERVE_INPUT,FFTW_PATIENT,FFTW_ESTIMATE, fftw_plan
+from _fftw cimport fftw_iodim, FFTW_FORWARD, FFTW_BACKWARD,FFTW_MEASURE,FFTW_DESTROY_INPUT,FFTW_UNALIGNED,FFTW_CONSERVE_MEMORY,FFTW_EXHAUSTIVE,FFTW_PRESERVE_INPUT,FFTW_PATIENT,FFTW_ESTIMATE, FFTW_MPI_TRANSPOSED_IN, FFTW_MPI_TRANSPOSED_OUT, fftw_plan
 cimport _fftw as fftw
 cimport libc
 cimport numpy as np
@@ -37,7 +37,9 @@ fftw_flags = {'FFTW_FORWARD': FFTW_FORWARD,
               'FFTW_EXHAUSTIVE': FFTW_EXHAUSTIVE,
               'FFTW_PRESERVE_INPUT': FFTW_PRESERVE_INPUT,
               'FFTW_PATIENT': FFTW_PATIENT,
-              'FFTW_ESTIMATE': FFTW_ESTIMATE
+              'FFTW_ESTIMATE': FFTW_ESTIMATE,
+              'FFTW_MPI_TRANSPOSED_IN': FFTW_MPI_TRANSPOSED_IN,
+              'FFTW_MPI_TRANSPOSED_OUT': FFTW_MPI_TRANSPOSED_OUT
               }
 
 from cpython cimport Py_INCREF
@@ -63,7 +65,7 @@ cdef class fftwMemoryReleaser:
         if self.memory:
             #release memory
             fftw.fftw_free(self.memory)
-            print "memory released", hex(<long>self.memory)
+            #print "memory released", hex(<long>self.memory)
 
 cdef fftwMemoryReleaser MemoryReleaserFactory(void* ptr):
     cdef fftwMemoryReleaser mr = fftwMemoryReleaser.__new__(fftwMemoryReleaser)
@@ -74,10 +76,9 @@ def fftw_mpi_init():
     fftw.fftw_mpi_init()
 
 def create_data(np.ndarray[DTYPEi_t, ndim=1] shape not None, com_sys):
-    """this allocates data using fftw's allocate routines. This is not
-    terribly useful in itself, as it only ensures SIMD alignment, but
-    it is important as a way to allow FFTW to choose MPI data array
-    layouts and then create the correctly sized arrays.
+    """this allocates data using fftw's allocate routines. We allocate
+    the complex part directly, shaping it with the local_n1 returned
+    by FFTW's parallel interface.
 
     create_data allocates shape[-1]/2 + 1 complex arrays. 
 
@@ -93,32 +94,53 @@ def create_data(np.ndarray[DTYPEi_t, ndim=1] shape not None, com_sys):
     Py_INCREF(dtype)
 
     cdef complex *data
-    cdef size_t local_n0, local_n0_start, n
+    cdef size_t n, local_x0, local_x0_start, local_k1, local_k1_start
     cdef np.ndarray[DTYPEi_t, ndim=1] modshape = shape.copy()
     cdef MPI.Comm comm = com_sys.comm
     cdef MPI_Comm c_comm = comm.ob_mpi
     modshape[-1] = modshape[-1]/2 + 1
 
     if shape.size == 2:
-        n = fftw.fftw_mpi_local_size_2d(<size_t> modshape[0], <size_t> modshape[1],
-                                        c_comm, &local_n0, &local_n0_start)
+        n = fftw.fftw_mpi_local_size_2d_transposed(<size_t> modshape[0],
+                                                   <size_t> modshape[1],
+                                                   c_comm,
+                                                   &local_x0, &local_x0_start,
+                                                   &local_k1, &local_k1_start)
     elif shape.size == 3:
-        n = fftw.fftw_mpi_local_size_3d(<size_t> modshape[0], <size_t> modshape[1], <size_t> modshape[2],
-                                        c_comm, &local_n0, &local_n0_start)
+        n = fftw.fftw_mpi_local_size_3d_transposed(<size_t> modshape[0],
+                                                   <size_t> modshape[1],
+                                                   <size_t> modshape[2],
+                                                   c_comm,
+                                                   &local_x0, &local_x0_start,
+                                                   &local_k1, &local_k1_start)
     else:
         raise ValueError("Data must be > 1 dimensional for MPI.")
-    modshape[0] = local_n0
+    modshape[1] = modshape[0]
+    modshape[0] = local_k1
+
     data = fftw.fftw_alloc_complex(n)
-
-    print "proc %i: allocated %i complex numbers" % (com_sys.myproc, n)
-    print "local_n0: %i, local_n0_start: %i" % (local_n0, local_n0_start)
+    cdef int i
+    for i in range(n):
+        data[i] = 0j
+    #print "proc %i: allocated %i complex numbers" % (com_sys.myproc, n)
     rank = len(modshape)
-    strides = None
-    array = np.PyArray_SimpleNewFromData(rank, <np.npy_intp *> modshape.data, np.NPY_COMPLEX128, <void *> data)
-    np.set_array_base(array, MemoryReleaserFactory(data))
 
-    array[:] = 0j
-    return array, local_n0, local_n0_start
+    # this is necessary to pass the strides without them being garbage
+    # collected, though why is not clear...
+    cdef np.ndarray[DTYPEi_t, ndim=1] np_strides = np.array((1,)+tuple(modshape[1:][::-1])).cumprod()[::-1]
+    np_strides *= 16
+    cdef size_t *strides
+    strides = <size_t *> libc.stdlib.malloc(sizeof(size_t) * rank)
+    for i in range(rank):
+        strides[i] = np_strides[i]
+
+    array = PyArray_NewFromDescr(np.ndarray, dtype, rank, <np.npy_intp *> modshape.data, <np.npy_intp *> strides, <void *> data, np.NPY_DEFAULT, None)
+    #array = np.PyArray_SimpleNewFromData(rank, <np.npy_intp *> modshape.data, np.NPY_COMPLEX128, <void *> data)
+    np.set_array_base(array, MemoryReleaserFactory(data))
+    libc.stdlib.free(strides)
+    #array[:] = 0j
+
+    return array, local_x0, local_x0_start, local_k1, local_k1_start
 
 def fftw_mpi_allocate(comm):
     """Allocates memory for local data block. fftw provides the load
@@ -267,11 +289,14 @@ cdef class PlanPencil(Plan):
                                              self.flags)
 cdef class rPlan(Plan):
     cdef np.ndarray _xdata, _kdata
-    def __init__(self, xdata, kdata, shape=None,direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
+    def __init__(self, xdata, kdata, com_sys,shape=None,direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
         """rPlan implements out-of-place, real-to-complex,
         complex-to-real transforms.
 
         """
+        cdef MPI.Comm comm = com_sys.comm
+        cdef MPI_Comm c_comm = comm.ob_mpi
+
         if direction == 'FFTW_FORWARD':
             self.direction = FFTW_FORWARD
         else:
@@ -284,33 +309,39 @@ cdef class rPlan(Plan):
             shape = xdata.shape
         if len(shape) == 2:
             if self.direction == FFTW_FORWARD:
-                self._fftw_plan = fftw.fftw_plan_dft_r2c_2d(shape[0],
-                                                       shape[1],
-                                                       <double *> self._xdata.data,
-                                                       <complex *> self._kdata.data,
-                                                       self.flags)
+                self.flags = self.flags | 'FFTW_MPI_TRANSPOSED_OUT'
+                self._fftw_plan = fftw.fftw_mpi_plan_dft_r2c_2d(shape[0],
+                                                                shape[1],
+                                                                <double *> self._xdata.data,
+                                                                <complex *> self._kdata.data,
+                                                                c_comm,
+                                                                self.flags)
             else:
-                self._fftw_plan = fftw.fftw_plan_dft_c2r_2d(shape[0],
-                                                       shape[1],
-                                                       <complex *> self._kdata.data,
-                                                       <double *> self._xdata.data,
-                                                       self.flags)
+                self.flags = self.flags | 'FFTW_MPI_TRANSPOSED_IN'
+                self._fftw_plan = fftw.fftw_mpi_plan_dft_c2r_2d(shape[0],
+                                                                shape[1],
+                                                                <complex *> self._kdata.data,
+                                                                <double *> self._xdata.data,
+                                                                c_comm,
+                                                                self.flags)
 
         elif len(shape) == 3:
             if self.direction == FFTW_FORWARD:
-                self._fftw_plan = fftw.fftw_plan_dft_r2c_3d(shape[0],
-                                                       shape[1],
-                                                       shape[2],
-                                                       <double *> self._xdata.data,
-                                                       <complex *> self._kdata.data,
-                                                       self.flags)
+                self._fftw_plan = fftw.fftw_mpi_plan_dft_r2c_3d(shape[0],
+                                                                shape[1],
+                                                                shape[2],
+                                                                <double *> self._xdata.data,
+                                                                <complex *> self._kdata.data,
+                                                                c_comm,
+                                                                self.flags)
             else:
-                self._fftw_plan = fftw.fftw_plan_dft_c2r_3d(shape[0],
-                                                       shape[1],
-                                                       shape[2],
-                                                       <complex *> self._kdata.data,
-                                                       <double *> self._xdata.data,
-                                                       self.flags)
+                self._fftw_plan = fftw.fftw_mpi_plan_dft_c2r_3d(shape[0],
+                                                                shape[1],
+                                                                shape[2],
+                                                                <complex *> self._kdata.data,
+                                                                <double *> self._xdata.data,
+                                                                c_comm,
+                                                                self.flags)
         else:
             raise RuntimeError("Only 2D and 3D arrays are supported.")
 

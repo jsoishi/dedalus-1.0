@@ -98,9 +98,9 @@ def kida_vortex(data, a, chi=None, smooth=False):
         raise KeyError("Kida vortex requires shearing box!")
 
     if chi is None:
-        if hasattr(data, '_shape'):
-            x = data._shape['kspace'][0]
-            y = data._shape['kspace'][1]
+        if hasattr(data, 'local_shape'):
+            x = data.local_shape['kspace'][0]
+            y = data.local_shape['kspace'][1]
         else:
             x = data.shape[1]
             y = data.shape[0]

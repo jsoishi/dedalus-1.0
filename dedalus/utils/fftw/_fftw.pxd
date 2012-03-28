@@ -102,6 +102,40 @@ cdef extern from "fftw3-mpi.h":
                                      size_t *local_n0, size_t *local_0_start)
     size_t fftw_mpi_local_size_3d(size_t n0, size_t n1, size_t n2, MPI.MPI_Comm comm,
                                      size_t *local_n0, size_t *local_0_start)
+    size_t fftw_mpi_local_size_2d_transposed(size_t n0, size_t n1, MPI.MPI_Comm comm,
+                                             size_t *local_n0, size_t *local_0_start,
+                                             size_t *local_n1, size_t *local_1_start)
+    size_t fftw_mpi_local_size_3d_transposed(size_t n0, size_t n1, size_t n2, MPI.MPI_Comm comm,
+                                             size_t *local_n0, size_t *local_0_start,
+                                             size_t *local_n1, size_t *local_1_start)
+
+    fftw_plan fftw_mpi_plan_dft_r2c_2d(int n0,
+                                       int n1,
+                                       double* in_,
+                                       complex* out_,
+                                       MPI.MPI_Comm comm,
+                                       unsigned flags)
+    fftw_plan fftw_mpi_plan_dft_r2c_3d(int n0,
+                                       int n1,
+                                       int n2,
+                                       double* in_,
+                                       complex* out_,
+                                       MPI.MPI_Comm comm,
+                                       unsigned flags)
+    fftw_plan fftw_mpi_plan_dft_c2r_2d(int n0,
+                                       int n1,
+                                       complex* in_,
+                                       double* out_,
+                                       MPI.MPI_Comm comm,
+                                       unsigned flags)
+    fftw_plan fftw_mpi_plan_dft_c2r_3d(int n0,
+                                       int n1,
+                                       int n2,
+                                       complex* in_,
+                                       double* out_,
+                                       MPI.MPI_Comm comm,
+                                       unsigned flags)
+
     void fftw_mpi_init()
     void fftw_mpi_cleanup()
 
@@ -116,6 +150,9 @@ cdef enum:
     FFTW_PRESERVE_INPUT = (1 << 4) # /* cancels FFTW_DESTROY_INPUT */
     FFTW_PATIENT = (1 << 5) # /* IMPATIENT is default */
     FFTW_ESTIMATE = (1 << 6)
+    FFTW_MPI_TRANSPOSED_IN = (1U << 29)
+    FFTW_MPI_TRANSPOSED_OUT = (1U << 30)
+
 
 
     

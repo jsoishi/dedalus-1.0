@@ -106,7 +106,7 @@ class BaseField(object):
         group.attrs["type"] = self.__class__.__name__
         for f in range(self.ncomp):
             dset = group.create_dataset(str(f), 
-                                        self.components[f]._shape[self.components[f]._curr_space], 
+                                        self.components[f].local_shape[self.components[f]._curr_space], 
                                         dtype=self.components[f].data.dtype)
             
             self.components[f].save(dset)
