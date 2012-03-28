@@ -10,6 +10,10 @@ import os
 # import setuptools
 
 def find_fftw():
+    """looks for fftw in FFTW_PATH, then searches a few other likely
+    places.
+
+    """
     import glob
     import os
     try:
@@ -19,13 +23,21 @@ def find_fftw():
         path = "/usr/lib"
         l = glob.glob(os.path.join(path,"*fftw*"))
         if len(l) != 0:
-            return path
+            return os.path.split(path)[0]
         path = os.path.expanduser("~/build/lib")
         l = glob.glob(os.path.join(path,"*fftw*"))
         if len(l) != 0:
-            return path
+            return os.path.split(path)[0]
 
         print "FFTW_PATH is not set, and we can't find FFTW in any of the standard places. If FFTW isn't in your LD_LIBRARY_PATH, compilation will likely fail."
+
+def fftw_get_include():
+    base = find_fftw()
+    return os.path.join(base,"include")
+
+def fftw_get_lib():
+    base = find_fftw()
+    return os.path.join(base,"lib")
         
 def get_mercurial_changeset_id(targetDir):
     """adapted from a script by Jason F. Harris, published at
@@ -82,9 +94,8 @@ setup(
     ext_modules = [Extension("dedalus.utils.fftw.fftw",
                              ["dedalus/utils/fftw/_fftw.pyx"],
                              libraries=["fftw3_mpi","mpi", "open-rte", "open-pal","dl", "nsl", "util", "fftw3" ,"m"],
-                             include_dirs=["dedalus/utils/fftw", mpi4py.get_include(), "/usr/include/mpi", "/home/jsoishi/build/include"],
-                             library_dirs=[find_fftw()],
-                             extra_compile_args=["-Wl,--export-dynamic"]),
+                             include_dirs=["dedalus/utils/fftw", mpi4py.get_include(), "/usr/include/mpi", fftw_get_include()],
+                             library_dirs=[fftw_get_lib()]),
                    Extension("dedalus.data_objects.dealias_cy_2d", ["dedalus/data_objects/dealias_cy_2d.pyx"]),
                    Extension("dedalus.data_objects.dealias_cy_3d", ["dedalus/data_objects/dealias_cy_3d.pyx"])]
     
