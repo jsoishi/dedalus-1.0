@@ -43,6 +43,7 @@ class Representation(object):
         pass
 
 class FourierRepresentation(Representation):
+    timer = Timer()
     """Container for data that can be Fourier transformed. Includes a
     wrapped and specifiable method for performing the FFT. 
 
@@ -72,6 +73,7 @@ class FourierRepresentation(Representation):
         self.set_fft(method)
         self.set_dealiasing(dealiasing)
 
+    @timer
     def _allocate_memory(self, method):
         self._global_shape = {'kspace': self.global_modes.copy(),
                        'xspace': self.global_modes.copy()
@@ -194,11 +196,11 @@ class FourierRepresentation(Representation):
             self.ifft = self.rev_np
         else:
             raise NotImplementedError("Only FFTW and numpy supported for real transforms.")
-
+    #@timer
     def fwd_fftw(self):
         self.fplan()
         self.kdata /= self.global_modes.prod()
-        
+    #@timer
     def rev_fftw(self):
         self.rplan()
 
