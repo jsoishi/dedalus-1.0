@@ -309,7 +309,7 @@ cdef class rPlan(Plan):
             shape = xdata.shape
         if len(shape) == 2:
             if self.direction == FFTW_FORWARD:
-                self.flags = self.flags | 'FFTW_MPI_TRANSPOSED_OUT'
+                self.flags = self.flags | fftw_flags['FFTW_MPI_TRANSPOSED_OUT']
                 self._fftw_plan = fftw.fftw_mpi_plan_dft_r2c_2d(shape[0],
                                                                 shape[1],
                                                                 <double *> self._xdata.data,
@@ -317,7 +317,7 @@ cdef class rPlan(Plan):
                                                                 c_comm,
                                                                 self.flags)
             else:
-                self.flags = self.flags | 'FFTW_MPI_TRANSPOSED_IN'
+                self.flags = self.flags | fftw_flags['FFTW_MPI_TRANSPOSED_IN']
                 self._fftw_plan = fftw.fftw_mpi_plan_dft_c2r_2d(shape[0],
                                                                 shape[1],
                                                                 <complex *> self._kdata.data,
@@ -327,6 +327,7 @@ cdef class rPlan(Plan):
 
         elif len(shape) == 3:
             if self.direction == FFTW_FORWARD:
+                self.flags = self.flags | fftw_flags['FFTW_MPI_TRANSPOSED_OUT']
                 self._fftw_plan = fftw.fftw_mpi_plan_dft_r2c_3d(shape[0],
                                                                 shape[1],
                                                                 shape[2],
@@ -335,6 +336,7 @@ cdef class rPlan(Plan):
                                                                 c_comm,
                                                                 self.flags)
             else:
+                self.flags = self.flags | fftw_flags['FFTW_MPI_TRANSPOSED_IN']
                 self._fftw_plan = fftw.fftw_mpi_plan_dft_c2r_3d(shape[0],
                                                                 shape[1],
                                                                 shape[2],
