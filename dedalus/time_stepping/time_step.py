@@ -352,9 +352,7 @@ def linear_step(start, deriv, dt, output):
     
     for k,f in start.fields.iteritems():
         for i in xrange(f.ncomp):
-            output[k][i]['kspace'] = start[k][i]['kspace'] + dt * deriv[k][i]['kspace']
-            output[k][i].dealias()
-            
+            output[k][i]['kspace'] = start[k][i]['kspace'] + dt * deriv[k][i]['kspace']            
                 
 def integrating_factor_step(start, deriv, dt, output):
     """
@@ -382,7 +380,6 @@ def integrating_factor_step(start, deriv, dt, output):
         EIF = na.exp(IF * dt)
         for i in xrange(f.ncomp):
             output[k][i]['kspace'] = (start[k][i]['kspace'] + deriv[k][i]['kspace'] / IF * (EIF - 1.)) / EIF
-            output[k][i].dealias()
 
     
     
