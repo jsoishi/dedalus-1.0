@@ -155,4 +155,13 @@ def reduce_max(data):
     if com_sys.myproc == 0:
         return global_max
 
+def swap_indices(arr):
+    """simple function to swap index [0] and [1]. useful for
+    constructing quantities for the FFTW parallel data objects.
     
+    """
+    a = arr[1]
+    arr[1] = arr[0]
+    arr[0] = a
+
+    return arr
