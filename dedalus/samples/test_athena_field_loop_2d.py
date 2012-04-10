@@ -40,16 +40,15 @@ r = na.sqrt(x ** 2 + y ** 2)
 theta = na.arctan2(y, x)
 
 # Setup B field
+aux = data.clone()
+aux.add_field('Az', 'ScalarField')
+
 env = 1e-3 * na.cos(r * 4 * na.pi / length[-1]) ** 2
-data['B']['x']['xspace'] = -env * na.sin(theta)
-data['B']['y']['xspace'] = env * na.cos(theta)
-
-data['B']['x']['xspace'][r < length[-1] * 0.25 / 2] = 0
-data['B']['y']['xspace'][r < length[-2] * 0.25 / 2] = 0
-
-data['B']['x']['xspace'][r > length[-1] * 0.75 / 2] = 0
-data['B']['y']['xspace'][r > length[-2] * 0.75 / 2] = 0
-
+rc = length[-1] * 0.25 / 2
+width = 4*length[0]/shape[0] # 4 dx...
+aux['Az']['xspace'] = env * (1. + na.tanh((rc - r)/width))
+data['B']['x']['kspace'] = aux['Az'].deriv('y')
+data['B']['y']['kspace'] = -aux['Az'].deriv('x')
 data['B'].div_free()
 
 # Setup flow
@@ -61,11 +60,11 @@ data['u']['y']['xspace'] += V * na.cos(vangle)
 # Integration parameters
 ti = RK2simple(RHS, CFL=0.4)
 ti.stop_time(5.) # set stoptime
-ti.stop_walltime(3600.) # stop after 1 hour
+ti.stop_walltime(5*3600.) # stop after 1 hour
 
 an = AnalysisSet(data, ti)
-an.add("field_snap", 1)
-an.add("en_spec", 1)
+an.add("field_snap", 10)
+#an.add("en_spec", 1)
 
 # Main loop
 CFLtime = na.min(na.array(length) / na.array(shape)) / V
