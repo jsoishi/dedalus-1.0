@@ -35,11 +35,11 @@ class CommunicationSystem(object):
         if self.comm:
             self.myproc = self.comm.Get_rank()
             self.nproc = self.comm.Get_size()
+            from dedalus.utils.fftw import fftw
             try:
-                from dedalus.utils.fftw import fftw
                 fftw.fftw_mpi_init()
             except:
-                raise ImplementationError("Cannot initialize fftw's MPI facilities. Rebuild FFTW with parallel support.")
+                raise NotImplementedError("Cannot initialize fftw's MPI facilities. Rebuild FFTW with parallel support.")
         else:
             self.myproc = 0
             self.nproc = 1
