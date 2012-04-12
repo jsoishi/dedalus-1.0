@@ -496,87 +496,87 @@ class FourierShearRepresentation(FourierRepresentation):
         while self.k['x'].max() >= self.kny[-1]:
             self.k['x'][self.k['x'] >= self.kny[-1]] -= 2 * self.kny[-1]
             
-class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierShearRepresentation):
-    def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
-                 dealiasing='2/3 cython'):
-        ParallelFourierRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
-        FourierShearRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
-        self.nproc = com_sys.nproc
-        self.myproc = com_sys.myproc
-        self.offset = na.array([0, 0, self.myproc * shape[2]])
+# class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierShearRepresentation):
+#     def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
+#                  dealiasing='2/3 cython'):
+#         ParallelFourierRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
+#         FourierShearRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
+#         self.nproc = com_sys.nproc
+#         self.myproc = com_sys.myproc
+#         self.offset = na.array([0, 0, self.myproc * shape[2]])
 
-    def fwd_np(self):
-        """FFT method to go from xspace to kspace."""
+#     def fwd_np(self):
+#         """FFT method to go from xspace to kspace."""
         
-        deltay = self.shear_rate * self.sd.time
-        x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False)
+#         deltay = self.shear_rate * self.sd.time
+#         x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False)
 
-        # Do y-z fft
-        self.data = fpack.fftn(self.data, axes=(0,1))
+#         # Do y-z fft
+#         self.data = fpack.fftn(self.data, axes=(0,1))
 
-        # communicate
-        recvbuf = self.communicate('forward')
+#         # communicate
+#         recvbuf = self.communicate('forward')
 
-        # Phase shift
-        recvbuf *= na.exp(1j * self.k['y'] * x * deltay)
+#         # Phase shift
+#         recvbuf *= na.exp(1j * self.k['y'] * x * deltay)
         
-        # Do x fft
-        self.data = fpack.fft(recvbuf, axis=2)
-        self.data /= (self.data.size * com_sys.nproc)
+#         # Do x fft
+#         self.data = fpack.fft(recvbuf, axis=2)
+#         self.data /= (self.data.size * com_sys.nproc)
 
-    def rev_np(self):
-        """IFFT method to go from kspace to xspace."""
-        deltay = self.shear_rate * self.sd.time 
-        x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
+#     def rev_np(self):
+#         """IFFT method to go from kspace to xspace."""
+#         deltay = self.shear_rate * self.sd.time 
+#         x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
 
-        # Do x fft
-        self.data = fpack.ifft(self.data, axis=2)
+#         # Do x fft
+#         self.data = fpack.ifft(self.data, axis=2)
         
-        # Phase shift
-        self.data *= na.exp(-1j * self.k['y'] * x * deltay)
+#         # Phase shift
+#         self.data *= na.exp(-1j * self.k['y'] * x * deltay)
 
-        # communicate
-        recvbuf = self.communicate('backward')
+#         # communicate
+#         recvbuf = self.communicate('backward')
         
-        # Do y-z fft
-        self.data = fpack.ifftn(recvbuf, axes=(0,1))
-        self.data *= (self.data.size * com_sys.nproc)
+#         # Do y-z fft
+#         self.data = fpack.ifftn(recvbuf, axes=(0,1))
+#         self.data *= (self.data.size * com_sys.nproc)
 
-    def fwd_fftw(self):
-        deltay = self.shear_rate * self.sd.time
-        x = na.linspace(self.left_edge[-1], self.left_edge[-1] + self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False)
+#     def fwd_fftw(self):
+#         deltay = self.shear_rate * self.sd.time
+#         x = na.linspace(self.left_edge[-1], self.left_edge[-1] + self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False)
 
-        # do y-z fft
-        self.fplan_yz()
-        a = self.communicate('forward')
-        self.data.shape = self._shape['kspace']
-        self.data[:] = a[:]
+#         # do y-z fft
+#         self.fplan_yz()
+#         a = self.communicate('forward')
+#         self.data.shape = self._shape['kspace']
+#         self.data[:] = a[:]
 
-        # Phase shift
-        self.data *= na.exp(1j * self.k['y'] * x * deltay)
+#         # Phase shift
+#         self.data *= na.exp(1j * self.k['y'] * x * deltay)
         
-        # Do x fft
-        self.fplan_x()
-        self.data /= (self.data.size * com_sys.nproc)
+#         # Do x fft
+#         self.fplan_x()
+#         self.data /= (self.data.size * com_sys.nproc)
 
-    def rev_fftw(self):
-        deltay = self.shear_rate * self.sd.time
-        x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
+#     def rev_fftw(self):
+#         deltay = self.shear_rate * self.sd.time
+#         x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
 
-        # Do x fft
-        self.rplan_x()
+#         # Do x fft
+#         self.rplan_x()
 
-        # Phase shift
-        self.data *= na.exp(-1j * self.k['y'] * x * deltay)
+#         # Phase shift
+#         self.data *= na.exp(-1j * self.k['y'] * x * deltay)
         
-        # Communicate
-        a = self.communicate('backward')
-        self.data.shape = self._shape['xspace']
-        self.data[:] = a[:]
+#         # Communicate
+#         a = self.communicate('backward')
+#         self.data.shape = self._shape['xspace']
+#         self.data[:] = a[:]
 
-        # Do y-z fft
-        self.rplan_yz()
-        self.data.imag = 0.
+#         # Do y-z fft
+#         self.rplan_yz()
+#         self.data.imag = 0.
 
 class SphericalHarmonicRepresentation(FourierRepresentation):
     """Dedalus should eventually support spherical and cylindrical geometries.

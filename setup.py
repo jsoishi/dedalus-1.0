@@ -93,8 +93,9 @@ setup(
                 'build_py': my_build_py},
     ext_modules = [Extension("dedalus.utils.fftw.fftw",
                              ["dedalus/utils/fftw/_fftw.pyx"],
-                             libraries=["fftw3_mpi","mpi", "open-rte", "open-pal","dl", "nsl", "util", "fftw3" ,"m"],
-                             include_dirs=["dedalus/utils/fftw", mpi4py.get_include(), "/usr/include/mpi", fftw_get_include()],
+                             libraries=["fftw3_mpi", "fftw3" ,"m"],
+                             #extra_objects=[os.path.join(fftw_get_lib(),"libfftw3_mpi.a"), os.path.join(fftw_get_lib(),"libfftw3.a")],
+                             include_dirs=["dedalus/utils/fftw", mpi4py.get_include(), fftw_get_include()],
                              library_dirs=[fftw_get_lib()]),
                    Extension("dedalus.data_objects.dealias_cy_2d", ["dedalus/data_objects/dealias_cy_2d.pyx"]),
                    Extension("dedalus.data_objects.dealias_cy_3d", ["dedalus/data_objects/dealias_cy_3d.pyx"])]

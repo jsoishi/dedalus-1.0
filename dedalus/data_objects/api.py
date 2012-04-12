@@ -29,9 +29,7 @@ from .state_data import \
 
 from .fourier_data import \
     FourierRepresentation, \
-    FourierShearRepresentation, \
-    ParallelFourierRepresentation, \
-    ParallelFourierShearRepresentation
+    FourierShearRepresentation
 
 from .hermitianize import \
     enforce_hermitian
