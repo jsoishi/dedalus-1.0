@@ -106,8 +106,6 @@ class FourierRepresentation(Representation):
                                 'xspace': self._global_shape['xspace'].copy()}
             self.local_shape['kspace'][0] = local_n1
             self.local_shape['xspace'][0] = local_n0
-            print "local_n1 = %i" % local_n1
-            print "local_n0 = %i" % local_n0
             self.offset = {'xspace': local_n0_start,
                            'kspace': local_n1_start}
 
@@ -161,9 +159,16 @@ class FourierRepresentation(Representation):
         self.kny = swap_indices(self.kny)
         # Setup wavenumbers
         self.k = []
+        if self.ndim == 2:
+            real_dim = 0
+        else:
+            real_dim = 2
         for i,S in enumerate(self._global_shape['kspace']):
             kshape = i * (1,) + (S,) + (self.ndim - i - 1) * (1,)
-            ki = fpack.fftfreq(S) * 2. * self.kny[i]
+            if i != real_dim:
+                ki = fpack.fftfreq(S) * 2. * self.kny[i]
+            else:
+                ki = na.linspace(0,1.,S) * self.kny[i]
             ki.resize(kshape)
             self.k.append(ki)
 
@@ -208,7 +213,6 @@ class FourierRepresentation(Representation):
             keys = self.k.keys()
             keys.sort(reverse=True) # get keys in z-y-x order
             keys = swap_indices(keys) # swap the first two indices
-
             has = []
             for i,k in enumerate(keys):
                 has.append(mode[i] in self.k[k])
