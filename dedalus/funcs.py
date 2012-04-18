@@ -25,6 +25,7 @@ import os
 import sys
 import subprocess
 import re
+import traceback
 
 __header = """
 == Welcome to the embedded IPython Shell ==
@@ -82,3 +83,8 @@ def get_mercurial_changeset_id():
     return get_mercurial_changeset_id.changeset
 
 get_mercurial_changeset_id.changeset = None
+
+def signal_print_traceback(signo, frame):
+    """grabbed from yt
+    """
+    print traceback.print_stack(frame)

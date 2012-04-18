@@ -20,7 +20,7 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
+import signal
 
 from dedalus.analysis.api import \
     AnalysisSet, \
@@ -73,3 +73,9 @@ from dedalus.utils.api import \
     setup_parallel_objs, \
     load_all, \
     com_sys
+
+from funcs import signal_print_traceback
+try:
+    signal.signal(signal.SIGUSR1, signal_print_traceback)
+except ValueError:  # Not in main thread
+    pass
