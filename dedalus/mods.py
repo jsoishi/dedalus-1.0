@@ -76,6 +76,6 @@ from dedalus.utils.api import \
 
 from funcs import signal_print_traceback
 try:
-    signal.signal(signal.SIGUSR1, signal_print_traceback)
+    signal.signal(signal.SIGHUP, signal_print_traceback)
 except ValueError:  # Not in main thread
     pass
