@@ -194,7 +194,7 @@ def compute_en_spec(data, field, normalization=1.0, averaging=None):
         mynk = na.zeros_like(spec)
         for i in xrange(k.size):
             kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
-            myspec[i] = (power[kshell]).sum()
+            myspec[i] = k[i] * (power[kshell]).sum()
             if averaging == 'all':
                 mynk[i] = kshell.sum()
             elif averaging == 'nonzero':
@@ -218,7 +218,7 @@ def compute_en_spec(data, field, normalization=1.0, averaging=None):
         return k, spec
 
 @AnalysisSet.register_task
-def en_spec(data, it, flist=['u']):
+def en_spec(data, it, flist=['u'], loglog=False):
     """Record power spectrum of specified fields."""
     N = len(flist)
     if com_sys.myproc == 0:
@@ -233,7 +233,10 @@ def en_spec(data, it, flist=['u']):
                 return
 
             ax = fig.add_subplot(1, N, i+1)
-            ax.semilogy(k[1:], spectrum[1:], 'o-')
+            if loglog:
+                ax.loglog(k[1:], spectrum[1:], 'o-')
+            else:
+                ax.semilogy(k[1:], spectrum[1:], 'o-')
 
             print "%s E total power = %10.5e" %(f, spectrum.sum())
             print "%s E0 power = %10.5e" %(f, spectrum[0])
