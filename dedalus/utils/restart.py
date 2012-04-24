@@ -67,9 +67,11 @@ def load_all_data(data, filename):
         field_name = '/fields/' + field
         for comp in range(data.fields[field].ncomp):
             field_comp = '%s/%i' % (field_name, comp)
-            print field_comp
+            load_space = data_file[field_comp].attrs['space']
+            if load_space != data[field][comp]._curr_space:
+                data[field][comp][load_space]
             try:
-                data_file[field_comp].read_direct(data[field][comp].data)
+                data[field][comp].data[:] = data_file[field_comp][:]
             except:
                 raise KeyError("Data File missing field %s component %i" % (field, comp))
             data.fields[field][comp]._curr_space = data_file[field_comp].attrs['space']
