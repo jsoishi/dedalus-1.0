@@ -80,7 +80,7 @@ def volume_average(data, kdict=None, space='kspace'):
                 raise ValueError("volume_average: data is not a Dedalus representation, so you must pass k vectors via kdict")
         
         if k['x'][...,0] == 0:
-            local_sum = 2*data_values[:,:,1:].sum() + data_values[:,:,0].sum()
+            local_sum = 2*data_values[...,1:].sum() + data_values[...,0].sum()
         else:
             local_sum = 2*data_values.sum()
     return reduce_sum(local_sum)
