@@ -168,7 +168,7 @@ def compute_en_spec(data, field, normalization=1.0, averaging=None):
     f = data[field]
     power = na.zeros(f[0]['kspace'].shape)
     for i in xrange(f.ncomp):
-        power += 0.5 * na.abs(f[i]['kspace']) ** 2
+        power += na.abs(f[i]['kspace']) ** 2
     power *= normalization
 
     # Construct bins by wavevector magnitude (evenly spaced)
@@ -176,13 +176,16 @@ def compute_en_spec(data, field, normalization=1.0, averaging=None):
 
     if com_sys.comm:
         # note: not the same k-values as serial version
-        k = na.linspace(0, na.max(f[0].kny), na.max(data.shape) / 2.)
+        k = na.linspace(0, int(na.max(f[0].kny)), na.max(data.shape)/2 + 1, endpoint=False)
     else:
         k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
-    kbottom = k - k[1] / 2.
-    ktop = k + k[1] / 2.
+    dk = k[1] - k[0]
+    print "dk = %10.5e" % dk
+    kbottom = k #- k[1] / 2.
+    ktop = k + k[1]#/ 2.
+    print "sizeof(kbottom) = %i" % kbottom.size
+    print "sizeof(ktop) = %i" % ktop.size
     spec = na.zeros_like(k)
-        
     nonzero = (power > 0)
 
     comm = com_sys.comm
@@ -194,7 +197,7 @@ def compute_en_spec(data, field, normalization=1.0, averaging=None):
         mynk = na.zeros_like(spec)
         for i in xrange(k.size):
             kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
-            myspec[i] = k[i] * (power[kshell]).sum()
+            myspec[i] = (power[kshell]).sum()
             if averaging == 'all':
                 mynk[i] = kshell.sum()
             elif averaging == 'nonzero':
