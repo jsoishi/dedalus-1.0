@@ -301,6 +301,8 @@ class FourierRepresentation(Representation):
             self.dealias = self.dealias_23_cython
         elif dealiasing == '2/3 spherical':
             self.dealias = self.dealias_spherical_23
+        elif dealiasing == None:
+            self.dealias = lambda : None
         else:
             self.dealias = self.zero_nyquist
 
