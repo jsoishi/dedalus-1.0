@@ -293,32 +293,32 @@ def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     kk = na.zeros(ux.data.shape)
     for k in ux.k.values():
         kk += k**2
+        
     kk = na.sqrt(kk)
+    k2 = na.sqrt(ux.k['x']**2 + ux.k['y']**2)
+    k2[k2==0] = 1.
     sp = spec(kk,**kwargs)
-    ampl = na.sqrt(sp/ux.data.ndim/sp.sum())
+    #sp *= tot_en/sp.sum()
+    sp *= 1./3.79732e-03 /sp.sum()
+    #sp *=2**8 /sp.sum()
 
-    for u in [ux,uy]:
-        u.data[:,:] = ampl*na.exp(1j*2*na.pi*na.random.random(u.data.shape))
+    kk[kk==0] = 1.
+    #ampl = na.sqrt(sp/(4*na.pi))/kk # for 3D
+    ampl = na.sqrt(sp/(2*na.pi*kk)) # for 2D
+    
+    # Rogallo algorithm for random-phase, incompressible motions
+    alpha = ampl * na.exp(1j*2*na.pi*na.random.random(ux.data.shape))# * na.cos(2*na.pi*na.random.random(ux.data.shape))
+    ux.data[:,:] = alpha*kk*ux.k['y']/(kk*k2)
+    uy.data[:,:] = -alpha*kk*ux.k['x']/(kk*k2)
 
-        # enforce symmetry in kspace to ensure data is real in
-        # xspace.
-        nx = u.data.shape[0]
-        u.data[-1:nx/2:-1,-1:nx/2:-1] = u.data[1:nx/2,1:nx/2].conj()
-        u.data[nx/2-1:0:-1, -1:nx/2:-1] = u.data[nx/2+1:,1:nx/2].conj()
-
-        u.data[0,nx/2+1:] = u.data[0,nx/2-1:0:-1].conj()
-        u.data[nx/2+1:,0] = u.data[nx/2-1:0:-1,0].conj()
-        u.data[nx/2,nx/2+1:] = u.data[nx/2,nx/2-1:0:-1].conj()
-        u.data[nx/2+1:,nx/2] = u.data[nx/2-1:0:-1,nx/2].conj()
-
-        u.data[0:1,0:1].imag= 0.
-        u.data[nx/2:nx/2+1,nx/2:nx/2+1].imag = 0
-        u.data[0:1,nx/2:nx/2+1].imag = 0
-        u.data[nx/2:nx/2+1,0:1].imag = 0
-        u.data[0,0] = 0.
-
-    remove_compressible(ux,uy)
-
+    # fix hermitian
+    nh = ux.data.shape[1]/2 + 1
+    if ux.data.shape[1] % 2 == 0:
+        start = nh - 2
+    else:
+        start = nh - 1
+    ux.data[0,nh:] = ux.data[0,start:0:-1].conj()
+    uy.data[0,nh:] = uy.data[0,start:0:-1].conj()
 
 def remove_compressible(ux,uy, renorm=False):
     """project off compressible parts of velocity fields. if renorm is
