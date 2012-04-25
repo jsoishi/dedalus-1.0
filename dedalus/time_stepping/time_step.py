@@ -27,6 +27,7 @@ import h5py
 import numpy as na
 
 from dedalus.utils.parallelism import com_sys
+from dedalus.utils.logger import mylog
 from dedalus.funcs import insert_ipython, get_mercurial_changeset_id
 from dedalus.utils.api import Timer
 
@@ -35,7 +36,7 @@ try:
 except ImportError:
     hg_version = get_mercurial_changeset_id()
 except:
-    print "could not find hg_version."
+    mylog.warning("could not find hg_version.")
     hg_version = "unknown"
 
 class TimeStepBase(object):
@@ -85,7 +86,7 @@ class TimeStepBase(object):
         if ((self.iter % self._dnsnap) == 0) or (data.time - self._tlastsnap >= self._dtsnap):
             self.snapshot(data)
         self.do_advance(data,dt)
-
+        mylog.info("step %i" % self.iter)
     def do_advance(self, data, dt):
         raise NotImplementedError("do_advance must be provided by subclass.")
 

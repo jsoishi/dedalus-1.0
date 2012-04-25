@@ -71,12 +71,12 @@ def get_mercurial_changeset_id():
         getChangeset = subprocess.Popen('hg parent --template "{node|short}" --cwd ' + targetDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         
         if (getChangeset.stderr.read() != ""):
-            print "Error in obtaining current changeset of the Mercurial repository"
+            mylog.warning("Error in obtaining current changeset of the Mercurial repository. changeset set to None")
             changeset = None
             
         changeset = getChangeset.stdout.read()
         if (not re.search("^[0-9a-f]{12}$", changeset)):
-            print "Current changeset of the Mercurial repository is malformed"
+            mylog.warning("Current changeset of the Mercurial repository is malformed. changeset set to None")
             changeset = None
         get_mercurial_changeset_id.changeset = changeset
 

@@ -23,6 +23,7 @@ License:
 import numpy as na
 import numpy.fft as fpack
 from dedalus.utils.parallelism import com_sys, swap_indices
+from dedalus.utils.logger import mylog
 from dedalus.utils.fftw import fftw
 from dedalus.utils.timer import Timer
 from dedalus.funcs import insert_ipython
@@ -31,7 +32,7 @@ try:
     import pycuda.gpuarray as gpuarray
     import scikits.cuda.fft as cu_fft
 except ImportError:
-    print "Warning: CUDA cannot be imported. Must use FFTW or numpy FFT"
+    mylog.warning("CUDA cannot be imported. Must use FFTW or numpy FFT")
 
 class Representation(object):
     """a representation of a field. it stores data and provides
