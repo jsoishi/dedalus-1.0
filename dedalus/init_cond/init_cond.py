@@ -25,6 +25,7 @@ License:
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 from dedalus.utils.parallelism import com_sys
+from dedalus.utils.logger import mylog
 from dedalus.funcs import insert_ipython
 import numpy as na
 from dedalus.data_objects import hermitianize
@@ -37,6 +38,7 @@ def taylor_green(data):
         data: StateData object
 
     """
+    mylog.info("Initializing Taylor Green Vortex.")
     ndim = data['u'].ndim
     if ndim == 2:
         data['u']['x'].data[1,1] = -1j/4.
@@ -108,7 +110,7 @@ def kida_vortex(data, a, chi=None, smooth=False):
 
     b = chi * a
     vort_ampl = data.parameters['S'] * (1 + chi) * Omega/(chi * (chi - 1.))    
-    print "adding vortex with vorticity = %10.5f" % vort_ampl
+    mylog.info("adding vortex with vorticity = %10.5f" % vort_ampl)
     sh = data['u']['x']['kspace'].shape
     le = data['u']['x'].length
     aux = data.clone()
@@ -284,6 +286,40 @@ def alfven_old(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6):
     
         sin_k(data['u'][i].data, k[::-1], ampl=u1[i])
         sin_k(data['B'][i].data, k[::-1], ampl=B1[i])
+
+def turb_new(data, spec, tot_en=0.5, **kwargs):
+    """generate noise with a random phase and a spectrum given by
+    the spec function.
+    
+    Uses the Rogallo (1981) algorithm.
+
+    MODERINZED, PARALLEL, MULTI-D VERSION
+
+    """
+
+    kk = na.sqrt(data['u'][0].k2())
+    kx = data['u']['y'].k['x']
+    ky = data['u']['x'].k['y']
+
+    sp = spec(kk, **kwargs)
+
+    theta1 = 2*na.pi*na.random.random(data['u'][0]['kspace'].shape)
+    theta2 = 2*na.pi*na.random.random(data['u'][0]['kspace'].shape)
+    phi    = 2*na.pi*na.random.random(data['u'][0]['kspace'].shape)
+    alpha = ampl * na.exp(1j*theta1)
+    if data.ndim == 2:
+        data['u']['x']['kspace'] = alpha * ky/kk
+        data['u']['x']['kspace'] = -alpha * kx/kk
+    elif data.ndim == 3:
+        kz = data['u']['x'].k['z']
+        k2 = na.sqrt(data['u']['x']**2 + data['u']['y']**2)
+        alpha *= na.cos(phi)
+        beta = ampl * na.exp(1j*theta2) * na.sin(phi)
+
+        data['u']['x']['kspace'] = (alpha * kk * ky + beta * kx * kz)/(kk * k2)
+        data['u']['y']['kspace'] = (beta * ky * kz - alpha * kk*kx)/(kk * k2)
+        data['u']['z']['kspace'] = (beta * k2)/kk
+
 
 def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     """generate noise with a random phase and a spectrum given by
@@ -514,7 +550,7 @@ def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, bary
     maxkk = na.sqrt(3*na.max(sampledata.kny)**2)
     maxkinput = max(ak)
     if maxkk > maxkinput:
-        print 'cannot interpolate: some grid wavenumbers larger than input wavenumbers; ICs for those modes are wrong'
+        mylog.warning('cannot interpolate: some grid wavenumbers larger than input wavenumbers; ICs for those modes are wrong')
         # ... any |k| larger than the max input k is replaced by max input k
         kk[:,:,:] = na.minimum(kk, maxkinput*na.ones_like(kk))
 

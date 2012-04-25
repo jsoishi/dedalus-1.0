@@ -20,7 +20,12 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
+import dedalus.startup_tasks as __startup_tasks
+
 import signal
+
+from dedalus.utils.logger import mylog
 
 from dedalus.analysis.api import \
     AnalysisSet, \
