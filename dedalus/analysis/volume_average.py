@@ -126,12 +126,12 @@ def vort_cenk(data):
     """Centroid wavenumber from McWilliams 1990.
 
     """
-    k2 = data['u']['x'].k2()
+    k2 = data['u']['x'].k2(no_zero=True)
     en = na.zeros(data['u']['x'].data.shape)
     for i in xrange(data['u'].ndim):
         en += 0.5*(data['u'][i]['kspace']*data['u'][i]['kspace'].conj()).real
-    
-    return (k2[1:,1:]**1.5*en[1:,1:]).sum()/(k2[1:,1:]*en[1:,1:]).sum()
+    en[0,0] = 0. # compensate for the fact that k2 has mean mode = 1
+    return (k2**1.5*en).sum()/(k2*en).sum()
 
 @VolumeAverageSet.register_task
 def ux_imag(data):
