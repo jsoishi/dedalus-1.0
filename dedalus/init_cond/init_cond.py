@@ -296,20 +296,26 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
     MODERINZED, PARALLEL, MULTI-D VERSION
 
     """
-
     kk = na.sqrt(data['u'][0].k2())
-    kx = data['u']['y'].k['x']
-    ky = data['u']['x'].k['y']
+    kx = data['u'][0].k['x']
+    ky = data['u'][0].k['y']
 
     sp = spec(kk, **kwargs)
+    kk[kk==0] = 1.
+
+    if data.ndim == 2:
+        ampl = na.sqrt(sp/(2*na.pi*kk))
+    elif data.ndim == 3:
+        ampl = na.sqrt(sp/(4*na.pi))/kk
 
     theta1 = 2*na.pi*na.random.random(data['u'][0]['kspace'].shape)
     theta2 = 2*na.pi*na.random.random(data['u'][0]['kspace'].shape)
     phi    = 2*na.pi*na.random.random(data['u'][0]['kspace'].shape)
     alpha = ampl * na.exp(1j*theta1)
+
     if data.ndim == 2:
         data['u']['x']['kspace'] = alpha * ky/kk
-        data['u']['x']['kspace'] = -alpha * kx/kk
+        data['u']['y']['kspace'] = -alpha * kx/kk
     elif data.ndim == 3:
         kz = data['u']['x'].k['z']
         k2 = na.sqrt(data['u']['x']**2 + data['u']['y']**2)
@@ -320,6 +326,19 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
         data['u']['y']['kspace'] = (beta * ky * kz - alpha * kk*kx)/(kk * k2)
         data['u']['z']['kspace'] = (beta * k2)/kk
 
+    # fix hermitian
+    shape =data['u']['x']['kspace'].shape
+    nh = shape[1]/2 + 1
+    uxd = data['u']['x'].data
+    uyd = data['u']['y'].data
+    if shape[1] % 2 == 0:
+        start = nh - 2
+        uxd[0,nh-1] = 0.
+        uyd[0,nh-1] = 0.
+    else:
+        start = nh - 1
+    uxd[0,nh:] = uxd[0,start:0:-1].conj()
+    uyd[0,nh:] = uyd[0,start:0:-1].conj()
 
 def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     """generate noise with a random phase and a spectrum given by
