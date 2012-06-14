@@ -334,16 +334,12 @@ def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     k2 = na.sqrt(ux.k['x']**2 + ux.k['y']**2)
     k2[k2==0] = 1.
     sp = spec(kk,**kwargs)
-    #sp *= tot_en/sp.sum()
-    sp *= 1./3.79732e-03 /sp.sum()
-    #sp *=2**8 /sp.sum()
 
     kk[kk==0] = 1.
-    #ampl = na.sqrt(sp/(4*na.pi))/kk # for 3D
     ampl = na.sqrt(sp/(2*na.pi*kk)) # for 2D
     
-    # Rogallo algorithm for random-phase, incompressible motions
-    alpha = ampl * na.exp(1j*2*na.pi*na.random.random(ux.data.shape))# * na.cos(2*na.pi*na.random.random(ux.data.shape))
+    # Rogallo alorithm for random-phase, incompressible motions
+    alpha = ampl * na.exp(1j*2*na.pi*na.random.random(ux.data.shape)) #* na.cos(2*na.pi*na.random.random(ux.data.shape))
     ux.data[:,:] = alpha*kk*ux.k['y']/(kk*k2)
     uy.data[:,:] = -alpha*kk*ux.k['x']/(kk*k2)
 
@@ -351,6 +347,7 @@ def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     nh = ux.data.shape[1]/2 + 1
     if ux.data.shape[1] % 2 == 0:
         start = nh - 2
+        ux.data[0,nh-1] = 0.
     else:
         start = nh - 1
     ux.data[0,nh:] = ux.data[0,start:0:-1].conj()
