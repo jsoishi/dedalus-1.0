@@ -9,34 +9,52 @@ import os
 # distribute_setup.use_setuptools()
 # import setuptools
 
-def find_fftw():
-    """looks for fftw in FFTW_PATH, then searches a few other likely
+def find_path(name):
+    """looks for <name> in <NAME>_PATH, then searches a few other likely
     places.
 
     """
     import glob
     import os
     try:
-        path = os.environ['FFTW_PATH']
+        pn = '%s_PATH' % name.upper()
+        path = os.environ[pn]
         return path
     except KeyError:
         path = "/usr/lib"
-        l = glob.glob(os.path.join(path,"*fftw*"))
-        if len(l) != 0:
-            return os.path.split(path)[0]
-        path = os.path.expanduser("~/build/lib")
-        l = glob.glob(os.path.join(path,"*fftw*"))
+        glob_string = "*%s*" % name
+        l = glob.glob(os.path.join(path, glob_string))
         if len(l) != 0:
             return os.path.split(path)[0]
 
-        print "FFTW_PATH is not set, and we can't find FFTW in any of the standard places. If FFTW isn't in your LD_LIBRARY_PATH, compilation will likely fail."
+        path = "/usr/local/lib"
+        glob_string = "*%s*" % name
+        l = glob.glob(os.path.join(path, glob_string))
+        if len(l) != 0:
+            return os.path.split(path)[0]
+        
+        path = os.path.expanduser("~/build/lib")
+        l = glob.glob(os.path.join(path,glob_string))
+        if len(l) != 0:
+            return os.path.split(path)[0]
+
+        print "%s is not set, and we can't find %s in any of the standard places. If %s isn't in your LD_LIBRARY_PATH, compilation will likely fail." % (pn, name, name)
 
 def fftw_get_include():
-    base = find_fftw()
+    base = find_path('fftw')
     return os.path.join(base,"include")
 
 def fftw_get_lib():
-    base = find_fftw()
+    base = find_path('fftw')
+    return os.path.join(base,"lib")
+        
+def mpi_get_include():
+    base = find_path('mpi')
+    print base
+    return os.path.join(base,"include", "mpi")
+
+def mpi_get_lib():
+    base = find_path('mpi')
     return os.path.join(base,"lib")
         
 def get_mercurial_changeset_id(targetDir):
@@ -95,7 +113,7 @@ setup(
                              ["dedalus/utils/fftw/_fftw.pyx"],
                              libraries=["fftw3_mpi", "fftw3" ,"m"],
                              #extra_objects=[os.path.join(fftw_get_lib(),"libfftw3_mpi.a"), os.path.join(fftw_get_lib(),"libfftw3.a")],
-                             include_dirs=["dedalus/utils/fftw", mpi4py.get_include(), fftw_get_include()],
+                             include_dirs=["dedalus/utils/fftw", mpi4py.get_include(), fftw_get_include(), mpi_get_include()],
                              library_dirs=[fftw_get_lib()]),
                    Extension("dedalus.data_objects.dealias_cy_2d", ["dedalus/data_objects/dealias_cy_2d.pyx"]),
                    Extension("dedalus.data_objects.dealias_cy_3d", ["dedalus/data_objects/dealias_cy_3d.pyx"])]
