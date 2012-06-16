@@ -49,6 +49,7 @@ class StateData(object):
     def __init__(self, time, shape, length, field_class_dict, field_list=[], params={}):
         self.time = time
         self.shape = shape
+        self.ndim = len(self.shape)
         self.length = length
         self._field_classes = field_class_dict
         self.parameters = params
