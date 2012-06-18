@@ -22,6 +22,7 @@ License:
 """
 import numpy as na
 import numpy.fft as fpack
+from dedalus.config import decfg
 from dedalus.utils.parallelism import com_sys, swap_indices
 from dedalus.utils.logger import mylog
 from dedalus.utils.fftw import fftw
@@ -79,6 +80,8 @@ class FourierRepresentation(Representation):
         self.ndim = len(self.global_xshape)
         self.length = length
         self.dtype = 'complex128'
+        method = decfg.get('FFT', 'method')
+        dealiasing = decfg.get('FFT', 'dealiasing')
         self._allocate_memory(method)
         self.__eps = na.finfo(self.dtype).eps
         self._curr_space = 'kspace'
@@ -249,6 +252,7 @@ class FourierRepresentation(Representation):
         return None
 
     def set_fft(self, method):
+        mylog.debug("Setting FFT method to %s" % method)
         if method == 'fftw':
             self.fplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_xshape, direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
             self.rplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_xshape, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
@@ -291,6 +295,7 @@ class FourierRepresentation(Representation):
         self._curr_space = 'xspace'
 
     def set_dealiasing(self, dealiasing):
+        mylog.debug("Setting dealiasing method to %s" % dealiasing)
         if dealiasing == '2/3':
             self.dealias = self.dealias_23
         elif dealiasing == '2/3 cython':
@@ -302,7 +307,7 @@ class FourierRepresentation(Representation):
             self.dealias = self.dealias_23_cython
         elif dealiasing == '2/3 spherical':
             self.dealias = self.dealias_spherical_23
-        elif dealiasing == None:
+        elif dealiasing == 'None':
             self.dealias = lambda : None
         else:
             self.dealias = self.zero_nyquist

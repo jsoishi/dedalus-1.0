@@ -23,6 +23,8 @@ License:
 
 import dedalus.startup_tasks as __startup_tasks
 
+from dedalus.config import decfg
+
 import signal
 
 from dedalus.utils.logger import mylog
