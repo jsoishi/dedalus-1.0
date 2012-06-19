@@ -164,3 +164,10 @@ def swap_indices(arr):
     arr[0] = a
 
     return arr
+
+def pickle(data,name):
+    import cPickle
+    filen = "%s_proc%05i" % (name, com_sys.myproc)
+    outf = open(filen,'w')
+    cPickle.dump(data,outf)
+    outf.close()
