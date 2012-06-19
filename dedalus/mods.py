@@ -42,6 +42,7 @@ from dedalus.init_cond.api import \
     sin_x, \
     sin_y, \
     turb,  \
+    turb_new, \
     mcwilliams_spec, \
     MIT_vortices, \
     shearing_wave, \
