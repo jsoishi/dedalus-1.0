@@ -103,7 +103,7 @@ class FourierRepresentation(Representation):
         if method == 'fftw':
             self.kdata, local_n0, local_n0_start, local_n1, local_n1_start = fftw.create_data(self.global_xshape, com_sys)
             if self.kdata.ndim == 2:
-                strides = (self.kdata.shape[0]*self.kdata.strides[-1], self.kdata.strides[-1]/2)
+                strides = (self.kdata.strides[0]/2, self.kdata.strides[-1]/2)
             else:
                 strides = self.kdata.strides[:-1] + (self.kdata.strides[-1]/2,)
             self.local_shape = {'kspace': self._global_shape['kspace'].copy(),
