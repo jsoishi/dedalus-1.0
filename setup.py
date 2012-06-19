@@ -51,7 +51,7 @@ def fftw_get_lib():
 def mpi_get_include():
     base = find_path('mpi')
     print base
-    return os.path.join(base,"include", "mpi")
+    return os.path.join(base,"include")
 
 def mpi_get_lib():
     base = find_path('mpi')

@@ -79,10 +79,18 @@ def volume_average(data, kdict=None, space='kspace'):
             if k == None:
                 raise ValueError("volume_average: data is not a Dedalus representation, so you must pass k vectors via kdict")
         
-        if k['x'][...,0] == 0:
-            local_sum = 2*data_values[...,1:].sum() + data_values[...,0].sum()
+        if data.ndim == 3:
+            if k['x'][...,0] == 0:
+                local_sum = 2*data_values[...,1:].sum() + data_values[...,0].sum()
+            else:
+                local_sum = 2*data_values.sum()
+                
         else:
-            local_sum = 2*data_values.sum()
+            if k['x'][0, ...] == 0:
+                local_sum = 2*data_values[1:, ...].sum() + data_values[0, ...].sum()
+            else:
+                local_sum = 2*data_values.sum()
+                
     return reduce_sum(local_sum)
        
 @VolumeAverageSet.register_task

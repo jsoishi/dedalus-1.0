@@ -78,7 +78,7 @@ class FourierRepresentation(Representation):
         self.sd = sd
         self.global_xshape = na.array(shape)
         self.ndim = len(self.global_xshape)
-        self.length = length
+        self.length = na.asfarray(length)
         self.dtype = 'complex128'
         method = decfg.get('FFT', 'method')
         dealiasing = decfg.get('FFT', 'dealiasing')
@@ -157,10 +157,11 @@ class FourierRepresentation(Representation):
         self._curr_space = space
 
     def _setup_k(self):
+    
         # Get Nyquist wavenumbers
         self.kny = na.pi * na.array(self.global_xshape) / na.array(self.length)
-
         self.kny = swap_indices(self.kny)
+        
         # Setup wavenumbers
         self.k = []
         if self.ndim == 2:
@@ -186,12 +187,13 @@ class FourierRepresentation(Representation):
         #     trim = self.k[-1].shape[-1]/2 + 1
         #     self.k[-1] = self.k[-1][...,:trim]
         #     self.k[-1][...,trim-1] *= -1
+        
         names = ['z','y','x'][3-self.ndim:]
-        #names = swap_indices(names)
+        names = swap_indices(names)
         self.k = dict(zip(names, self.k))
 
         if self.k.has_key('z'):
-            self.k['z'] = self.k['z'][self.offset['kspace']:self.offset['kspace']+self.local_shape['kspace'][0]]
+            self.k['y'] = self.k['y'][self.offset['kspace']:self.offset['kspace']+self.local_shape['kspace'][0]]
         else:
             self.k['x'] = self.k['x'][self.offset['kspace']:self.offset['kspace']+self.local_shape['kspace'][0]]
 

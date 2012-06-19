@@ -28,6 +28,7 @@ from .init_cond import \
     sin_k, \
     cos_k, \
     turb, \
+    turb_new, \
     MIT_vortices, \
     shearing_wave, \
     collisionless_cosmo_fields, \

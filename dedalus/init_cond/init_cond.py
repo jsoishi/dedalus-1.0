@@ -327,18 +327,18 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
         data['u']['z']['kspace'] = (beta * k2)/kk
 
     # fix hermitian
-    shape =data['u']['x']['kspace'].shape
-    nh = shape[1]/2 + 1
-    uxd = data['u']['x'].data
-    uyd = data['u']['y'].data
-    if shape[1] % 2 == 0:
-        start = nh - 2
-        uxd[0,nh-1] = 0.
-        uyd[0,nh-1] = 0.
-    else:
-        start = nh - 1
-    uxd[0,nh:] = uxd[0,start:0:-1].conj()
-    uyd[0,nh:] = uyd[0,start:0:-1].conj()
+    # shape =data['u']['x']['kspace'].shape
+#     nh = shape[1]/2 + 1
+#     uxd = data['u']['x'].data
+#     uyd = data['u']['y'].data
+#     if shape[1] % 2 == 0:
+#         start = nh - 2
+#         uxd[0,nh-1] = 0.
+#         uyd[0,nh-1] = 0.
+#     else:
+#         start = nh - 1
+#     uxd[0,nh:] = uxd[0,start:0:-1].conj()
+#     uyd[0,nh:] = uyd[0,start:0:-1].conj()
 
 def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     """generate noise with a random phase and a spectrum given by
@@ -346,7 +346,9 @@ def turb(ux, uy, spec, tot_en=0.5, **kwargs):
 
     """
     kk = na.zeros(ux.data.shape)
-    for k in ux.k.values():
+    print ux.local_shape
+    for i,k in ux.k.iteritems():
+        print k.shape
         kk += k**2
         
     kk = na.sqrt(kk)
