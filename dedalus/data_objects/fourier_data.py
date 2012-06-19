@@ -157,6 +157,7 @@ class FourierRepresentation(Representation):
         self._curr_space = space
 
     def _setup_k(self):
+        """ Create local wavenumber arrays."""
     
         # Get Nyquist wavenumbers
         self.kny = na.pi * self.global_xshape / self.length
@@ -188,6 +189,7 @@ class FourierRepresentation(Representation):
             self.k['x'] = self.k['x'][self.offset['kspace']:self.offset['kspace'] + self.local_shape['kspace'][0]]
         else:
             self.k['y'] = self.k['y'][self.offset['kspace']:self.offset['kspace'] + self.local_shape['kspace'][0]]
+
             
     def has_mode(self, mode):
         """tests to see if we have a given mode. 
