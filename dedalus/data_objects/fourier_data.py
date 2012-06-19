@@ -159,44 +159,36 @@ class FourierRepresentation(Representation):
     def _setup_k(self):
     
         # Get Nyquist wavenumbers
-        self.kny = na.pi * na.array(self.global_xshape) / na.array(self.length)
+        self.kny = na.pi * self.global_xshape / self.length
         self.kny = swap_indices(self.kny)
         
-        # Setup wavenumbers
+        # Setup global wavenumber arrays
         self.k = []
+        
         if self.ndim == 2:
             real_dim = 0
         else:
             real_dim = 2
+            
         for i,S in enumerate(self._global_shape['kspace']):
             kshape = i * (1,) + (S,) + (self.ndim - i - 1) * (1,)
-            if i != real_dim:
-                ki = fpack.fftfreq(S) * 2. * self.kny[i]
-            else:
+            if i == real_dim:
                 ki = na.linspace(0,1.,S) * self.kny[i]
+            else:
+                ki = fpack.fftfreq(S) * 2. * self.kny[i]
             ki.resize(kshape)
             self.k.append(ki)
-
-        # trim the kx dimension, which may not be the last one, if
-        # we're in 2D
-        # if self.ndim == 2:
-        #     trim = self.k[0].shape[0]/2 + 1
-        #     self.k[0] = self.k[0][:trim,...]
-        #     self.k[0][trim-1,...] *= -1
-        # else:
-        #     trim = self.k[-1].shape[-1]/2 + 1
-        #     self.k[-1] = self.k[-1][...,:trim]
-        #     self.k[-1][...,trim-1] *= -1
         
         names = ['z','y','x'][3-self.ndim:]
         names = swap_indices(names)
         self.k = dict(zip(names, self.k))
 
-        if self.k.has_key('z'):
-            self.k['y'] = self.k['y'][self.offset['kspace']:self.offset['kspace']+self.local_shape['kspace'][0]]
+        # Restrict to local
+        if self.ndim == 2:
+            self.k['x'] = self.k['x'][self.offset['kspace']:self.offset['kspace'] + self.local_shape['kspace'][0]]
         else:
-            self.k['x'] = self.k['x'][self.offset['kspace']:self.offset['kspace']+self.local_shape['kspace'][0]]
-
+            self.k['y'] = self.k['y'][self.offset['kspace']:self.offset['kspace'] + self.local_shape['kspace'][0]]
+            
     def has_mode(self, mode):
         """tests to see if we have a given mode. 
 
