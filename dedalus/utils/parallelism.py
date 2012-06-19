@@ -89,27 +89,26 @@ def load_all(field, snap_dir):
     nproc = len(glob.glob(os.path.join(snap_dir,"data.cpu*")))
 
     data_file = os.path.join(snap_dir, 'data.cpu%04i')
-    fi = h5py.File(data_file % 0)
-    time = fi['/time'].value
-    space = fi['/fields/u/0'].attrs['space']
-    local_size = fi['/fields/u/0'].shape
-    dtype = fi['/fields/u/0'].dtype
-    data = np.empty((nproc,)+local_size, dtype=dtype)
+
+    # prefetch step to get sizes
+    data = []
+    for i in range(nproc):
+        fi = h5py.File(data_file % i)
+        time = fi['/time'].value
+        space = fi['/fields/u/0'].attrs['space']
+        dtype = fi['/fields/u/0'].dtype
+        data.append(np.empty(fi['/fields/u/0'].shape, dtype=dtype))
+        fi.close()
+
     if not field.startswith('/fields/'):
         field = os.path.join('/fields',field)
 
-    fi[field].read_direct(data[0])
-    fi.close()
     for i in range(1,nproc):
         fi = h5py.File(data_file % i)
         fi[field].read_direct(data[i])
         fi.close()
 
-        
-    if space == 'xspace':
-        concat_ax = 2
-    else:
-        concat_ax = 0
+    concat_ax = 0
 
     print "loaded %s at time = %f" % (field, time)
     return np.concatenate(data,axis=concat_ax), space
