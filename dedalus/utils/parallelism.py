@@ -166,8 +166,11 @@ def swap_indices(arr):
     return arr
 
 def pickle(data,name):
+    """quickly dump data to a file with name, 1 proc for each file.
+
+    """
     import cPickle
-    filen = "%s_proc%05i" % (name, com_sys.myproc)
+    filen = "%s_proc%05i.dat" % (name, com_sys.myproc)
     outf = open(filen,'w')
     cPickle.dump(data,outf)
     outf.close()
