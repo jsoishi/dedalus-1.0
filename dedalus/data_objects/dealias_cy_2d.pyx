@@ -1,11 +1,13 @@
 import numpy as np
 cimport numpy as np
 cimport cython
+
 DTYPE1 = np.complex128
 ctypedef np.complex128_t DTYPE1_t
 
 DTYPE2 = np.float64
 ctypedef np.float64_t DTYPE2_t
+
 @cython.boundscheck(False)
 def dealias_23(np.ndarray[DTYPE1_t, ndim=2] data not None,
                np.ndarray[DTYPE2_t, ndim=2] kx not None,
@@ -17,20 +19,20 @@ def dealias_23(np.ndarray[DTYPE1_t, ndim=2] data not None,
     assert kx.dtype == DTYPE2
     assert ky.dtype == DTYPE2
     
-    cdef int xmax = data.shape[1]
-    cdef int ymax = data.shape[0]
+    cdef int xmax = data.shape[0]
+    cdef int ymax = data.shape[1]
     cdef int x, y
     
-    if kx.shape[0] == 1:
+    if ky.shape[0] == 1:
         for y in range(ymax):
             for x in range(xmax):
                 if ((kx[x, 0] >= 2 / 3. * knyquist[0]) or (kx[x, 0] <= -2 / 3. * knyquist[0])) or \
                    ((ky[0, y] >= 2 / 3. * knyquist[1]) or (ky[0, y] <= -2 / 3. * knyquist[1])):
-                    data[y, x] = 0.
+                    data[x, y] = 0.
 
     else:
         for y in range(ymax):
             for x in range(xmax):
-                if ((kx[x, y] >= 2 / 3. * knyquist[0]) or (kx[x, y] <= -2 / 3. * knyquist[0])) or \
-                   ((ky[0, y] >= 2 / 3. * knyquist[1]) or (ky[0, y] <= -2 / 3. * knyquist[1])):
-                    data[y, x] = 0.
+                if ((kx[x, 0] >= 2 / 3. * knyquist[0]) or (kx[x, 0] <= -2 / 3. * knyquist[0])) or \
+                   ((ky[x, y] >= 2 / 3. * knyquist[1]) or (ky[x, y] <= -2 / 3. * knyquist[1])):
+                    data[x, y] = 0.
