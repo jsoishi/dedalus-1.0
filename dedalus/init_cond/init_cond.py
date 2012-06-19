@@ -24,7 +24,7 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from dedalus.utils.parallelism import com_sys
+from dedalus.utils.parallelism import com_sys, pickle
 from dedalus.utils.logger import mylog
 from dedalus.funcs import insert_ipython
 import numpy as na
@@ -395,8 +395,9 @@ def MIT_vortices(data):
 
     """
     
-    sh = data['u']['x']['kspace'].shape
-    x, y = na.meshgrid(na.r_[0:sh[0]]*2*na.pi/sh[0],na.r_[0:sh[1]]*2*na.pi/sh[1])
+    sh = data['u']['x']['xspace'].shape
+    offset = data['u']['x'].offset['xspace']
+    x, y = na.meshgrid(na.r_[0:sh[1]]*2*na.pi/sh[1],na.r_[offset:sh[0]+offset]*2*na.pi/sh[0])
     aux = data.clone()
     aux.add_field('w','ScalarField')
     aux.add_field('psi','ScalarField')
