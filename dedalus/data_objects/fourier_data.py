@@ -159,7 +159,7 @@ class FourierRepresentation(Representation):
         self._curr_space = space
 
     def _setup_k(self):
-        """ Create local wavenumber arrays."""
+        """Create local wavenumber arrays."""
     
         # Get Nyquist wavenumbers
         self.kny = na.pi * self.global_xshape / self.length
@@ -192,7 +192,6 @@ class FourierRepresentation(Representation):
         else:
             self.k['y'] = self.k['y'][self.offset['kspace']:self.offset['kspace'] + self.local_shape['kspace'][0]]
 
-            
     def has_mode(self, mode):
         """tests to see if we have a given mode. 
 
@@ -325,13 +324,15 @@ class FourierRepresentation(Representation):
                      (na.abs(self.k['y']) >= 2 / 3. * self.kny[0]) |
                      (na.abs(self.k['z']) >= 2 / 3. * self.kny[1]))
 
-        self['kspace'] # Dummy call to ensure in kspace
+        if self._curr_space == 'xspace': 
+            self.forward()
         self.data[dmask] = 0.
         
     def dealias_23_cython(self):
         """Orszag 2/3 dealiasing rule implemented in cython."""
         
-        self['kspace'] # Dummy call to ensure in kspace
+        if self._curr_space == 'xspace': 
+            self.forward()
         
         if self.ndim == 2:
             self._cython_dealias_function(self.data, self.k['x'], self.k['y'], self.kny)
@@ -344,34 +345,42 @@ class FourierRepresentation(Representation):
         # Zeroing mask   
         dmask = (na.sqrt(self.k2()) >= 2 / 3. * na.min(self.kny))
 
-        self['kspace'] # Dummy call to ensure in kspace
+        if self._curr_space == 'xspace': 
+            self.forward()
         self.data[dmask] = 0.
         
-    def deriv(self,dim):
-        """take a derivative along dim"""
-        if self._curr_space == 'xspace':
+    def deriv(self, dim):
+        """Calculate derivative along specified dimension."""
+        
+        if self._curr_space == 'xspace': 
             self.forward()
-        der = self.data * 1j*self.k[dim]
+        der = self.data * 1j * self.k[dim]
+        
         return der
 
     def k2(self, no_zero=False):
-        """returns k**2. if no_zero is set, will set the mean mode to
-        1. useful for division when the mean is not important.
         """
+        Calculate wavenumber magnitudes squared.  If keyword 'no_zero' is True, 
+        set the mean mode amplitude to 1 (useful for division).
+        
+        """
+        
         k2 = na.zeros(self.local_shape['kspace'])
         for k in self.k.values():
             k2 += k**2
         if no_zero:
             k2[k2 == 0] = 1.
+            
         return k2
         
     def zero_nyquist(self):
         """Zero out the Nyquist space in each dimension."""
         
-        self['kspace'] # Dummy call to ensure in kspace
-        nyspace = [slice(None)] * self.ndim 
-        
+        if self._curr_space == 'xspace': 
+            self.forward()
+            
         # Pick out Nyquist space for each dimension and set to zero
+        nyspace = [slice(None)] * self.ndim 
         for i in xrange(self.ndim):
             nyspace[i] = self.local_shape['kspace'][i] / 2
             self.data[nyspace] = 0.
@@ -380,7 +389,8 @@ class FourierRepresentation(Representation):
     def zero_under_eps(self):
         """Zero out any modes with coefficients smaller than machine epsilon."""
         
-        self['kspace']  # Dummy call to ensure in kspace
+        if self._curr_space == 'xspace': 
+            self.forward()
         self.data[na.abs(self.data) < self.__eps] = 0.
 
     def save(self, dataset):
