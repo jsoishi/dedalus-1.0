@@ -307,7 +307,7 @@ class FourierRepresentation(Representation):
             self._cython_dealias_function = dealias_23
             self.dealias = self.dealias_23_cython
         elif dealiasing == '2/3 spherical':
-            self.dealias = self.dealias_spherical_23
+            self.dealias = self.dealias_23_spherical
         elif dealiasing == 'None':
             self.dealias = self.zero_nyquist
         else:
@@ -325,21 +325,18 @@ class FourierRepresentation(Representation):
                      (na.abs(self.k['y']) >= 2 / 3. * self.kny[0]) |
                      (na.abs(self.k['z']) >= 2 / 3. * self.kny[1]))
 
-        self['kspace'] # Dummy call to switch spaces
+        self['kspace'] # Dummy call to ensure in kspace
         self.data[dmask] = 0.
         
     def dealias_23_cython(self):
         """Orszag 2/3 dealiasing rule implemented in cython."""
         
+        self['kspace'] # Dummy call to ensure in kspace
+        
         if self.ndim == 2:
             self._cython_dealias_function(self.data, self.k['x'], self.k['y'], self.kny)
         else:
             self._cython_dealias_function(self.data, self.k['x'], self.k['y'], self.k['z'], self.kny)
-
-    def dealias_wrap(self):
-        """Test function for dealias speed testing."""
-        
-        self.dealias_func(self.data, self.k['x'], self.k['y'], self.kny)
 
     def dealias_23_spherical(self):
         """Spherical 2/3 dealiasing rule."""
@@ -347,7 +344,7 @@ class FourierRepresentation(Representation):
         # Zeroing mask   
         dmask = (na.sqrt(self.k2()) >= 2 / 3. * na.min(self.kny))
 
-        self['kspace'] # Dummy call to switch spaces
+        self['kspace'] # Dummy call to ensure in kspace
         self.data[dmask] = 0.
         
     def deriv(self,dim):
@@ -371,12 +368,12 @@ class FourierRepresentation(Representation):
     def zero_nyquist(self):
         """Zero out the Nyquist space in each dimension."""
         
-        self['kspace']  # Dummy call to ensure in kspace
+        self['kspace'] # Dummy call to ensure in kspace
         nyspace = [slice(None)] * self.ndim 
         
         # Pick out Nyquist space for each dimension and set to zero
         for i in xrange(self.ndim):
-            nyspace[i] = self.shape[i] / 2
+            nyspace[i] = self.local_shape['kspace'][i] / 2
             self.data[nyspace] = 0.
             nyspace[i] = slice(None)
 
