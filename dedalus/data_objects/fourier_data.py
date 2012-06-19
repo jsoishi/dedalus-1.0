@@ -78,6 +78,8 @@ class FourierRepresentation(Representation):
         self.sd = sd
         self.global_xshape = na.array(shape)
         self.ndim = len(self.global_xshape)
+        if self.ndim not in (2, 3):
+            raise ValueError("Must use either 2 or 3 dimensions.")
         self.length = na.asfarray(length)
         self.dtype = 'complex128'
         method = decfg.get('FFT', 'method')
@@ -291,32 +293,37 @@ class FourierRepresentation(Representation):
         self._curr_space = 'xspace'
 
     def set_dealiasing(self, dealiasing):
+        """Assign dealiasing method."""
+    
         mylog.debug("Setting dealiasing method to %s" % dealiasing)
+        
         if dealiasing == '2/3':
             self.dealias = self.dealias_23
         elif dealiasing == '2/3 cython':
             if self.ndim == 2:
                 from dealias_cy_2d import dealias_23
-            elif self.ndim == 3:
+            else:
                 from dealias_cy_3d import dealias_23 
             self._cython_dealias_function = dealias_23
             self.dealias = self.dealias_23_cython
         elif dealiasing == '2/3 spherical':
             self.dealias = self.dealias_spherical_23
         elif dealiasing == 'None':
-            self.dealias = lambda : None
-        else:
             self.dealias = self.zero_nyquist
+        else:
+            raise NotImplementedError("Specified dealiasing method not implemented.")
 
     def dealias_23(self):
-        """Orszag 2/3 dealiasing rule"""
+        """Orszag 2/3 dealiasing rule."""
         
         # Zeroing mask   
-        dmask = ((na.abs(self.k['x']) >= 2/3. * self.kny[-1]) | 
-                 (na.abs(self.k['y']) >= 2/3. * self.kny[-2]))
-
-        if self.ndim == 3:
-            dmask = dmask | (na.abs(self.k['z']) >= 2/3. * self.kny[-3])
+        if self.ndim ==2:
+            dmask = ((na.abs(self.k['x']) >= 2 / 3. * self.kny[0]) | 
+                     (na.abs(self.k['y']) >= 2 / 3. * self.kny[1]))
+        else:
+            dmask = ((na.abs(self.k['x']) >= 2 / 3. * self.kny[2]) | 
+                     (na.abs(self.k['y']) >= 2 / 3. * self.kny[0]) |
+                     (na.abs(self.k['z']) >= 2 / 3. * self.kny[1]))
 
         self['kspace'] # Dummy call to switch spaces
         self.data[dmask] = 0.
@@ -326,11 +333,11 @@ class FourierRepresentation(Representation):
         
         if self.ndim == 2:
             self._cython_dealias_function(self.data, self.k['x'], self.k['y'], self.kny)
-        elif self.ndim == 3:
+        else:
             self._cython_dealias_function(self.data, self.k['x'], self.k['y'], self.k['z'], self.kny)
 
     def dealias_wrap(self):
-        """Test function for dealias speed testing"""
+        """Test function for dealias speed testing."""
         
         self.dealias_func(self.data, self.k['x'], self.k['y'], self.kny)
 
@@ -338,7 +345,7 @@ class FourierRepresentation(Representation):
         """Spherical 2/3 dealiasing rule."""
         
         # Zeroing mask   
-        dmask = na.sqrt(self.k2()) >= 2/3. * na.min(self.kny)
+        dmask = (na.sqrt(self.k2()) >= 2 / 3. * na.min(self.kny))
 
         self['kspace'] # Dummy call to switch spaces
         self.data[dmask] = 0.
