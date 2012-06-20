@@ -108,16 +108,23 @@ class FourierRepresentation(Representation):
                 strides = ((self.global_xshape[-1] + 2) * self.kdata.strides[-1] / 2, 
                            self.kdata.strides[-1] / 2)
             else:
-                strides = (self.global_xspace[-2] * (self.global_xshape[-1] + 2) * self.kdata.strides[-1] / 2,
+                strides = (self.global_xshape[-2] * (self.global_xshape[-1] + 2) * self.kdata.strides[-1] / 2,
                            (self.global_xshape[-1] + 2) * self.kdata.strides[-1] / 2,
-                           self.kdata.strides[-1] / 2)
-
+                           self.kdata.strides[-1] / 2)          
+            
             self.local_shape = {'kspace': self._global_shape['kspace'].copy(),
                                 'xspace': self._global_shape['xspace'].copy()}
             self.local_shape['kspace'][0] = local_n1
             self.local_shape['xspace'][0] = local_n0
             self.offset = {'xspace': local_n0_start,
                            'kspace': local_n1_start}
+
+                        
+            print 'buffer size:', len(self.kdata.data)
+            print 'global shape:', self._global_shape
+            print 'local shape:', self.local_shape
+            print 'kdata stride:', self.kdata.strides
+            print 'xdata stride:', strides
 
             self.xdata = na.ndarray(buffer=self.kdata.data,shape=self.local_shape['xspace'],
                                     strides=strides,dtype='float64')
