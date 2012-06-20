@@ -228,6 +228,47 @@ class FourierRepresentation(Representation):
 
         return False
 
+    def find_mode(self, mode):
+        """
+        Test if object has a given mode, return index for closest mode if so.
+
+        Parameters
+        ----------
+        mode : tuple of ints or floats
+            Tuple of wavenumber for which to search.  Recall kspace ordering
+            (ky, kz, kx) for 3D, (kx, ky) for 2D.
+
+        Returns
+        -------
+        index : tuple of ints, or bool
+            Tuple of indexes to the closest mode, k, if input mode is present
+            in (k <= mode < k + dk) in all dimensions. False otherwise.
+
+        """
+
+        if self.ndim == 2:
+            names = ['x', 'y']
+            has = [False, False]
+            index = [None, None]
+        else:
+            names = ['y', 'z', 'x']
+            present = {}
+
+        for i,name in enumerate(names):
+            ki = self.k[name]
+            for j,s in enumerate(ki.shape)
+                if s != 1:
+                    under = (ki
+                    jind = np.where()
+                    dk = self.k[name]
+        
+        np.prod(present.items())
+
+        if all(has):
+            return index
+        else:
+            return False
+
     def get_local_mode(self, mode):
         """return the local mode index for a given global mode.
         
@@ -373,7 +414,7 @@ class FourierRepresentation(Representation):
         
         k2 = na.zeros(self.local_shape['kspace'])
         for k in self.k.values():
-            k2 += k**2
+            k2 += k ** 2
         if no_zero:
             k2[k2 == 0] = 1.
             
