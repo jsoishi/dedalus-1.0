@@ -32,7 +32,7 @@ import numpy as na
 import os
 from functools import wraps
 from dedalus.utils.parallelism import com_sys
-
+from dedalus.utils.logger import mylog
 class AnalysisSet(object):
 
     # Dictionary of registered tasks
@@ -69,7 +69,6 @@ def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', save
     Take a snapshot of all fields defined. Currently takes z[0] slice for 3D.
     
     """
-    
     # Determine image grid size
     nrow = len(data.fields.keys())
     ncol = na.max([f.ncomp for f in data.fields.values()])
@@ -126,15 +125,16 @@ def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', save
     # Time label     
     tstr = 't = %5.2f' % data.time
     grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
-    
-    if not os.path.exists('frames') and com_sys.myproc == 0:
-        os.mkdir('frames')
-    if space == 'kspace':
-        outfile = "frames/k_" + saveas + "_%07i.png" % it
-    else:
-        outfile = "frames/" + saveas + "_%07i.png" % it
-    fig.savefig(outfile)
-    fig.clf()
+
+    if com_sys.myproc == 0:
+        if not os.path.exists('frames'):
+            os.mkdir('frames')
+        if space == 'kspace':
+            outfile = "frames/k_" + saveas + "_%07i.png" % it
+        else:
+            outfile = "frames/" + saveas + "_%07i.png" % it
+        fig.savefig(outfile)
+        fig.clf()
 
 @AnalysisSet.register_task
 def print_energy(data, it):
