@@ -85,7 +85,7 @@ def create_data(np.ndarray[DTYPEi_t, ndim=1] shape not None, com_sys):
     inputs
     ------
 
-    shape -- numpy array of int64 giving the *global* logical shape in grid points. 
+    shape -- numpy array of int64 giving the *global* logical shape in x-space grid points. 
 
     """
     np.import_array()
@@ -95,50 +95,49 @@ def create_data(np.ndarray[DTYPEi_t, ndim=1] shape not None, com_sys):
 
     cdef complex *data
     cdef size_t n, local_x0, local_x0_start, local_k1, local_k1_start
-    cdef np.ndarray[DTYPEi_t, ndim=1] modshape = shape.copy()
     cdef MPI.Comm comm = com_sys.comm
     cdef MPI_Comm c_comm = comm.ob_mpi
-    modshape[-1] = modshape[-1]/2 + 1
+    cdef np.ndarray[DTYPEi_t, ndim=1] kshape = shape.copy()
+    kshape[-1] = kshape[-1]/2 + 1 # create global k shape (not transposed)
 
     if shape.size == 2:
-        n = fftw.fftw_mpi_local_size_2d_transposed(<size_t> modshape[0],
-                                                   <size_t> modshape[1],
+        n = fftw.fftw_mpi_local_size_2d_transposed(<size_t> kshape[0],
+                                                   <size_t> kshape[1],
                                                    c_comm,
                                                    &local_x0, &local_x0_start,
                                                    &local_k1, &local_k1_start)
     elif shape.size == 3:
-        n = fftw.fftw_mpi_local_size_3d_transposed(<size_t> modshape[0],
-                                                   <size_t> modshape[1],
-                                                   <size_t> modshape[2],
+        n = fftw.fftw_mpi_local_size_3d_transposed(<size_t> kshape[0],
+                                                   <size_t> kshape[1],
+                                                   <size_t> kshape[2],
                                                    c_comm,
                                                    &local_x0, &local_x0_start,
                                                    &local_k1, &local_k1_start)
     else:
         raise ValueError("Data must be > 1 dimensional for MPI.")
-    modshape[1] = modshape[0]
-    modshape[0] = local_k1
+
+    # now local k shape, properly transposed
+    kshape[1] = kshape[0]
+    kshape[0] = local_k1
 
     data = fftw.fftw_alloc_complex(n)
     cdef int i
     for i in range(n):
         data[i] = 0j
-    #print "proc %i: allocated %i complex numbers" % (com_sys.myproc, n)
-    rank = len(modshape)
+    rank = len(kshape)
 
     # this is necessary to pass the strides without them being garbage
     # collected, though why is not clear...
-    cdef np.ndarray[DTYPEi_t, ndim=1] np_strides = np.array((1,)+tuple(modshape[1:][::-1])).cumprod()[::-1]
+    cdef np.ndarray[DTYPEi_t, ndim=1] np_strides = np.array((1,)+tuple(kshape[1:][::-1])).cumprod()[::-1]
     np_strides *= 16
-    cdef size_t *strides
+    cdef size_t *stridesp
     strides = <size_t *> libc.stdlib.malloc(sizeof(size_t) * rank)
     for i in range(rank):
         strides[i] = np_strides[i]
 
-    array = PyArray_NewFromDescr(np.ndarray, dtype, rank, <np.npy_intp *> modshape.data, <np.npy_intp *> strides, <void *> data, np.NPY_DEFAULT, None)
-    #array = np.PyArray_SimpleNewFromData(rank, <np.npy_intp *> modshape.data, np.NPY_COMPLEX128, <void *> data)
+    array = PyArray_NewFromDescr(np.ndarray, dtype, rank, <np.npy_intp *> kshape.data, <np.npy_intp *> strides, <void *> data, np.NPY_DEFAULT, None)
     np.set_array_base(array, MemoryReleaserFactory(data))
     libc.stdlib.free(strides)
-    #array[:] = 0j
 
     return array, local_x0, local_x0_start, local_k1, local_k1_start
 
