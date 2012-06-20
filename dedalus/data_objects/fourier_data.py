@@ -249,39 +249,45 @@ class FourierRepresentation(Representation):
         return None
 
     def set_fft(self, method):
-        mylog.debug("Setting FFT method to %s" % method)
+        """Assign fft method."""
+        
+        mylog.debug("Setting FFT method to %s." % method)
+        
         if method == 'fftw':
             self.fplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_xshape, direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
             self.rplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_xshape, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
             self.fft = self.fwd_fftw
             self.ifft = self.rev_fftw
         elif method == 'numpy':
+            if com_sys.nproc > 1:
+                raise NotImplementedError("Numpy fft not implemented in parallel.")
             self.fft = self.fwd_np
             self.ifft = self.rev_np
         else:
             raise NotImplementedError("Only FFTW and numpy supported for real transforms.")
+            
     #@timer
     def fwd_fftw(self):
         self.fplan()
         self.kdata /= self.global_xshape.prod()
+        
     #@timer
     def rev_fftw(self):
         self.rplan()
 
     def fwd_np(self):
-        self.kdata = fpack.rfftn(self.xdata / self.xdata.size)
+        self.kdata = fpack.rfftn(self.xdata / self.global_xshape.prod())
 
     def rev_np(self):
-        self.xdata = fpack.irfftn(self.kdata) * self.xdata.size
+        self.xdata = fpack.irfftn(self.kdata) * self.global_xshape.prod()
 
     def forward(self):
         """FFT method to go from xspace to kspace."""
         
         self.fft()
-        self._curr_space = 'kspace'
         self.data = self.kdata
+        self._curr_space = 'kspace'
         self.dealias()
-        #self.zero_under_eps()
 
     def backward(self):
         """IFFT method to go from kspace to xspace."""
@@ -294,7 +300,7 @@ class FourierRepresentation(Representation):
     def set_dealiasing(self, dealiasing):
         """Assign dealiasing method."""
     
-        mylog.debug("Setting dealiasing method to %s" % dealiasing)
+        mylog.debug("Setting dealiasing method to %s." % dealiasing)
         
         if dealiasing == '2/3':
             self.dealias = self.dealias_23
@@ -394,13 +400,15 @@ class FourierRepresentation(Representation):
         self.data[na.abs(self.data) < self.__eps] = 0.
 
     def save(self, dataset):
-        """save data to HDF5 dataset
+        """
+        Save data to HDF5 dataset.
 
-        inputs 
-        ------
-        dataset -- an h5py dataset opbject
+        Parameters
+        ----------
+        dataset : h5py dataset object
 
         """
+        
         dataset[:] = self.data
         dataset.attrs['space'] = self._curr_space
 
