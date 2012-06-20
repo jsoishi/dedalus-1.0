@@ -26,12 +26,9 @@ import os
 
 decfgDefaults = {}
 
-if os.path.exists(os.path.expanduser("~/.dedalus/config")):
-    decfg = ConfigParser.ConfigParser(decfgDefaults)
-    decfg.read(['dedalus.cfg', os.path.expanduser('~/.dedalus/config')])
-else:
-    decfg = ConfigParser.ConfigParser(decfgDefaults)
-    decfg.read(['dedalus.cfg'])
+decfg = ConfigParser.ConfigParser(decfgDefaults)
+decfg.read([os.path.expanduser('~/.dedalus/config'), 'dedalus.cfg'])
+
 if not decfg.has_section("dedalus"):
     decfg.add_section("dedalus")
 
