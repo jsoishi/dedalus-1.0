@@ -105,9 +105,13 @@ class FourierRepresentation(Representation):
         if method == 'fftw':
             self.kdata, local_n0, local_n0_start, local_n1, local_n1_start = fftw.create_data(self.global_xshape, com_sys)
             if self.kdata.ndim == 2:
-                strides = (self.kdata.strides[0]/2, self.kdata.strides[-1]/2)
+                strides = ((self.global_xshape[-1] + 2) * self.kdata.strides[-1] / 2, 
+                           self.kdata.strides[-1] / 2)
             else:
-                strides = self.kdata.strides[:-1] + (self.kdata.strides[-1]/2,)
+                strides = (self.global_xspace[-2] * (self.global_xshape[-1] + 2) * self.kdata.strides[-1] / 2,
+                           (self.global_xshape[-1] + 2) * self.kdata.strides[-1] / 2,
+                           self.kdata.strides[-1] / 2)
+
             self.local_shape = {'kspace': self._global_shape['kspace'].copy(),
                                 'xspace': self._global_shape['xspace'].copy()}
             self.local_shape['kspace'][0] = local_n1
@@ -228,46 +232,61 @@ class FourierRepresentation(Representation):
 
         return False
 
-    def find_mode(self, mode):
-        """
-        Test if object has a given mode, return index for closest mode if so.
-
-        Parameters
-        ----------
-        mode : tuple of ints or floats
-            Tuple of wavenumber for which to search.  Recall kspace ordering
-            (ky, kz, kx) for 3D, (kx, ky) for 2D.
-
-        Returns
-        -------
-        index : tuple of ints, or bool
-            Tuple of indexes to the closest mode, k, if input mode is present
-            in (k <= mode < k + dk) in all dimensions. False otherwise.
-
-        """
-
-        if self.ndim == 2:
-            names = ['x', 'y']
-            has = [False, False]
-            index = [None, None]
-        else:
-            names = ['y', 'z', 'x']
-            present = {}
-
-        for i,name in enumerate(names):
-            ki = self.k[name]
-            for j,s in enumerate(ki.shape)
-                if s != 1:
-                    under = (ki
-                    jind = np.where()
-                    dk = self.k[name]
-        
-        np.prod(present.items())
-
-        if all(has):
-            return index
-        else:
-            return False
+#     def find_mode(self, mode):
+#         """
+#         Test if object has a given mode, return index for closest mode if so.
+# 
+#         Parameters
+#         ----------
+#         mode : tuple of ints or floats
+#             Tuple of wavenumber for which to search.  Recall kspace ordering
+#             (ky, kz, kx) for 3D, (kx, ky) for 2D.
+# 
+#         Returns
+#         -------
+#         index : tuple of ints, or bool
+#             Tuple of indexes to the closest mode, k, if input mode is present
+#             in (k <= mode < k + dk) in all dimensions. False otherwise.
+# 
+#         """
+# 
+#         names = ['z','y','x'][3-self.ndim:]
+#         names = swap_indices(names)
+#         mask = True
+#         
+#         for i,name in enumerate(names):
+#             ki = self.k[name]
+#             imask = {}
+#             for j,size in enumerate(ki.shape):
+#                 if size == 1:
+#                     imask[j] = True
+#                 else:
+#                     dk = na.diff(ki, axis=j).flatten()[0]
+#                     jmask = na.where((ki - mode[i] >= 0) & (ki - mode[i] < dk))
+#                     jmask = set(zip(jmask[0], jmask[1]))
+#                     
+#                     
+#                     
+#                     if imask is True:
+#                         imask = jmask
+#                     else:
+#                         imask = imask.intersection(jmask)
+#                     
+#                     print 'i,j,dk = ',i,j,dk
+#             
+#             print imask
+#         
+#             if mask is True:
+#                 mask = imask
+#             else:
+#                 mask = mask.intersection(imask)
+#         
+#         return mask
+# 
+#         if all(has):
+#             return index
+#         else:
+#             return False
 
     def get_local_mode(self, mode):
         """return the local mode index for a given global mode.
@@ -355,6 +374,7 @@ class FourierRepresentation(Representation):
         elif dealiasing == '2/3 spherical':
             self.dealias = self.dealias_23_spherical
         elif dealiasing == 'None':
+            print 'NONE DEALIASING'
             self.dealias = self.zero_nyquist
         else:
             raise NotImplementedError("Specified dealiasing method not implemented.")
