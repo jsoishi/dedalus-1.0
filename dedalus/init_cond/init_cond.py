@@ -308,10 +308,14 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
     elif data.ndim == 3:
         ampl = na.sqrt(sp/(4*na.pi))/kk
 
-    theta1 = 2*na.pi*na.random.random(data['u'][0]['kspace'].shape)
-    theta2 = 2*na.pi*na.random.random(data['u'][0]['kspace'].shape)
-    phi    = 2*na.pi*na.random.random(data['u'][0]['kspace'].shape)
-    alpha = ampl * na.exp(1j*theta1)
+    theta1 = na.fft.rfftn(na.random.random(data['u'][0]['xspace'].transpose().shape)).transpose()
+    theta1 /= na.abs(theta1)
+    theta2 = na.fft.rfftn(na.random.random(data['u'][0]['xspace'].transpose().shape)).transpose()
+    theta2 /= na.abs(theta2)
+    phi    = na.fft.rfftn(na.random.random(data['u'][0]['xspace'].transpose().shape)).transpose()
+    phi    /= na.abs(phi)
+    phi = na.arctan2(phi.imag, phi.real)
+    alpha = ampl * theta1
 
     if data.ndim == 2:
         data['u']['x']['kspace'] = alpha * ky/kk
@@ -320,25 +324,11 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
         kz = data['u']['x'].k['z']
         k2 = na.sqrt(data['u']['x']**2 + data['u']['y']**2)
         alpha *= na.cos(phi)
-        beta = ampl * na.exp(1j*theta2) * na.sin(phi)
+        beta = ampl * theta2 * na.sin(phi)
 
         data['u']['x']['kspace'] = (alpha * kk * ky + beta * kx * kz)/(kk * k2)
         data['u']['y']['kspace'] = (beta * ky * kz - alpha * kk*kx)/(kk * k2)
         data['u']['z']['kspace'] = (beta * k2)/kk
-
-    # fix hermitian
-    # shape =data['u']['x']['kspace'].shape
-#     nh = shape[1]/2 + 1
-#     uxd = data['u']['x'].data
-#     uyd = data['u']['y'].data
-#     if shape[1] % 2 == 0:
-#         start = nh - 2
-#         uxd[0,nh-1] = 0.
-#         uyd[0,nh-1] = 0.
-#     else:
-#         start = nh - 1
-#     uxd[0,nh:] = uxd[0,start:0:-1].conj()
-#     uyd[0,nh:] = uyd[0,start:0:-1].conj()
 
 def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     """generate noise with a random phase and a spectrum given by
