@@ -122,7 +122,8 @@ class FourierRepresentation(Representation):
             self.xdata = na.zeros(self.global_shape['xspace'])
             self.local_shape = {'kspace': self.global_shape['kspace'].copy(),
                                 'xspace': self.global_shape['xspace'].copy()}
-            self.n0_offset = 0
+            self.offset = {'xspace': 0,
+                           'kspace': 0}
 
     def __getitem__(self,space):
         """returns data in either xspace or kspace, transforming as necessary.
@@ -334,10 +335,18 @@ class FourierRepresentation(Representation):
         self.rplan()
 
     def fwd_np(self):
-        self.kdata = fpack.rfftn(self.xdata / self.global_shape['xspace'].prod())
+        if self.ndim == 2:
+            tr = (1, 0)
+        else:
+            tr = (1, 0, 2)
+        self.kdata = na.transpose(fpack.rfftn(self.xdata / self.global_shape['xspace'].prod()), tr)
 
     def rev_np(self):
-        self.xdata = fpack.irfftn(self.kdata) * self.global_shape['xspace'].prod()
+        if self.ndim == 2:
+            tr = (1, 0)
+        else:
+            tr = (1, 0, 2)
+        self.xdata = fpack.irfftn(na.transpose(self.kdata, tr)) * self.global_shape['xspace'].prod()
 
     def forward(self):
         """FFT method to go from xspace to kspace."""
