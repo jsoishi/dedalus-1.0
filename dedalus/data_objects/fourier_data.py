@@ -335,17 +335,11 @@ class FourierRepresentation(Representation):
         self.rplan()
 
     def fwd_np(self):
-        if self.ndim == 2:
-            tr = (1, 0)
-        else:
-            tr = (1, 0, 2)
+        tr = [1, 0, 2][:self.ndim]
         self.kdata = na.transpose(fpack.rfftn(self.xdata / self.global_shape['xspace'].prod()), tr)
 
     def rev_np(self):
-        if self.ndim == 2:
-            tr = (1, 0)
-        else:
-            tr = (1, 0, 2)
+        tr = [1, 0, 2][:self.ndim]
         self.xdata = fpack.irfftn(na.transpose(self.kdata, tr)) * self.global_shape['xspace'].prod()
 
     def forward(self):
