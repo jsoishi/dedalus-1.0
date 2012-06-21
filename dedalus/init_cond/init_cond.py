@@ -308,11 +308,14 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
     elif data.ndim == 3:
         ampl = na.sqrt(sp/(4*na.pi))/kk
 
-    theta1 = na.fft.rfftn(na.random.random(data['u'][0]['xspace'].transpose().shape)).transpose()
+    data['u']['x']['xspace'] = na.random.random(data['u'][0]['xspace'].shape)
+    theta1 = data['u']['x']['kspace'].copy()
     theta1 /= na.abs(theta1)
-    theta2 = na.fft.rfftn(na.random.random(data['u'][0]['xspace'].transpose().shape)).transpose()
+    data['u']['x']['xspace'] = na.random.random(data['u'][0]['xspace'].shape)
+    theta2 = data['u']['x']['kspace'].copy()
     theta2 /= na.abs(theta2)
-    phi    = na.fft.rfftn(na.random.random(data['u'][0]['xspace'].transpose().shape)).transpose()
+    data['u']['x']['xspace'] = na.random.random(data['u'][0]['xspace'].shape)
+    phi    = data['u']['x']['kspace'].copy()
     phi    /= na.abs(phi)
     phi = na.arctan2(phi.imag, phi.real)
     alpha = ampl * theta1
