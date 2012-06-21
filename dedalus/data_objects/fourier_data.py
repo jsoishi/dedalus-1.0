@@ -117,13 +117,16 @@ class FourierRepresentation(Representation):
             mylog.debug('local xshape: %s'% self.local_shape['xspace'])
             mylog.debug('local kshape: %s'% self.local_shape['kspace'])
 
-        else:
+        elif method == 'numpy':
             self.kdata = na.zeros(self.global_shape['kspace'], dtype=self.dtype)
             self.xdata = na.zeros(self.global_shape['xspace'])
             self.local_shape = {'kspace': self.global_shape['kspace'].copy(),
                                 'xspace': self.global_shape['xspace'].copy()}
             self.offset = {'xspace': 0,
                            'kspace': 0}
+        
+        else:
+            raise NotImplementedError("Specified FFT method not implemented.")
 
     def __getitem__(self,space):
         """returns data in either xspace or kspace, transforming as necessary.
@@ -323,7 +326,7 @@ class FourierRepresentation(Representation):
             self.fft = self.fwd_np
             self.ifft = self.rev_np
         else:
-            raise NotImplementedError("Only FFTW and numpy supported for real transforms.")
+            raise NotImplementedError("Specified FFT method not implemented.")
             
     #@timer
     def fwd_fftw(self):
