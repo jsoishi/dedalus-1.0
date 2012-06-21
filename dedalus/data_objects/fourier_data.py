@@ -76,8 +76,8 @@ class FourierRepresentation(Representation):
             
         """
         self.sd = sd
-        self.global_xshape = na.array(shape)
-        self.ndim = len(self.global_xshape)
+        self.global_shape = {'xspace': na.array(shape)}
+        self.ndim = len(self.global_shape['xspace'])
         if self.ndim not in (2, 3):
             raise ValueError("Must use either 2 or 3 dimensions.")
         self.length = na.asfarray(length)
@@ -97,15 +97,14 @@ class FourierRepresentation(Representation):
 
     @timer
     def _allocate_memory(self, method):
-        self._global_shape = {'kspace': self.global_xshape.copy(),
-                       'xspace': self.global_xshape.copy()
-                       }
-        self._global_shape['kspace'][-1]  = self._global_shape['kspace'][-1]/2 + 1
-        self._global_shape['kspace'] = swap_indices(self._global_shape['kspace'])
+        self.global_shape['kspace'] = self.global_shape['xspace'].copy()
+        self.global_shape['kspace'][-1]  = self.global_shape['kspace'][-1] / 2 + 1
+        self.global_shape['kspace'] = swap_indices(self.global_shape['kspace'])
+        
         if method == 'fftw':
-            self.kdata, self.xdata, local_n0, local_n0_start, local_n1, local_n1_start = fftw.create_data(self.global_xshape, com_sys)
-            self.local_shape = {'kspace': self._global_shape['kspace'].copy(),
-                                'xspace': self._global_shape['xspace'].copy()}
+            self.kdata, self.xdata, local_n0, local_n0_start, local_n1, local_n1_start = fftw.create_data(self.global_shape['xspace'], com_sys)
+            self.local_shape = {'kspace': self.global_shape['kspace'].copy(),
+                                'xspace': self.global_shape['xspace'].copy()}
             self.local_shape['kspace'][0] = local_n1
             self.local_shape['xspace'][0] = local_n0
             self.offset = {'xspace': local_n0_start,
@@ -113,15 +112,16 @@ class FourierRepresentation(Representation):
 
             mylog.debug('kbuffer size: %i' % len(self.kdata.data))
             mylog.debug('xbuffer size: %i' % (self.xdata.size*8))
-            mylog.debug('global xshape: %s'% self._global_shape['xspace'])
-            mylog.debug('global kshape: %s'% self._global_shape['kspace'])
+            mylog.debug('global xshape: %s'% self.global_shape['xspace'])
+            mylog.debug('global kshape: %s'% self.global_shape['kspace'])
             mylog.debug('local xshape: %s'% self.local_shape['xspace'])
             mylog.debug('local kshape: %s'% self.local_shape['kspace'])
 
         else:
-            self.kdata = na.zeros(self._global_shape['kspace'], dtype=self.dtype)
-            self.xdata = na.zeros(self._global_shape['xspace'])
-            self.local_shape = self.global_xshape
+            self.kdata = na.zeros(self.global_shape['kspace'], dtype=self.dtype)
+            self.xdata = na.zeros(self.global_shape['xspace'])
+            self.local_shape = {'kspace': self.global_shape['kspace'].copy(),
+                                'xspace': self.global_shape['xspace'].copy()}
             self.n0_offset = 0
 
     def __getitem__(self,space):
@@ -163,7 +163,7 @@ class FourierRepresentation(Representation):
         """Create local wavenumber arrays."""
     
         # Get Nyquist wavenumbers
-        self.kny = na.pi * self.global_xshape / self.length
+        self.kny = na.pi * self.global_shape['xspace'] / self.length
         self.kny = swap_indices(self.kny)
         
         # Setup global wavenumber arrays
@@ -174,10 +174,10 @@ class FourierRepresentation(Representation):
         else:
             real_dim = 2
             
-        for i,S in enumerate(self._global_shape['kspace']):
+        for i,S in enumerate(self.global_shape['kspace']):
             kshape = i * (1,) + (S,) + (self.ndim - i - 1) * (1,)
             if i == real_dim:
-                full_shape = swap_indices(self._global_shape['xspace'])[i]
+                full_shape = swap_indices(self.global_shape['xspace'])[i]
                 ki = fpack.fftfreq(full_shape)[:S] * 2. * self.kny[i]
             else:
                 ki = fpack.fftfreq(S) * 2. * self.kny[i]
@@ -312,8 +312,8 @@ class FourierRepresentation(Representation):
         mylog.debug("Setting FFT method to %s." % method)
         
         if method == 'fftw':
-            self.fplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_xshape, direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
-            self.rplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_xshape, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+            self.fplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'], direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+            self.rplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'], direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
             self.fft = self.fwd_fftw
             self.ifft = self.rev_fftw
         elif method == 'numpy':
@@ -327,17 +327,17 @@ class FourierRepresentation(Representation):
     #@timer
     def fwd_fftw(self):
         self.fplan()
-        self.kdata /= self.global_xshape.prod()
+        self.kdata /= self.global_shape['xspace'].prod()
         
     #@timer
     def rev_fftw(self):
         self.rplan()
 
     def fwd_np(self):
-        self.kdata = fpack.rfftn(self.xdata / self.global_xshape.prod())
+        self.kdata = fpack.rfftn(self.xdata / self.global_shape['xspace'].prod())
 
     def rev_np(self):
-        self.xdata = fpack.irfftn(self.kdata) * self.global_xshape.prod()
+        self.xdata = fpack.irfftn(self.kdata) * self.global_shape['xspace'].prod()
 
     def forward(self):
         """FFT method to go from xspace to kspace."""
