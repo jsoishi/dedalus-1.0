@@ -177,7 +177,8 @@ class FourierRepresentation(Representation):
         for i,S in enumerate(self._global_shape['kspace']):
             kshape = i * (1,) + (S,) + (self.ndim - i - 1) * (1,)
             if i == real_dim:
-                ki = fpack.fftfreq(2 * S - 1)[:S] * 2. * self.kny[i]
+                full_shape = swap_indices(self._global_shape['xspace'])[i]
+                ki = fpack.fftfreq(full_shape)[:S] * 2. * self.kny[i]
             else:
                 ki = fpack.fftfreq(S) * 2. * self.kny[i]
             ki.resize(kshape)
