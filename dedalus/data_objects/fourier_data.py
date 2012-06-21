@@ -440,15 +440,18 @@ class FourierRepresentation(Representation):
     def zero_nyquist(self):
         """Zero out the Nyquist space in each dimension."""
         
+        # Zeroing mask   
+        if self.ndim ==2:
+            dmask = ((na.abs(self.k['x']) == self.kny[0]) | 
+                     (na.abs(self.k['y']) == self.kny[1]))
+        else:
+            dmask = ((na.abs(self.k['x']) == self.kny[2]) | 
+                     (na.abs(self.k['y']) == self.kny[0]) |
+                     (na.abs(self.k['z']) == self.kny[1]))
+
         if self._curr_space == 'xspace': 
             self.forward()
-            
-        # Pick out Nyquist space for each dimension and set to zero
-        nyspace = [slice(None)] * self.ndim 
-        for i in xrange(self.ndim):
-            nyspace[i] = self.local_shape['kspace'][i] / 2
-            self.data[nyspace] = 0.
-            nyspace[i] = slice(None)
+        self.data[dmask] = 0.
 
     def zero_under_eps(self):
         """Zero out any modes with coefficients smaller than machine epsilon."""
