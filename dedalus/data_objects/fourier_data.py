@@ -371,7 +371,6 @@ class FourierRepresentation(Representation):
         elif dealiasing == '2/3 spherical':
             self.dealias = self.dealias_23_spherical
         elif dealiasing == 'None':
-            print 'NONE DEALIASING'
             self.dealias = self.zero_nyquist
         else:
             raise NotImplementedError("Specified dealiasing method not implemented.")
