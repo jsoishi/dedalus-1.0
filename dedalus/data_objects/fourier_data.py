@@ -117,8 +117,6 @@ class FourierRepresentation(Representation):
             mylog.debug('global kshape: %s'% self._global_shape['kspace'])
             mylog.debug('local xshape: %s'% self.local_shape['xspace'])
             mylog.debug('local kshape: %s'% self.local_shape['kspace'])
-            mylog.debug('kdata stride %i, %i:'% self.kdata.strides)
-            mylog.debug('xdata stride:%i, %i'% strides)
 
         else:
             self.kdata = na.zeros(self._global_shape['kspace'], dtype=self.dtype)
