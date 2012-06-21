@@ -103,15 +103,7 @@ class FourierRepresentation(Representation):
         self._global_shape['kspace'][-1]  = self._global_shape['kspace'][-1]/2 + 1
         self._global_shape['kspace'] = swap_indices(self._global_shape['kspace'])
         if method == 'fftw':
-            self.kdata, local_n0, local_n0_start, local_n1, local_n1_start = fftw.create_data(self.global_xshape, com_sys)
-            if self.kdata.ndim == 2:
-                strides = ((self.global_xshape[-1] + 2) * self.kdata.strides[-1] / 2, 
-                           self.kdata.strides[-1] / 2)
-            else:
-                strides = (self.global_xshape[-2] * (self.global_xshape[-1] + 2) * self.kdata.strides[-1] / 2,
-                           (self.global_xshape[-1] + 2) * self.kdata.strides[-1] / 2,
-                           self.kdata.strides[-1] / 2)          
-            
+            self.kdata, self.xdata, local_n0, local_n0_start, local_n1, local_n1_start = fftw.create_data(self.global_xshape, com_sys)
             self.local_shape = {'kspace': self._global_shape['kspace'].copy(),
                                 'xspace': self._global_shape['xspace'].copy()}
             self.local_shape['kspace'][0] = local_n1
@@ -119,15 +111,13 @@ class FourierRepresentation(Representation):
             self.offset = {'xspace': local_n0_start,
                            'kspace': local_n1_start}
 
-                        
-            print 'buffer size:', len(self.kdata.data)
-            print 'global shape:', self._global_shape
-            print 'local shape:', self.local_shape
-            print 'kdata stride:', self.kdata.strides
-            print 'xdata stride:', strides
+            mylog.debug('kbuffer size: %i' % len(self.kdata.data))
+            mylog.debug('xbuffer size: %i' % (self.xdata.size*8))
+            mylog.debug('global xshape: %s'% self._global_shape['xspace'])
+            mylog.debug('global kshape: %s'% self._global_shape['kspace'])
+            mylog.debug('local xshape: %s'% self.local_shape['xspace'])
+            mylog.debug('local kshape: %s'% self.local_shape['kspace'])
 
-            self.xdata = na.ndarray(buffer=self.kdata.data,shape=self.local_shape['xspace'],
-                                    strides=strides,dtype='float64')
         else:
             self.kdata = na.zeros(self._global_shape['kspace'], dtype=self.dtype)
             self.xdata = na.zeros(self._global_shape['xspace'])
