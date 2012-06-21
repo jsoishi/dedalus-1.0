@@ -20,6 +20,7 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+import numpy as na
 
 class CommunicationSystem(object):
     comm = None
@@ -159,11 +160,17 @@ def swap_indices(arr):
     constructing quantities for the FFTW parallel data objects.
     
     """
-    a = arr[1]
-    arr[1] = arr[0]
-    arr[0] = a
+    
+    if type(arr) == na.ndarray:
+        out_arr = arr.copy()
+    elif type(arr) == list:
+        out_arr = arr
 
-    return arr
+    a = out_arr[1]
+    out_arr[1] = out_arr[0]
+    out_arr[0] = a
+
+    return out_arr
 
 def pickle(data,name):
     """quickly dump data to a file with name, 1 proc for each file.
