@@ -203,42 +203,6 @@ class FourierRepresentation(Representation):
         else:
             self.k['y'] = self.k['y'][self.offset['kspace']:self.offset['kspace'] + self.local_shape['kspace'][0]]
 
-    def has_mode(self, mode):
-        """tests to see if we have a given mode. 
-
-        inputs
-        ------
-
-        mode -- (tuple) (kz, ky, kx).if ints, will check if mode with
-        this index is present (global if in parallel), if floats, find
-        the bin from k < mode < k+dk that contains mode
-
-        outputs
-        -------
-        kindex -- (tuple_ (kz, ky, kx)
-
-        """
-        if self._curr_space == 'xspace':
-            self.forward()
-
-        if na.array(mode).dtype == 'int':
-            keys = self.k.keys()
-            keys.sort(reverse=True) # get keys in z-y-x order
-            keys = swap_indices(keys) # swap the first two indices
-            has = []
-            for i,k in enumerate(keys):
-                has.append(mode[i] in self.k[k])
-            
-            if all(has):
-                return True
-            
-        elif na.array(mode).dtype == 'float':
-            raise NotImplementedError("Floating point mode indexing not yet implemented.")
-        else:
-            raise ValueError("mode must be a tuple of ints or floats but is %s instead."  % (na.array(mode).dtype))
-
-        return False
-
     def find_mode(self, mode):
         """
         Test if object has a given mode, return index for closest mode if so.
@@ -285,26 +249,6 @@ class FourierRepresentation(Representation):
                 raise NotImplementedError("This should never happen. Check code.")
         
         return out
-
-    def get_local_mode(self, mode):
-        """return the local mode index for a given global mode.
-        
-        inputs
-        ------
-
-        mode -- (tuple) (kz, ky, kx).if ints, will check if mode with
-        this index is present (global if in parallel), if floats, find
-        the bin from k < mode < k+dk that contains mode
-
-        outputs
-        -------
-        kindex -- (tuple_ (kz, ky, kx)
-
-        """
-        if self.has_mode(mode):
-            return local_mode
-
-        return None
 
     def set_fft(self, method):
         """Assign fft method."""
