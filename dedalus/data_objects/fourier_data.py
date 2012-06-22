@@ -134,17 +134,14 @@ class FourierRepresentation(Representation):
             raise NotImplementedError("Specified FFT method not implemented.")
 
     def __getitem__(self,space):
-        """returns data in either xspace or kspace, transforming as necessary.
-
-        """
+        """Returns data in specified space, transforming as necessary."""
+        
         if space == self._curr_space:
             pass
         elif space == 'xspace':
             self.backward()
-            self.data = self.xdata
         elif space == 'kspace':
             self.forward()
-            self.data = self.kdata
         else:
             raise KeyError("space must be either xspace or kspace")
         
@@ -276,6 +273,9 @@ class FourierRepresentation(Representation):
     def forward(self):
         """FFT method to go from xspace to kspace."""
         
+        if self._curr_space == 'kspace':
+            raise ValueError("Forward transform cannot be called from kspace.")
+        
         self.fft()
         self.data = self.kdata
         self._curr_space = 'kspace'
@@ -283,6 +283,9 @@ class FourierRepresentation(Representation):
 
     def backward(self):
         """IFFT method to go from kspace to xspace."""
+        
+        if self._curr_space == 'xspace':
+            raise ValueError("Backward transform cannot be called from xspace.")
         
         self.dealias()
         self.ifft()
