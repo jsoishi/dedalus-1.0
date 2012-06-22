@@ -47,33 +47,38 @@ class Representation(object):
 
 class FourierRepresentation(Representation):
     timer = Timer()
-    """Container for data that can be Fourier transformed. Includes a
-    wrapped and specifiable method for performing the FFT. 
-
     """
-    def __init__(self, sd, shape, length, method='fftw',
-                 dealiasing='2/3 cython'):
+    Container for data that can be Fourier transformed. Includes a
+    wrapped and specifiable method for performing the FFT. 
+    
+    """
+    
+    def __init__(self, sd, shape, length):
         """
+        Representation for data that can be Fourier transformed (i.e. periodic
+        across the domain).
+        
         When dealing with data, keep in mind that for parallelism, the
         data is transposed between k and x spaces: currently, we use
         FFTW's internal MPI parallelism. This may be updated later,
         but for now, the transposition means that the first two
-        indexed dimensions are swapped when in k-space
+        indexed dimensions are swapped when in k-space:
 
-        in 3D
-        -----
-        x-space: z, y, x
-        k-space: y, z, x
-
-        in 2D
-        x-space: y, x
-        k-space: x, y
+        In 3D:
+            x-space: z, y, x
+            k-space: y, z, x
+    
+        In 2D:
+            x-space: y, x
+            k-space: x, y
         
-        Inputs:
-            sd          state data object
-            shape       The shape of the data in x space (z, y, x), tuple of ints
-            length      The length of the data in x space (z, y, x), tuple of floats 
-                        (default: 2 pi)
+        Parameters
+        ----------
+        sd : StateData object
+        shape : tuple of ints
+            The shape of the data in xspace: (z, y, x) or (y, x)
+        length : tuple of floats
+            The length of the data in xspace: (z, y, x) or (y, x)
             
         """
         
