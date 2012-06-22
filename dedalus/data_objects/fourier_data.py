@@ -177,19 +177,20 @@ class FourierRepresentation(Representation):
         
         # Setup global wavenumber arrays
         self.k = []
-        
-        if self.ndim == 2:
-            real_dim = 0
-        else:
-            real_dim = 2
-            
-        for i,S in enumerate(self.global_shape['kspace']):
-            kshape = i * (1,) + (S,) + (self.ndim - i - 1) * (1,)
-            if i == real_dim:
-                full_shape = swap_indices(self.global_shape['xspace'])[i]
-                ki = fpack.fftfreq(full_shape)[:S] * 2. * self.kny[i]
+  
+        for i,ksize in enumerate(self.global_shape['kspace']):
+            kshape = i * (1,) + (ksize,) + (self.ndim - i - 1) * (1,)
+            xsize = swap_indices(self.global_shape['xspace'])[i]
+            if ksize == xsize:
+                ki = fpack.fftfreq(ksize) * 2. * self.kny[i]
+                if xsize % 2 == 0:
+                    ki[ksize / 2] *= -1.
             else:
-                ki = fpack.fftfreq(S) * 2. * self.kny[i]
+                if xsize % 2 == 0:
+                    ki = fpack.fftfreq(2 * ksize - 2)[:ksize] * 2. * self.kny[i]
+                    ki[-1] *= -1.
+                else:
+                    ki = fpack.fftfreq(2 * ksize - 1)[:ksize] * 2. * self.kny[i]
             ki.resize(kshape)
             self.k.append(ki)
         
@@ -220,35 +221,22 @@ class FourierRepresentation(Representation):
             in (k - dk/2 <= mode < k + dk/2) in all dimensions. None otherwise.
 
         """
-
+        
         # Get k-mode spacing
         dk = 2 * na.pi / swap_indices(self.length)
         
         # Intersect applicable mode sets by dimension
-        mask = [None for i in xrange(self.ndim)]
+        index = [None] * self.ndim
         for name, kn in self.k.iteritems():
             i = self.ktrans[name]
             ilist = na.where((mode[i] >= kn - dk[i] / 2.) & 
                              (mode[i] <  kn + dk[i] / 2.))
-            for j in xrange(self.ndim):
-                if kn.shape[j] < self.local_shape['kspace'][j]:
-                    continue
-                if mask[j] is None:
-                    mask[j] = set(ilist[j])
-                else:
-                    mask[j] = mask[j].intersection(ilist[j])
-        
-        # Return indices if present, None otherwise
-        out = []
-        for s in mask:
-            if len(s) == 0:
+            if ilist[i].size == 0:
                 return None
-            elif len(s) == 1:
-                out.append(s.pop())
             else:
-                raise NotImplementedError("This should never happen. Check code.")
-        
-        return out
+                index[i] = ilist[i][0]
+                
+        return index
 
     def set_fft(self, method):
         """Assign fft method."""
