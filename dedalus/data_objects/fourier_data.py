@@ -76,19 +76,28 @@ class FourierRepresentation(Representation):
                         (default: 2 pi)
             
         """
+        
+        # Store inputs
         self.sd = sd
         self.global_shape = {'xspace': na.array(shape)}
         self.ndim = len(self.global_shape['xspace'])
+        self.length = na.asfarray(length)
+        
+        # Flexible datatypes not currently supported
+        self.dtype = 'complex128'
+        self.__eps = na.finfo(self.dtype).eps
+        
+        # Make sure all dimensions make sense
         if self.ndim not in (2, 3):
             raise ValueError("Must use either 2 or 3 dimensions.")
-        self.length = na.asfarray(length)
-        self.dtype = 'complex128'
+        if self.ndim != len(self.length):
+            raise ValueError("Shape and Length must have same dimensions.")
+        
+        # Retrieve FFT method and dealiasing method from config
         method = decfg.get('FFT', 'method')
         dealiasing = decfg.get('FFT', 'dealiasing')
-        self._allocate_memory(method)
-        self.__eps = na.finfo(self.dtype).eps
-        self._curr_space = 'kspace'
-        self.data = self.kdata
+        
+        # Translation tables
         self.trans = {'x': 0, 'y': 1, 'z': 2,
                       0:'x', 1:'y', 2:'z'} # for vector fields
         if self.ndim == 2:
@@ -97,16 +106,24 @@ class FourierRepresentation(Representation):
         else:
             self.xtrans = {'x':2, 2:'x', 'y':1, 1:'y', 'z':0, 0:'z'}
             self.ktrans = {'x':2, 2:'x', 'y':0, 0:'y', 'z':1, 1:'z'}
+            
+        # Complete setup
+        self._allocate_memory(method)
         self._setup_k()
+        self._curr_space = 'kspace'
+        self.data = self.kdata
         self.set_fft(method)
         self.set_dealiasing(dealiasing)
 
     @timer
     def _allocate_memory(self, method):
+    
+        # Compute global kspace shape for R2C FFT with transpose
         self.global_shape['kspace'] = self.global_shape['xspace'].copy()
         self.global_shape['kspace'][-1]  = self.global_shape['kspace'][-1] / 2 + 1
         self.global_shape['kspace'] = swap_indices(self.global_shape['kspace'])
         
+        # Assign data arrays and compute local shapes and offsets
         if method == 'fftw':
             self.kdata, self.xdata, local_n0, local_n0_start, local_n1, local_n1_start = fftw.create_data(self.global_shape['xspace'], com_sys)
             self.local_shape = {'kspace': self.global_shape['kspace'].copy(),
@@ -248,11 +265,13 @@ class FourierRepresentation(Representation):
             self.rplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'], direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
             self.fft = self.fwd_fftw
             self.ifft = self.rev_fftw
+            
         elif method == 'numpy':
             if com_sys.nproc > 1:
                 raise NotImplementedError("Numpy fft not implemented in parallel.")
             self.fft = self.fwd_np
             self.ifft = self.rev_np
+            
         else:
             raise NotImplementedError("Specified FFT method not implemented.")
             
