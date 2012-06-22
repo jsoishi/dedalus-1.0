@@ -1,4 +1,5 @@
-"""Representation object for fourier transformable fields
+"""
+Representation object for transformable fields.
 
 Author: J. S. Oishi <jsoishi@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
@@ -19,7 +20,9 @@ License:
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  
 """
+
 import numpy as na
 import numpy.fft as fpack
 import warnings
@@ -34,11 +37,11 @@ try:
     import pycuda.gpuarray as gpuarray
     import scikits.cuda.fft as cu_fft
 except ImportError:
-    mylog.warning("CUDA cannot be imported. Must use FFTW or numpy FFT")
+    mylog.warning("CUDA cannot be imported. Must use FFTW or numpy FFT.")
 
 class Representation(object):
-    """a representation of a field. it stores data and provides
-    spatial derivatives.
+    """
+    Representation of a field. Stores data and provides spatial derivatives.
 
     """
 
@@ -55,8 +58,8 @@ class FourierRepresentation(Representation):
     
     def __init__(self, sd, shape, length):
         """
-        Representation for data that can be Fourier transformed (i.e. periodic
-        across the domain).
+        Representation of a field that can be Fourier transformed 
+        (i.e. periodic across the domain).
         
         When dealing with data, keep in mind that for parallelism, the
         data is transposed between k and x spaces: currently, we use
@@ -166,7 +169,7 @@ class FourierRepresentation(Representation):
         elif space == 'kspace':
             self.forward()
         else:
-            raise KeyError("space must be either xspace or kspace")
+            raise KeyError("space must be either xspace or kspace.")
         
         return self.data
 
@@ -273,7 +276,7 @@ class FourierRepresentation(Representation):
             
         elif method == 'numpy':
             if com_sys.nproc > 1:
-                raise NotImplementedError("Numpy fft not implemented in parallel.")
+                raise NotImplementedError("Numpy FFT not implemented in parallel.")
             self.fft = self.fwd_np
             self.ifft = self.rev_np
             
