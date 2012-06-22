@@ -22,6 +22,7 @@ License:
 """
 import numpy as na
 import numpy.fft as fpack
+import warnings
 from dedalus.config import decfg
 from dedalus.utils.parallelism import com_sys, swap_indices
 from dedalus.utils.logger import mylog
@@ -148,15 +149,19 @@ class FourierRepresentation(Representation):
         return self.data
 
     def __setitem__(self, space, data):
-        """this needs to ensure the pointer for the field's data
-        member doesn't change for FFTW. Currently, we do that by
-        slicing the entire data array. 
         """
+        This needs to ensure the pointer for the field's data member doesn't 
+        change for FFTW. Currently, we do that by slicing the entire data array. 
+        
+        """
+        
         if space == 'xspace':
             self.data = self.xdata
         elif space == 'kspace':
             self.data = self.kdata
+            
         if data.size < self.data.size:
+            warnings.warn("Size of assignment and data don't agree. This may be disallowed in future versions.")
             sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
             self.data[sli] = data
         else:
@@ -183,11 +188,9 @@ class FourierRepresentation(Representation):
                 if xsize % 2 == 0:
                     ki[ksize / 2] *= -1.
             else:
+                ki = fpack.fftfreq(xsize)[:ksize] * 2. * self.kny[i]
                 if xsize % 2 == 0:
-                    ki = fpack.fftfreq(2 * ksize - 2)[:ksize] * 2. * self.kny[i]
                     ki[-1] *= -1.
-                else:
-                    ki = fpack.fftfreq(2 * ksize - 1)[:ksize] * 2. * self.kny[i]
             ki.resize(kshape)
             self.k.append(ki)
         
