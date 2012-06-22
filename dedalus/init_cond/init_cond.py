@@ -51,38 +51,38 @@ def taylor_green(data):
         data['u']['y'].data[-1,1] = -1j/4.
         data['u']['y'].data[1,-1] = 1j/4.
     elif ndim == 3:
-        if data['u']['x'].has_mode((1,1,1)):
+        if data['u']['x'].find_mode((1,1,1)):
             data['u']['x']['kspace'][1,1,1] = -1j/8.
-        if data['u']['x'].has_mode((1,1,-1)):
+        if data['u']['x'].find_mode((1,1,-1)):
             data['u']['x']['kspace'][1,1,-1] = 1j/8.
-        if data['u']['x'].has_mode((-1,1,1)):
+        if data['u']['x'].find_mode((-1,1,1)):
             data['u']['x']['kspace'][-1,1,1] = -1j/8.
-        if data['u']['x'].has_mode((-1,1,-1)):
+        if data['u']['x'].find_mode((-1,1,-1)):
             data['u']['x']['kspace'][-1,1,-1] = 1j/8.
-        if data['u']['x'].has_mode((1,-1,1)):
+        if data['u']['x'].find_mode((1,-1,1)):
             data['u']['x']['kspace'][1,-1,1] = -1j/8.
-        if data['u']['x'].has_mode((1,-1,-1)):
+        if data['u']['x'].find_mode((1,-1,-1)):
             data['u']['x']['kspace'][1,-1,-1] = 1j/8.
-        if data['u']['x'].has_mode((-1,-1,1)):
+        if data['u']['x'].find_mode((-1,-1,1)):
             data['u']['x']['kspace'][-1,-1,1] = -1j/8.
-        if data['u']['x'].has_mode((-1,-1,-1)):
+        if data['u']['x'].find_mode((-1,-1,-1)):
             data['u']['x']['kspace'][-1,-1,-1] = 1j/8.
 
-        if data['u']['y'].has_mode((1,1,1)):
+        if data['u']['y'].find_mode((1,1,1)):
             data['u']['y']['kspace'][1,1,1] = 1j/8.
-        if data['u']['y'].has_mode((1,1,-1)):
+        if data['u']['y'].find_mode((1,1,-1)):
             data['u']['y']['kspace'][1,1,-1] = 1j/8.
-        if data['u']['y'].has_mode((-1,1,1)):
+        if data['u']['y'].find_mode((-1,1,1)):
             data['u']['y']['kspace'][-1,1,1] = 1j/8.
-        if data['u']['y'].has_mode((-1,1,-1)):
+        if data['u']['y'].find_mode((-1,1,-1)):
             data['u']['y']['kspace'][-1,1,-1] = 1j/8.
-        if data['u']['y'].has_mode((1,-1,1)):
+        if data['u']['y'].find_mode((1,-1,1)):
             data['u']['y']['kspace'][1,-1,1] = -1j/8.
-        if data['u']['y'].has_mode((1,-1,-1)):
+        if data['u']['y'].find_mode((1,-1,-1)):
             data['u']['y']['kspace'][1,-1,-1] = -1j/8.
-        if data['u']['y'].has_mode((-1,-1,1)):
+        if data['u']['y'].find_mode((-1,-1,1)):
             data['u']['y']['kspace'][-1,-1,1] = -1j/8.
-        if data['u']['y'].has_mode((-1,-1,-1)):
+        if data['u']['y'].find_mode((-1,-1,-1)):
             data['u']['y']['kspace'][-1,-1,-1] = -1j/8.
             
 def kida_vortex(data, a, chi=None, smooth=False):
