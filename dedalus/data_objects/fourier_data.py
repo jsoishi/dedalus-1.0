@@ -90,7 +90,12 @@ class FourierRepresentation(Representation):
         self.data = self.kdata
         self.trans = {'x': 0, 'y': 1, 'z': 2,
                       0:'x', 1:'y', 2:'z'} # for vector fields
-        
+        if self.ndim == 2:
+            self.xtrans = {'x':1, 1:'x', 'y':0, 0:'y'}
+            self.ktrans = {'x':0, 0:'x', 'y':1, 1:'y'}
+        else:
+            self.xtrans = {'x':2, 2:'x', 'y':1, 1:'y', 'z':0, 0:'z'}
+            self.ktrans = {'x':2, 2:'x', 'y':0, 0:'y', 'z':1, 1:'z'}
         self._setup_k()
         self.set_fft(method)
         self.set_dealiasing(dealiasing)
@@ -234,61 +239,52 @@ class FourierRepresentation(Representation):
 
         return False
 
-#     def find_mode(self, mode):
-#         """
-#         Test if object has a given mode, return index for closest mode if so.
-# 
-#         Parameters
-#         ----------
-#         mode : tuple of ints or floats
-#             Tuple of wavenumber for which to search.  Recall kspace ordering
-#             (ky, kz, kx) for 3D, (kx, ky) for 2D.
-# 
-#         Returns
-#         -------
-#         index : tuple of ints, or bool
-#             Tuple of indexes to the closest mode, k, if input mode is present
-#             in (k <= mode < k + dk) in all dimensions. False otherwise.
-# 
-#         """
-# 
-#         names = ['z','y','x'][3-self.ndim:]
-#         names = swap_indices(names)
-#         mask = True
-#         
-#         for i,name in enumerate(names):
-#             ki = self.k[name]
-#             imask = {}
-#             for j,size in enumerate(ki.shape):
-#                 if size == 1:
-#                     imask[j] = True
-#                 else:
-#                     dk = na.diff(ki, axis=j).flatten()[0]
-#                     jmask = na.where((ki - mode[i] >= 0) & (ki - mode[i] < dk))
-#                     jmask = set(zip(jmask[0], jmask[1]))
-#                     
-#                     
-#                     
-#                     if imask is True:
-#                         imask = jmask
-#                     else:
-#                         imask = imask.intersection(jmask)
-#                     
-#                     print 'i,j,dk = ',i,j,dk
-#             
-#             print imask
-#         
-#             if mask is True:
-#                 mask = imask
-#             else:
-#                 mask = mask.intersection(imask)
-#         
-#         return mask
-# 
-#         if all(has):
-#             return index
-#         else:
-#             return False
+    def find_mode(self, mode):
+        """
+        Test if object has a given mode, return index for closest mode if so.
+
+        Parameters
+        ----------
+        mode : tuple of ints or floats
+            Tuple describing physical wavevector for which to search.  Recall 
+            kspace ordering (ky, kz, kx) for 3D, (kx, ky) for 2D.
+
+        Returns
+        -------
+        index : tuple of ints, or bool
+            Tuple of indexes to the closest mode, k, if input mode is present
+            in (k - dk/2 <= mode < k + dk/2) in all dimensions. None otherwise.
+
+        """
+
+        # Get k-mode spacing
+        dk = 2 * na.pi / swap_indices(self.length)
+        
+        # Intersect applicable mode sets by dimension
+        mask = [None for i in xrange(self.ndim)]
+        for name, kn in self.k.iteritems():
+            i = self.ktrans[name]
+            ilist = na.where((mode[i] >= kn - dk[i] / 2.) & 
+                             (mode[i] <  kn + dk[i] / 2.))
+            for j in xrange(self.ndim):
+                if kn.shape[j] < self.local_shape['kspace'][j]:
+                    continue
+                if mask[j] is None:
+                    mask[j] = set(ilist[j])
+                else:
+                    mask[j] = mask[j].intersection(ilist[j])
+        
+        # Return indices if present, None otherwise
+        out = []
+        for s in mask:
+            if len(s) == 0:
+                return None
+            elif len(s) == 1:
+                out.append(s.pop())
+            else:
+                raise NotImplementedError("This should never happen. Check code.")
+        
+        return out
 
     def get_local_mode(self, mode):
         """return the local mode index for a given global mode.
