@@ -25,7 +25,6 @@ License:
 
 import numpy as na
 import numpy.fft as fpack
-import warnings
 from dedalus.config import decfg
 from dedalus.utils.parallelism import com_sys, swap_indices
 from dedalus.utils.logger import mylog
@@ -186,7 +185,7 @@ class FourierRepresentation(Representation):
             self.data = self.kdata
             
         if data.size < self.data.size:
-            warnings.warn("Size of assignment and data don't agree. This may be disallowed in future versions.")
+            mylog.warning("Size of assignment and data don't agree. This may be disallowed in future versions.")
             sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
             self.data[sli] = data
         else:
