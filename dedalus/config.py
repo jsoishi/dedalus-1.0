@@ -1,4 +1,5 @@
-"""Configuration file parser.
+"""
+Configuration file parser.
 
 Author: J. S. Oishi <jsoishi@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
@@ -19,16 +20,20 @@ License:
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  
 """
 
 import ConfigParser
 import os
 
-decfgDefaults = {}
+decfg = ConfigParser.ConfigParser()
 
-decfg = ConfigParser.ConfigParser(decfgDefaults)
+# Default values
+decfg.add_section('FFT')
+decfg.set('FFT', 'method', 'fftw')
+decfg.set('FFT', 'dealiasing', '2/3 cython')
+
+# Read user config, local config
 decfg.read([os.path.expanduser('~/.dedalus/config'), 'dedalus.cfg'])
 
-if not decfg.has_section("dedalus"):
-    decfg.add_section("dedalus")
 
