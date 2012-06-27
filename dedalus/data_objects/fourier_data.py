@@ -30,7 +30,6 @@ from dedalus.utils.parallelism import com_sys, swap_indices
 from dedalus.utils.logger import mylog
 from dedalus.utils.fftw import fftw
 from dedalus.utils.timer import Timer
-from dedalus.funcs import insert_ipython
 try:
     import pycuda.autoinit
     import pycuda.gpuarray as gpuarray
@@ -48,12 +47,13 @@ class Representation(object):
         pass
 
 class FourierRepresentation(Representation):
-    timer = Timer()
     """
     Container for data that can be Fourier transformed. Includes a
     wrapped and specifiable method for performing the FFT. 
     
     """
+    
+    timer = Timer()
     
     def __init__(self, sd, shape, length):
         """
