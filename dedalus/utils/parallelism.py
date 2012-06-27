@@ -47,27 +47,6 @@ class CommunicationSystem(object):
 
 com_sys = CommunicationSystem()
 
-def setup_parallel_objs(global_shape, global_len):
-    """Helper function for parallel runs. Given a global shape and
-    length, it returns a local shape and length.
-
-    inputs
-    ------
-    global_shape (tuple of int)
-    global_length (tuple of reals)
-
-    returns
-    -------
-    local_shape, local_len (tuple of ints, tuple of reals)
-
-    """
-    
-    local_shape = (global_shape[0]/com_sys.nproc,) + global_shape[1:]
-    
-    local_len = (global_len[0]/com_sys.nproc,) + global_len[1:]
-
-    return local_shape, local_len
-
 def load_all(field, snap_dir):
     """hacky function to concatenate all MPI tasks data into a single
     global size cube for analysis/testing.
@@ -156,7 +135,8 @@ def reduce_max(data):
         return global_max
 
 def swap_indices(arr):
-    """simple function to swap index [0] and [1]. useful for
+    """
+    Simple function to swap index [0] and [1].  Useful for
     constructing quantities for the FFTW parallel data objects.
     
     """
@@ -164,7 +144,9 @@ def swap_indices(arr):
     if type(arr) == na.ndarray:
         out_arr = arr.copy()
     elif type(arr) == list:
-        out_arr = arr
+        out_arr = list(arr)
+    else:
+        raise NotImplementedError("swap_indices only implemented for numpy arrays and lists.")
 
     a = out_arr[1]
     out_arr[1] = out_arr[0]
