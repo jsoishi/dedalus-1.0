@@ -110,14 +110,6 @@ class FourierRepresentation(Representation):
             self.local_shape['xspace'][0] = local_n0
             self.offset = {'xspace': local_n0_start,
                            'kspace': local_n1_start}
-
-            mylog.debug('kbuffer size: %i' % len(self.kdata.data))
-            mylog.debug('xbuffer size: %i' % (self.xdata.size*8))
-            mylog.debug('global xshape: %s'% self._global_shape['xspace'])
-            mylog.debug('global kshape: %s'% self._global_shape['kspace'])
-            mylog.debug('local xshape: %s'% self.local_shape['xspace'])
-            mylog.debug('local kshape: %s'% self.local_shape['kspace'])
-
         else:
             self.kdata = na.zeros(self._global_shape['kspace'], dtype=self.dtype)
             self.xdata = na.zeros(self._global_shape['xspace'])
