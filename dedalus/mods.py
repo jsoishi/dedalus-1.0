@@ -78,7 +78,6 @@ from dedalus.utils.api import \
     integrate_simp, \
     interp_linear, \
     find_zero, \
-    setup_parallel_objs, \
     load_all, \
     com_sys
 

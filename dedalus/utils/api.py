@@ -14,6 +14,5 @@ from .misc_numeric import \
     find_zero
 
 from .parallelism import \
-    setup_parallel_objs, \
     com_sys,\
     load_all
