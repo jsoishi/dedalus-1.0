@@ -1,4 +1,5 @@
-"""Timers to track code performance
+"""
+Timers to track code performance.
 
 Author: J. S. Oishi <jsoishi@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
@@ -19,17 +20,26 @@ License:
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  
 """
+
 import time 
 from dedalus.utils.parallelism import com_sys
+
 class Timer(object):
-    timers = {}
+
     def __init__(self):
-        """a simple class that builds a dictionary of functions and
+        """
+        A simple class that builds a dictionary of functions and
         their cumulative times.
 
         """
+        
+        self.timers = {}
+        
     def __call__(self, func):
+        """Decorator to time function execution."""
+    
         def wrapper(*args, **kwargs):
             start = time.time()
             retval = func(*args, **kwargs)
@@ -51,13 +61,11 @@ class Timer(object):
             print
 
 if __name__ == "__main__":
-    from time import sleep
-    times = Timer()
+    timer = Timer()
 
-    @times
-    def blah(f, g):
-        sleep(2)
+    @timer
+    def SleepTwoSec():
+        time.sleep(2.0)
 
-    blah(1,2)
-
-    times.print_stats()
+    SleepTwoSec()
+    timer.print_stats()
