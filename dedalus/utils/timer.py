@@ -52,10 +52,10 @@ class Timer(object):
             return retval
         return wrapper
 
-    def print_stats(self):
-        if com_sys.myproc == 0:
+    def print_stats(self, proc=0):
+        if com_sys.myproc == proc:
             print
-            print "---Timings---"
+            print "---Timings (proc %i)---" % (proc)
             for k,v in self.timers.iteritems():
                 print "%s: %10.5f sec" % (k,v)
             print
