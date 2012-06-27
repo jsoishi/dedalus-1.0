@@ -39,7 +39,8 @@ except ImportError:
 
 class Representation(object):
     """
-    Representation of a field. Stores data and provides spatial derivatives.
+    Representation of a field component. Stores data and provides spatial 
+    derivatives.
 
     """
 
@@ -57,7 +58,7 @@ class FourierRepresentation(Representation):
     
     def __init__(self, sd, shape, length):
         """
-        Representation of a field that can be Fourier transformed 
+        Representation of a field component that can be Fourier transformed 
         (i.e. periodic across the domain).
         
         When dealing with data, keep in mind that for parallelism, the
@@ -87,8 +88,8 @@ class FourierRepresentation(Representation):
         # Store inputs
         self.sd = sd
         self.global_shape = {'xspace': na.array(shape)}
-        self.ndim = len(self.global_shape['xspace'])
         self.length = na.asfarray(length)
+        self.ndim = len(shape)
         
         # Flexible datatypes not currently supported
         self.dtype = 'complex128'
@@ -105,8 +106,6 @@ class FourierRepresentation(Representation):
         dealiasing = decfg.get('FFT', 'dealiasing')
         
         # Translation tables
-        self.trans = {'x': 0, 'y': 1, 'z': 2,
-                      0:'x', 1:'y', 2:'z'} # for vector fields
         if self.ndim == 2:
             self.xtrans = {'x':1, 1:'x', 'y':0, 0:'y'}
             self.ktrans = {'x':0, 0:'x', 'y':1, 1:'y'}
@@ -183,6 +182,8 @@ class FourierRepresentation(Representation):
             self.data = self.xdata
         elif space == 'kspace':
             self.data = self.kdata
+        else:
+            raise KeyError("space must be either xspace or kspace.")
             
         if data.size < self.data.size:
             mylog.warning("Size of assignment and data don't agree. This may be disallowed in future versions.")

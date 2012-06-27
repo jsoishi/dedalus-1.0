@@ -1,4 +1,5 @@
-"""The Main Dedalus data object. This is dynamically created with a
+"""
+The main Dedalus data object. This is dynamically created with a
 given representation when the physics class is initialized.
 
 Author: J. S. Oishi <jsoishi@gmail.com>
@@ -20,155 +21,194 @@ License:
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  
 """
+
 import weakref
 import h5py
 import numpy as na
 
 def create_field_classes(representation, shape, length):
-    """utility function to bind representation and shape to tensor,
+    """
+    Utility function to bind representation and shape to tensor,
     vector, and scalar fields.
 
     """
+    
+    attr_dict = {'representation': representation,
+                 'shape': shape, 
+                 'length': length}
+    
     tname = "TensorField"
-    new_tensorclass = type(tname, (TensorFieldBase,), {'representation': representation,
-                                                  'shape': shape, 'length': length})
+    new_tensorclass = type(tname, (TensorFieldBase,), attr_dict)
 
     vname = "VectorField"
-    new_vectorclass = type(vname, (VectorFieldBase,), {'representation': representation,
-                                                  'shape': shape, 'length': length})
+    new_vectorclass = type(vname, (VectorFieldBase,), attr_dict)
+    
     sname = "ScalarField" 
-    new_scalarclass = type(sname, (ScalarFieldBase,), {'representation': representation,
-                                                  'shape': shape, 'length': length})
+    new_scalarclass = type(sname, (ScalarFieldBase,), attr_dict)
 
     return {tname: new_tensorclass,
             vname: new_vectorclass,
             sname: new_scalarclass}
-
-def lookup(name, translation_table):
-    """this may need to be inlined?"""
-    
-    name = translation_table.get(name, None)
-    if name is None:
-        raise KeyError
-    return name
     
 class BaseField(object):
-    def __init__(self, sd, ncomp=-1):
-        """
-        inputs
-        ------
-        sd -- state data object that creates it. stored as a weak ref
+    """Base class for all field objects."""
 
-        ncomp (optional) -- the number of components
+    def __init__(self, sd, ncomp):
+        """
+        Basic field object containing field components.
+        
+        Parameters
+        ----------
+        sd : StateData object
+        ncomp : int
+            Number of components in the field.
 
         """
         
         # self.representation provided in call to create_field_classes
         # self.shape provided in call to create_field_classes
         # self.length provided in call to create_field_classes
+        
+        # Store inputs
         self.sd = weakref.proxy(sd)
+        self.ncomp = ncomp
         self.ndim = len(self.shape)
+        
+        # Make sure all dimensions make sense
+        if self.ndim not in (2, 3):
+            raise ValueError("Must use either 2 or 3 dimensions.")
+        if self.ndim != len(self.length):
+            raise ValueError("Shape and Length must have same dimensions.")
 
         # Construct components
         self.components = []
-        if ncomp == -1:
-            self.ncomp = self.ndim
-        else:
-            self.ncomp = ncomp
-
-        for f in xrange(self.ncomp):
+        for i in xrange(self.ncomp):
             self.components.append(self.representation(self.sd, self.shape, self.length))
 
-        # Take translation table for coordinate names from representation
-        self.trans = self.components[-1].trans
-                                               
+        # Option for integrating factor                                       
         self.integrating_factor = None
-
-    def __getitem__(self, comp_name):
+        
+        # Translation table to be specified in derived classes
+        self.trans = {}
+        
+    def __getitem__(self, item):
         """If item is not a component number, lookup in translation table."""
         
-        if type(comp_name) == str:
-            comp_name = lookup(comp_name, self.trans)
-        return self.components[comp_name]
+        if type(item) == str:
+            item = self.trans[item]
+        return self.components[item]
+        
+    def __setitem__(self, item, data):
+        """If item is not a component number, lookup in translation table."""
+        
+        if type(item) == str:
+            item = self.trans[item]
+        self.components[item] = data
 
-    def zero(self, comp_name):
-        if type(comp_name) == str:
-            comp_name = lookup(comp_name, self.trans)
-        self.components[comp_name].data[:] = 0.
+    def zero(self, comp):
+        if type(comp) == str:
+            comp = self.trans[comp]
+        self.components[comp].data[:] = 0.
 
     def zero_all(self):
-        for f in self.components:
-            f.data[:] = 0.
+        for c in self.components:
+            c.data[:] = 0.
 
     def save(self, group):
         group.attrs["representation"] = self.representation.__name__
         group.attrs["type"] = self.__class__.__name__
-        for f in range(self.ncomp):
-            dset = group.create_dataset(str(f), 
-                                        self.components[f].local_shape[self.components[f]._curr_space], 
-                                        dtype=self.components[f].data.dtype)
+        for i in xrange(self.ncomp):
+            dset = group.create_dataset(str(i), 
+                                        self.components[i].local_shape[self.components[i]._curr_space], 
+                                        dtype=self.components[i].data.dtype)
             
-            self.components[f].save(dset)
-
+            self.components[i].save(dset)
 
 class TensorFieldBase(BaseField):
-    """Tensor class. Currently used mostly for the velocity gradient tensor."""
+    """Tensor class. Primarily used for vector covariant derivatives."""
     
-    def __init__(self, sd, **kwargs):
-        ncomp = len(self.shape) ** 2
-        BaseField.__init__(self, sd, ncomp=ncomp, **kwargs)
+    def __init__(self, sd):
+        ncomp = sd.ndim ** 2
+        BaseField.__init__(self, sd, ncomp)
 
 class VectorFieldBase(BaseField):
-    """these should have N components with names defined at simulation initialization time.
-
-    state data will be composed of vectors and scalars
-    """
+    """Vector class. Number of components equal to simulation dimension."""
     
+    def __init__(self, sd):
+        ncomp = sd.ndim
+        BaseField.__init__(self, sd, ncomp)
+        #self.trans = self.components[0].trans
+        self.trans = {'x': 0, 'y': 1, 'z': 2,
+                      0:'x', 1:'y', 2:'z'} # for vector fields
+
     def div_free(self, verbose=False):
-        """Project off compressible parts of the field."""
+        """
+        Project off irrotational part of the vector field.
+        
+        F = -grad(phi) + curl(A)
+        
+        ==> laplace(phi) = - div(F) 
+        
+        """
+        
+        mylog.debug("Projecting off irrotational part of vector field.")
         
         if verbose:
-            power0 = 0
+            # Compute pre-projection power
+            power0 = 0.
             for i in xrange(self.ncomp):
                 power0 += 0.5 * na.sum(na.abs(self[i]['kspace']) ** 2)
-            print 'Pre-projection power: ', power0
+            mylog.debug("Pre-projection power : %f" % power0)
     
-        kV = 0
+        KF = 0
         for i in xrange(self.ncomp):
-            kV += self[i].k[self.trans[i]] * self[i]['kspace']
+            KF += self[i].k[self.trans[i]] * self[i]['kspace']
 
         k2 = self[i].k2(no_zero=True)
         
         for i in xrange(self.ncomp):
-            self[i]['kspace'] -= self[i].k[self.trans[i]] * kV / k2
-            
+            self[i]['kspace'] -= self[i].k[self.trans[i]] * KF / k2
+        
         if verbose:
-            power1 = 0
+            # Compute post-projection power
+            power1 = 0.
             for i in xrange(self.ncomp):
                 power1 += 0.5 * na.sum(na.abs(self[i]['kspace']) ** 2)
-            print 'Post-projection power: ', power1
-            print 'Power projected off: ', power1 - power0
+            mylog.debug("Post-projection power: %f" % power1)
+            mylog.debug("Power projected off  : %f" % (power1 - power0))
     
 class ScalarFieldBase(BaseField):
-    """Scalar class; always has one component."""
+    """Scalar class. One component."""
     
-    def __init__(self, sd, **kwargs):
-        BaseField.__init__(self, sd, ncomp=1, **kwargs)
+    def __init__(self, sd):
+        ncomp = 1
+        BaseField.__init__(self, sd, ncomp)
 
     def __getitem__(self, item):
         """
         0 call returns the scalar representation object. 
         Other calls passed to the representation object.
+        
         """
         
-        if item == 0: return self.components[0]
-        return self.components[0][item]
+        if item == 0: 
+            return self.components[0]
+        else:
+            return self.components[0][item]
 
     def __setitem__(self, item, data):
-        """Set calls passed to the scalar representation object."""
+        """
+        0 call sets the scalar representation object.
+        Other calls passed to the representation object.
         
-        self.components[0].__setitem__(item, data)
+        """
+        
+        if item == 0:
+            self.components[0] = data
+        else:
+            self.components[0].__setitem__(item, data)
 
     def __getattr__(self, attr):
         """
@@ -177,10 +217,12 @@ class ScalarFieldBase(BaseField):
         attributes of the underlying representation (stored in
         self.components[0]). Thus, a ScalarField will act like a
         single instance of its underlying representation.
+        
         """
         
         return self.components[0].__getattribute__(attr)
 
-    def zero(self):
-        self.zero_all()
+    def zero(self, comp=0):
+        self.components[comp].data[:] = 0.
+            
 

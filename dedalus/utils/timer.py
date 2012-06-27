@@ -53,6 +53,8 @@ class Timer(object):
         return wrapper
 
     def print_stats(self, proc=0):
+        """Print cumulative times for functions executed on a specified processor."""
+    
         if com_sys.myproc == proc:
             print
             print "---Timings (proc %i)---" % (proc)
