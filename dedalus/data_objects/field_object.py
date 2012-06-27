@@ -25,7 +25,6 @@ License:
 """
 
 import weakref
-import h5py
 import numpy as na
 
 def create_field_classes(representation, shape, length):
