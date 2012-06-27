@@ -33,6 +33,9 @@ decfg.add_section('FFT')
 decfg.set('FFT', 'method', 'fftw')
 decfg.set('FFT', 'dealiasing', '2/3 cython')
 
+decfg.add_section('UTILS')
+decfg.set('UTILS', 'loglevel', 'debug')
+
 # Read user config, local config
 decfg.read([os.path.expanduser('~/.dedalus/config'), 'dedalus.cfg'])
 

@@ -1,4 +1,5 @@
-"""parallel support.
+"""
+Parallel support.
 
 Author: J. S. Oishi <jsoishi@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
@@ -19,7 +20,9 @@ License:
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  
 """
+
 import numpy as na
 
 class CommunicationSystem(object):
