@@ -387,10 +387,7 @@ def MIT_vortices(data):
     http://math.mit.edu/cse/codes/mit18336_spectral_ns2d.m
 
     """
-    
-    sh = data['u']['x']['xspace'].shape
-    offset = data['u']['x'].offset['xspace']
-    x, y = na.meshgrid(na.r_[0:sh[1]]*2*na.pi/sh[1],na.r_[offset:sh[0]+offset]*2*na.pi/sh[0])
+    x, y = data['u']['x'].xspace_grid()
     aux = data.clone()
     aux.add_field('w','ScalarField')
     aux.add_field('psi','ScalarField')
