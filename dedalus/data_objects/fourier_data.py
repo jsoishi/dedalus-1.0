@@ -139,13 +139,6 @@ class FourierRepresentation(Representation):
             self.offset = {'xspace': local_n0_start,
                            'kspace': local_n1_start}
 
-            mylog.debug('kbuffer size: %i' % len(self.kdata.data))
-            mylog.debug('xbuffer size: %i' % (self.xdata.size*8))
-            mylog.debug('global xshape: %s'% self.global_shape['xspace'])
-            mylog.debug('global kshape: %s'% self.global_shape['kspace'])
-            mylog.debug('local xshape: %s'% self.local_shape['xspace'])
-            mylog.debug('local kshape: %s'% self.local_shape['kspace'])
-
         elif method == 'numpy':
             self.kdata = na.zeros(self.global_shape['kspace'], dtype=self.dtype)
             self.xdata = na.zeros(self.global_shape['xspace'])
@@ -439,6 +432,18 @@ class FourierRepresentation(Representation):
         
         dataset[:] = self.data
         dataset.attrs['space'] = self._curr_space
+
+    def xspace_grid(self):
+        """returns the xspace grid for the local processor
+
+        """
+        gsh = self.global_shape['xspace']
+        lsh = self.local_shape['xspace']
+        offset = self.offset['xspace']
+
+        x, y = na.meshgrid(na.r_[0:lsh[1]]*2*na.pi/gsh[1],na.r_[offset:lsh[0]+offset]*2*na.pi/gsh[0])
+        return x, y
+
 
 class FourierShearRepresentation(FourierRepresentation):
     """
