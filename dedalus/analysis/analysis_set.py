@@ -29,6 +29,7 @@ matplotlib.use('AGG')
 import matplotlib.pyplot as P
 from mpl_toolkits.axes_grid1 import AxesGrid
 import numpy as na
+import numpy.lib.stride_tricks as st
 import os
 from functools import wraps
 from dedalus.utils.parallelism import com_sys
@@ -69,29 +70,31 @@ def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', save
     Take a snapshot of all fields defined. Currently takes z[0] slice for 3D.
     
     """
+    concat_axis = 0
     # Determine image grid size
     nrow = len(data.fields.keys())
     ncol = na.max([f.ncomp for f in data.fields.values()])
-    
-    # Figure setup
-    fig = P.figure(4, figsize=(8 * ncol, 8 * nrow))
 
-    if use_extent:
-        extent = [0., data.length[-1], 0., data.length[-2]]
-    else:
-        extent = None
-    
-    # Figure setup
-    fig = P.figure(1, figsize=(8 * ncol, 8 * nrow))
-    
-    grid = AxesGrid(fig, 111,
-                    nrows_ncols = (nrow, ncol),
-                    axes_pad=0.3,
-                    cbar_pad=0.,
-                    share_all=True,
-                    label_mode="1",
-                    cbar_location="top",
-                    cbar_mode="each")
+    if com_sys.myproc == 0:
+        # Figure setup
+        fig = P.figure(4, figsize=(8 * ncol, 8 * nrow))
+
+        if use_extent:
+            extent = [0., data.length[-1], 0., data.length[-2]]
+        else:
+            extent = None
+
+        # Figure setup
+        fig = P.figure(1, figsize=(8 * ncol, 8 * nrow))
+
+        grid = AxesGrid(fig, 111,
+                        nrows_ncols = (nrow, ncol),
+                        axes_pad=0.3,
+                        cbar_pad=0.,
+                        share_all=True,
+                        label_mode="1",
+                        cbar_location="top",
+                        cbar_mode="each")
                     
     # Plot field components
     i = -1
@@ -104,29 +107,38 @@ def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', save
                 if plot_slice == None:
                     # Default to bottom xy plane
                     plot_slice = [0, slice(None), slice(None)]
-                plot_array = f[j][space][plot_slice]
+                plot_array = st.as_strided(f[j][space][plot_slice],shape=f[j][space][plot_slice].shape,strides=f[j][space][plot_slice].strides)
             else:
-                plot_array = f[j][space]
+                plot_array = st.as_strided(f[j][space],shape=f[j][space].shape,strides=f[j][space].strides)
                 
             if space == 'kspace':
                 plot_array = na.abs(plot_array)
                 plot_array[plot_array == 0] = na.nan
                 plot_array = na.log10(plot_array)
-
+                dtype = com_sys.MPI.COMPLEX
             else:
                 plot_array = plot_array.real
+                dtype = com_sys.MPI.DOUBLE
 
+            # collect all slices
+            #gplot_array = na.empty((com_sys.nproc,) + plot_array.shape)
+            #com_sys.comm.Gather([plot_array, dtype], [gplot_array, dtype], root=0)
+            mylog.debug("plot_array strides = %s, %s)" % tuple(plot_array.strides))
+            gplot_array = com_sys.comm.gather(plot_array, root=0)
             # Plot
-            im = grid[I].imshow(plot_array, extent=extent, origin='lower', 
-                                interpolation='nearest', **kwargs)
-            grid[I].text(0.05, 0.95, k + str(j), transform=grid[I].transAxes, size=24, color='white')
-            grid.cbar_axes[I].colorbar(im)
+            if com_sys.myproc == 0:
+                gplot_array = na.concatenate(gplot_array, axis=concat_axis)
+                #mylog.debug("gplot_array shape = %s, %s" % tuple(gplot_array.shape))
+                im = grid[I].imshow(gplot_array, extent=extent, origin='lower', 
+                                    interpolation='nearest', **kwargs)
+                grid[I].text(0.05, 0.95, k + str(j), transform=grid[I].transAxes, size=24, color='white')
+                grid.cbar_axes[I].colorbar(im)
             
-    # Time label     
-    tstr = 't = %5.2f' % data.time
-    grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
-
     if com_sys.myproc == 0:
+        # Time label     
+        tstr = 't = %5.2f' % data.time
+        grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
+
         if not os.path.exists('frames'):
             os.mkdir('frames')
         if space == 'kspace':
