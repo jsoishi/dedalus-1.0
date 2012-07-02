@@ -121,14 +121,11 @@ def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', save
                 dtype = com_sys.MPI.DOUBLE
 
             # collect all slices
-            #gplot_array = na.empty((com_sys.nproc,) + plot_array.shape)
-            #com_sys.comm.Gather([plot_array, dtype], [gplot_array, dtype], root=0)
-            mylog.debug("plot_array strides = %s, %s)" % tuple(plot_array.strides))
             gplot_array = com_sys.comm.gather(plot_array, root=0)
+
             # Plot
             if com_sys.myproc == 0:
                 gplot_array = na.concatenate(gplot_array, axis=concat_axis)
-                #mylog.debug("gplot_array shape = %s, %s" % tuple(gplot_array.shape))
                 im = grid[I].imshow(gplot_array, extent=extent, origin='lower', 
                                     interpolation='nearest', **kwargs)
                 grid[I].text(0.05, 0.95, k + str(j), transform=grid[I].transAxes, size=24, color='white')
