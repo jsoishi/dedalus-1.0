@@ -10,6 +10,9 @@ def mcwilliams_spec(k, k0, E0):
         sl = (slice(0,1),slice(0,k.shape[1]/2-1))
         norm = E0/spec[sl].sum()
     else:
-        norm = 0.
-    com_sys.comm.bcast(norm, root=0)
+        norm = None
+    norm = com_sys.comm.bcast(norm, root=0)
+    if norm == None:
+        raise ValueError("Normalization did not properly broadcast.")
+
     return spec*norm
