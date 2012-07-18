@@ -52,7 +52,7 @@ extras = {'proc': com_sys.myproc}
 
 # Construct logger adapter
 dedaluslog = logging.getLogger("Dedalus")
-loglevel = decfg.get('UTILS', 'loglevel')
+loglevel = decfg.get('utils', 'loglevel')
 dedaluslog.setLevel(getattr(logging, loglevel.upper()))
 mylog = logging.LoggerAdapter(dedaluslog, extras)
 

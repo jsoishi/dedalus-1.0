@@ -33,8 +33,11 @@ decfg.add_section('FFT')
 decfg.set('FFT', 'method', 'fftw')
 decfg.set('FFT', 'dealiasing', '2/3 cython')
 
-decfg.add_section('UTILS')
-decfg.set('UTILS', 'loglevel', 'debug')
+decfg.add_section('utils')
+decfg.set('utils', 'loglevel', 'debug')
+
+decfg.add_section('analysis')
+decfg.set('analysis', 'plot_slice', None)
 
 # Read user config, local config
 decfg.read([os.path.expanduser('~/.dedalus/config'), 'dedalus.cfg'])
