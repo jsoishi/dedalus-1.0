@@ -23,7 +23,8 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from dedalus.utils.parallelism import com_sys, reduce_sum
+from dedalus.utils.parallelism import com_sys, reduce_sum, reduce_mean
+from dedalus.utils.logger import mylog
 import numpy as na
 
 class VolumeAverageSet(object):
@@ -90,24 +91,40 @@ def volume_average(data, kdict=None, space='kspace'):
                 local_sum = 2*data_values[1:, ...].sum() + data_values[0, ...].sum()
             else:
                 local_sum = 2*data_values.sum()
+
+        return reduce_sum(local_sum)
+    elif space == 'xspace':
+        data_values = data['xspace']
+        return reduce_mean(data_values)
+    else:
+        raise ValueError("volume_average: must be either xspace or kspace")
                 
-    return reduce_sum(local_sum)
+
        
 @VolumeAverageSet.register_task
-def ekin(data):
-    en = na.zeros(data['u']['x']['kspace'].shape)
+def ekin(data, space='kspace'):
+    aux = data.clone()
+    aux.add_field('ekin', 'ScalarField')
     for i in xrange(data['u'].ncomp):
-        en += 0.5 * na.abs(data['u'][i]['kspace']) ** 2
+        if space == 'kspace':
+            aux['ekin']['kspace'] += 0.5 * na.abs(data['u'][i]['kspace']) ** 2
+        else:
+            aux['ekin']['xspace'] += 0.5 * na.abs(data['u'][i]['xspace']) ** 2
 
-    return volume_average(en, kdict=data['u']['x'].k)
-    
+
+    return volume_average(aux['ekin'], space=space)
+
 @VolumeAverageSet.register_task
-def emag(data):
-    en = na.zeros(data['B']['x']['kspace'].shape)
+def emag(data, space='kspace'):
+    aux = data.clone()
+    aux.add_field('emag', 'ScalarField')
     for i in xrange(data['B'].ncomp):
-        en += 0.5 * na.abs(data['B'][i]['kspace']) ** 2
+        if space == 'kspace':
+            aux['emag']['kspace'] += 0.5 * na.abs(data['B'][i]['kspace']) ** 2
+        else:
+            aux['emag']['xspace'] += 0.5 * na.abs(data['B'][i]['xspace']) ** 2
 
-    return reduce_sum(en.sum())
+    return volume_average(aux['emag'], space=space)
     
 @VolumeAverageSet.register_task
 def mode_track(data, k=(1, 0, 0)):
