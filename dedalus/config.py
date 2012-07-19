@@ -37,7 +37,9 @@ decfg.add_section('utils')
 decfg.set('utils', 'loglevel', 'debug')
 
 decfg.add_section('analysis')
-decfg.set('analysis', 'plot_slice', None)
+decfg.set('analysis', 'slice_axis', '0')
+decfg.set('analysis', 'slice_index', 'middle')
+decfg.set('analysis', 'slice_name', 'snap')
 
 # Read user config, local config
 decfg.read([os.path.expanduser('~/.dedalus/config'), 'dedalus.cfg'])
