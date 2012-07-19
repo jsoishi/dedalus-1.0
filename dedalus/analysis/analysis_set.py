@@ -32,6 +32,7 @@ import numpy as na
 import numpy.lib.stride_tricks as st
 import os
 from functools import wraps
+from dedalus.config import decfg
 from dedalus.utils.parallelism import com_sys
 from dedalus.utils.logger import mylog
 class AnalysisSet(object):
@@ -65,12 +66,48 @@ def volume_average(data, it, va_obj=None):
     va_obj.run()
 
 @AnalysisSet.register_task
-def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', saveas='snap', **kwargs):
+def field_snap(data, it, use_extent=False, space='xspace', **kwargs):
     """
-    Take a snapshot of all fields defined. Currently takes z[0] slice for 3D.
+    Take a snapshot of all fields defined.
     
     """
-    concat_axis = 0
+    # plot_slice is only for 3D. 
+    saveas = decfg.get('analysis', 'slice_name')
+    slice_axis = int(decfg.get('analysis', 'slice_axis'))
+    slice_index = decfg.get('analysis', 'slice_index')
+
+    if slice_index == 'top':
+        index = data.shape[slice_axis]
+    elif slice_index == 'bottom':
+        index = 0
+    elif slice_index == 'middle':
+        index = data.shape[slice_axis]/2 # round down
+    else:
+        index = int(slice_index)
+
+    plot_slice = [slice(None), slice(None), slice(None)]
+    plot_slice[slice_axis] = index
+    has_data = False
+    concat_axis = None
+    if data.ndim == 2:
+        com_pattern = 'gather'
+        concat_axis = 0
+    elif data.ndim == 3:
+        if (slice_axis == 0 and space == 'xspace') or (slice_axis == 1 and space == 'kspace'):
+            com_pattern = 'locate'
+        elif (slice_axis == 1 and space == 'xspace'):
+            com_pattern = 'gather'
+            concat_axis = 0
+        elif (slice_axis == 2 and space == 'xspace'):
+            com_pattern = 'gather'
+            concat_axis = 0
+        elif (slice_axis == 0 and space == 'kspace'):
+            com_pattern = 'gather'
+            concat_axis = 1
+        elif (slice_axis == 2 and space == 'kspace'):
+            com_pattern = 'gather'
+            concat_axis = 0
+
     # Determine image grid size
     nrow = len(data.fields.keys())
     ncol = na.max([f.ncomp for f in data.fields.values()])
@@ -102,12 +139,27 @@ def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', save
         i += 1
         for j in xrange(f.ncomp):
             I = i * ncol + j
-        
+
             if f[j].ndim == 3:
-                if plot_slice == None:
-                    # Default to bottom xy plane
-                    plot_slice = [0, slice(None), slice(None)]
-                plot_array = st.as_strided(f[j][space][plot_slice],shape=f[j][space][plot_slice].shape,strides=f[j][space][plot_slice].strides)
+                if com_pattern == 'locate':
+                    f[j][space] # make sure to switch spaces with all procs first
+                    
+                    if I == 0:
+                        test_mode = [q if type(q) == int else 0 for q in plot_slice]
+                        local_mode = f[j].find_mode(test_mode)
+                        if local_mode:
+                            mylog.debug("local mode = (%i, %i, %i)" % tuple(local_mode))
+                            plot_slice[slice_axis] = local_mode[slice_axis]
+                            has_data = True
+                        else:
+                            has_data = False
+                
+                if has_data or com_pattern == 'gather':
+                    plot_array = st.as_strided(f[j][space][plot_slice],
+                                               shape=f[j][space][plot_slice].shape,
+                                               strides=f[j][space][plot_slice].strides)
+                else:
+                    plot_array = False
             else:
                 plot_array = st.as_strided(f[j][space],shape=f[j][space].shape,strides=f[j][space].strides)
                 
@@ -117,15 +169,30 @@ def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', save
                 plot_array = na.log10(plot_array)
                 dtype = com_sys.MPI.COMPLEX
             else:
-                plot_array = plot_array.real
+                #plot_array = plot_array.real
                 dtype = com_sys.MPI.DOUBLE
 
             # collect all slices
-            gplot_array = com_sys.comm.gather(plot_array, root=0)
+            if plot_array is not False:
+                proc = com_sys.myproc
+            else:
+                proc = 0
 
+            if com_pattern == 'gather':
+                gplot_array = com_sys.comm.gather(plot_array, root=0)
+            elif com_pattern == 'locate':
+                recv_proc = com_sys.comm.reduce(proc,op=com_sys.MPI.SUM)
+                if plot_array is not False and com_sys.myproc == 0:
+                    gplot_array = plot_array
+                elif plot_array is not False and com_sys.myproc != 0:
+                    com_sys.comm.send(plot_array, dest=0, tag=11)
+                elif com_sys.myproc == 0:
+                    gplot_array = com_sys.comm.recv(source=recv_proc, tag=11)
+                com_sys.comm.barrier()
             # Plot
             if com_sys.myproc == 0:
-                gplot_array = na.concatenate(gplot_array, axis=concat_axis)
+                if com_pattern == 'gather':
+                    gplot_array = na.concatenate(gplot_array, axis=concat_axis)
                 im = grid[I].imshow(gplot_array, extent=extent, origin='lower', 
                                     interpolation='nearest', **kwargs)
                 grid[I].text(0.05, 0.95, k + str(j), transform=grid[I].transAxes, size=24, color='white')
@@ -139,11 +206,12 @@ def field_snap(data, it, plot_slice=None, use_extent=False, space='xspace', save
         if not os.path.exists('frames'):
             os.mkdir('frames')
         if space == 'kspace':
-            outfile = "frames/k_" + saveas + "_%07i.png" % it
+            outfile = "frames/k_" + saveas + "ax_%i_zone_%s_%07i.png" % (slice_axis, slice_index, it)
         else:
-            outfile = "frames/" + saveas + "_%07i.png" % it
+            outfile = "frames/" + saveas + "ax_%i_zone_%s_%07i.png" % (slice_axis, slice_index, it)
         fig.savefig(outfile)
         fig.clf()
+    mylog.debug("exiting field_snap")
 
 @AnalysisSet.register_task
 def print_energy(data, it):
