@@ -138,7 +138,6 @@ class FourierRepresentation(Representation):
             self.local_shape['xspace'][0] = local_n0
             self.offset = {'xspace': local_n0_start,
                            'kspace': local_n1_start}
-
         elif method == 'numpy':
             self.kdata = na.zeros(self.global_shape['kspace'], dtype=self.dtype)
             self.xdata = na.zeros(self.global_shape['xspace'])
