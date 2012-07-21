@@ -26,6 +26,7 @@ import h5py
 import numpy as na
 from dedalus.funcs import get_mercurial_changeset_id
 from dedalus.utils.api import Timer
+from dedalus.utils.logger import mylog
 from field_object import create_field_classes
 
 def _reconstruct_data(*args, **kwargs):
@@ -123,3 +124,8 @@ class StateData(object):
 
         fi = self.fields[self.fields.keys()[0]][0]
         return na.zeros(fi.local_shape[space], fi.data.dtype)
+
+    def report_counts(self):
+        for k,v in self.fields.iteritems():
+            mylog.debug("field %s" % k)
+            v.report_counts()

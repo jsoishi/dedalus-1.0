@@ -121,6 +121,10 @@ class FourierRepresentation(Representation):
         self.set_fft(method)
         self.set_dealiasing(dealiasing)
 
+        # for testing
+        self.fwd_count = 0
+        self.rev_count = 0
+
     @timer
     def _allocate_memory(self, method):
     
@@ -170,7 +174,6 @@ class FourierRepresentation(Representation):
         change for FFTW. Currently, we do that by slicing the entire data array. 
         
         """
-        
         if space == 'xspace':
             self.data = self.xdata
         elif space == 'kspace':
@@ -303,6 +306,7 @@ class FourierRepresentation(Representation):
         self.data = self.kdata
         self._curr_space = 'kspace'
         self.dealias()
+        self.fwd_count += 1
 
     def backward(self):
         """IFFT method to go from kspace to xspace."""
@@ -314,6 +318,7 @@ class FourierRepresentation(Representation):
         self.ifft()
         self.data = self.xdata
         self._curr_space = 'xspace'
+        self.rev_count += 1
 
     def set_dealiasing(self, dealiasing):
         """Assign dealiasing method."""

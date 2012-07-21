@@ -27,6 +27,7 @@ License:
 import weakref
 import h5py
 import numpy as na
+from dedalus.utils.logger import mylog
 
 def create_field_classes(representation, shape, length):
     """
@@ -125,6 +126,11 @@ class BaseField(object):
                                         dtype=self.components[i].data.dtype)
             
             self.components[i].save(dset)
+
+    def report_counts(self):
+        for i,c in enumerate(self.components):
+            mylog.debug("component[%i] forward count = %i" % (i,c.fwd_count))
+            mylog.debug("component[%i] rev count = %i" % (i,c.rev_count))
 
 class TensorFieldBase(BaseField):
     """Tensor class. Primarily used for vector covariant derivatives."""
