@@ -199,5 +199,4 @@ def divergence(data):
         + data['u']['y'].deriv('y') \
         + data['u']['z'].deriv('z')
 
-    div = (aux['div']['kspace'].sum()).real
-    return reduce_sum(div)
+    return volume_average(aux['div'])
