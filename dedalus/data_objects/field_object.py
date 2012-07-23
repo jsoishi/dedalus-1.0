@@ -108,14 +108,16 @@ class BaseField(object):
             item = self.trans[item]
         self.components[item] = data
 
-    def zero(self, comp):
+    def zero(self, comp, space='kspace'):
         if type(comp) == str:
             comp = self.trans[comp]
-        self.components[comp].data[:] = 0.
+        self.components[comp][space] = 0.
 
-    def zero_all(self):
+    def zero_all(self, space='kspace'):
+        """zero all field components, setting space if needed
+        """
         for c in self.components:
-            c.data[:] = 0.
+            c[space] = 0.
 
     def save(self, group):
         group.attrs["representation"] = self.representation.__name__
