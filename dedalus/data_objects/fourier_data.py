@@ -24,6 +24,7 @@ License:
 """
 
 import numpy as na
+import numpy.lib.stride_tricks as st
 import numpy.fft as fpack
 from dedalus.config import decfg
 from dedalus.utils.parallelism import com_sys, swap_indices
@@ -180,8 +181,10 @@ class FourierRepresentation(Representation):
             self.data = self.kdata
         else:
             raise KeyError("space must be either xspace or kspace.")
-            
-        if data.size < self.data.size:
+
+        if type(data) == float or type(data) == complex:
+            self.data[:] = data
+        elif data.size < self.data.size:
             mylog.warning("Size of assignment and data don't agree. This may be disallowed in future versions.")
             sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
             self.data[sli] = data
@@ -434,8 +437,12 @@ class FourierRepresentation(Representation):
         dataset : h5py dataset object
 
         """
-        
-        dataset[:] = self.data
+        if self._curr_space == 'xspace':
+            dataset[:] = st.as_strided(self.data,
+                                       shape = self.data.shape,
+                                       strides = self.data.strides)
+        else:
+            dataset[:] = self.data
         dataset.attrs['space'] = self._curr_space
 
     def xspace_grid(self):
