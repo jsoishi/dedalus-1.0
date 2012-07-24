@@ -24,6 +24,7 @@ License:
 """
 
 import numpy as na
+import numpy.lib.stride_tricks as st
 import numpy.fft as fpack
 from dedalus.config import decfg
 from dedalus.utils.parallelism import com_sys, swap_indices
@@ -121,6 +122,10 @@ class FourierRepresentation(Representation):
         self.set_fft(method)
         self.set_dealiasing(dealiasing)
 
+        # for testing
+        self.fwd_count = 0
+        self.rev_count = 0
+
     @timer
     def _allocate_memory(self, method):
     
@@ -169,15 +174,16 @@ class FourierRepresentation(Representation):
         change for FFTW. Currently, we do that by slicing the entire data array. 
         
         """
-        
         if space == 'xspace':
             self.data = self.xdata
         elif space == 'kspace':
             self.data = self.kdata
         else:
             raise KeyError("space must be either xspace or kspace.")
-            
-        if data.size < self.data.size:
+
+        if type(data) == float or type(data) == complex:
+            self.data[:] = data
+        elif data.size < self.data.size:
             mylog.warning("Size of assignment and data don't agree. This may be disallowed in future versions.")
             sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
             self.data[sli] = data
@@ -302,6 +308,7 @@ class FourierRepresentation(Representation):
         self.data = self.kdata
         self._curr_space = 'kspace'
         self.dealias()
+        self.fwd_count += 1
 
     def backward(self):
         """IFFT method to go from kspace to xspace."""
@@ -313,6 +320,7 @@ class FourierRepresentation(Representation):
         self.ifft()
         self.data = self.xdata
         self._curr_space = 'xspace'
+        self.rev_count += 1
 
     def set_dealiasing(self, dealiasing):
         """Assign dealiasing method."""
@@ -428,8 +436,12 @@ class FourierRepresentation(Representation):
         dataset : h5py dataset object
 
         """
-        
-        dataset[:] = self.data
+        if self._curr_space == 'xspace':
+            dataset[:] = st.as_strided(self.data,
+                                       shape = self.data.shape,
+                                       strides = self.data.strides)
+        else:
+            dataset[:] = self.data
         dataset.attrs['space'] = self._curr_space
 
     def xspace_grid(self):

@@ -70,10 +70,11 @@ def load_all_data(data, filename):
             load_space = data_file[field_comp].attrs['space']
             if load_space != data[field][comp]._curr_space:
                 data[field][comp][load_space]
-            try:
-                data[field][comp].data[:] = data_file[field_comp][:]
-            except:
-                raise KeyError("Data File missing field %s component %i" % (field, comp))
+           try:
+               output = (field,comp) + tuple(data[field][comp].data.shape)
+           except:
+               raise KeyError("Data File field %s component %i is missing or corrupt" % (field, comp))
+            data[field][comp].data[:] = data_file[field_comp][:]
             data.fields[field][comp]._curr_space = data_file[field_comp].attrs['space']
 
     data_file.close()
