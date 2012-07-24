@@ -337,8 +337,7 @@ class Hydro(Physics):
         
         # Compute terms
         #self.XgradY(u, u, gradu, ugradu)
-        #self.XlistgradY([u], u, mathtmp, [ugradu]) 
-        self.XlistgradY2([u], u, mathtmp, [ucopy],[ugradu]) 
+        self.XlistgradY([u], u, mathtmp, [ucopy],[ugradu]) 
         self.pressure(data)
         
         # Construct time derivatives
