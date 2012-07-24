@@ -143,7 +143,7 @@ def field_snap(data, it, use_extent=False, space='xspace', **kwargs):
             if f[j].ndim == 3:
                 if com_pattern == 'locate':
                     f[j][space] # make sure to switch spaces with all procs first
-                    
+
                     if I == 0:
                         test_mode = [q if type(q) == int else 0 for q in plot_slice]
                         local_mode = f[j].find_mode(test_mode)
@@ -189,6 +189,7 @@ def field_snap(data, it, use_extent=False, space='xspace', **kwargs):
                 elif com_sys.myproc == 0:
                     gplot_array = com_sys.comm.recv(source=recv_proc, tag=11)
                 com_sys.comm.barrier()
+
             # Plot
             if com_sys.myproc == 0:
                 if com_pattern == 'gather':

@@ -73,13 +73,13 @@ def taylor_green(data):
         if data['u']['y'].find_mode((1,1,-1)):
             data['u']['y']['kspace'][1,1,-1] = 1j/8.
         if data['u']['y'].find_mode((-1,1,1)):
-            data['u']['y']['kspace'][-1,1,1] = 1j/8.
+            data['u']['y']['kspace'][-1,1,1] = -1j/8.
         if data['u']['y'].find_mode((-1,1,-1)):
-            data['u']['y']['kspace'][-1,1,-1] = 1j/8.
+            data['u']['y']['kspace'][-1,1,-1] = -1j/8.
         if data['u']['y'].find_mode((1,-1,1)):
-            data['u']['y']['kspace'][1,-1,1] = -1j/8.
+            data['u']['y']['kspace'][1,-1,1] = 1j/8.
         if data['u']['y'].find_mode((1,-1,-1)):
-            data['u']['y']['kspace'][1,-1,-1] = -1j/8.
+            data['u']['y']['kspace'][1,-1,-1] = 1j/8.
         if data['u']['y'].find_mode((-1,-1,1)):
             data['u']['y']['kspace'][-1,-1,1] = -1j/8.
         if data['u']['y'].find_mode((-1,-1,-1)):
