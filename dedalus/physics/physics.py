@@ -24,6 +24,7 @@ License:
 """
 
 import numpy as na
+from dedalus.utils.logger import mylog
 from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
 from dedalus.utils.api import a_friedmann
 from dedalus.funcs import insert_ipython
@@ -165,7 +166,7 @@ class Physics(object):
             output[i]['xspace'] += tmp.real                    
             tmp *= 0+0j
             
-    def XlistgradY(self, Xlist, Y, tmp, outlist):
+    def XlistgradY(self, Xlist, Y, stmp, vtmp, outlist):
         """
         Calculate X dot (grad Y) for X in Xlist.
         This is a low-memory alternative to XgradY (never stores a full gradY tensor).
@@ -173,7 +174,8 @@ class Physics(object):
         Inputs:
             Xlist       List of input VectorField objects
             Y           Input Scalar/VectorField object
-            tmp         ScalarField object for use in internal calculations
+            stmp        List of ScalarField object for use in internal calculations
+            vtmp        VectorField object for use in internal calculations
             outlist     List of output Scalar/VectorField object
 
         """
@@ -182,16 +184,22 @@ class Physics(object):
 
         # Zero all output fields
         for outfield in outlist:
-            outfield.zero_all()
+            outfield.zero_all('xspace')
+
+        for i,X in enumerate(Xlist):
+            for j in xrange(X.ncomp):
+                vtmp[i][j]['kspace'] = X[j]['kspace']
+                vtmp[i][j]['xspace']
 
         for i in xrange(Y.ncomp):
             for j in self.dims:
                 # Compute dY_i/dx_j
-                tmp['kspace'] = Y[i].deriv(self._trans[j])
+                stmp['kspace'] = Y[i].deriv(self._trans[j])
                 
                 # Add term to each output
-                for k,X in enumerate(Xlist):
-                    outlist[k][i]['xspace'] += (X[j]['xspace'] * tmp['xspace']).real
+                for k,X in enumerate(vtmp):
+                    #outlist[k][i]['xspace'] += (X[j]['xspace'] * stmp['xspace']).real
+                    na.add(outlist[k][i]['xspace'], (X[j]['xspace'] * stmp['xspace']), outlist[k][i]['xspace'])
      
     def XcrossY(self, X, Y, output, space):
         """
@@ -289,6 +297,7 @@ class Hydro(Physics):
         self.fields = [('u', 'VectorField')]
         self._aux_fields = [('pressure', 'VectorField'),
                             ('mathtmp', 'ScalarField'),
+                            ('ucopy','VectorField'),
                             ('ugradu', 'VectorField')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
@@ -323,11 +332,13 @@ class Hydro(Physics):
         #gradu = self.aux_fields['gradu']
         ugradu = self.aux_fields['ugradu']
         pressure = self.aux_fields['pressure']
+        ucopy = self.aux_fields['ucopy']
         k2 = data['u']['x'].k2()
         
         # Compute terms
         #self.XgradY(u, u, gradu, ugradu)
-        self.XlistgradY([u], u, mathtmp, [ugradu]) 
+        #self.XlistgradY([u], u, mathtmp, [ugradu]) 
+        self.XlistgradY2([u], u, mathtmp, [ucopy],[ugradu]) 
         self.pressure(data)
         
         # Construct time derivatives
@@ -354,6 +365,7 @@ class Hydro(Physics):
         
         # Setup temporary data container
         sampledata = data['u']['x']
+
         sampledata['kspace']
         tmp = na.zeros_like(sampledata.data)
         k2 = sampledata.k2(no_zero=True)
