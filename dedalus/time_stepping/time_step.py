@@ -379,8 +379,10 @@ def integrating_factor_step(start, deriv, dt, output):
         else:
             IF[IF == 0] = 1e-10
         EIF = na.exp(IF * dt)
+        EIF1 = na.zeros_like(EIF)
+        na.subtract(EIF, 1, EIF1)
         for i in xrange(f.ncomp):
-            output[k][i]['kspace'] = (start[k][i]['kspace'] + deriv[k][i]['kspace'] / IF * (EIF - 1.)) / EIF
-
-    
-    
+            na.divide(deriv[k][i]['kspace'], IF, deriv[k][i]['kspace'])
+            na.multiply(deriv[k][i]['kspace'], EIF1, deriv[k][i]['kspace'])
+            na.add(start[k][i]['kspace'], deriv[k][i]['kspace'], start[k][i]['kspace'])
+            na.divide(start[k][i]['kspace'], EIF, output[k][i]['kspace'])
