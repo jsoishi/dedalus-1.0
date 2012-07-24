@@ -154,6 +154,9 @@ class FourierRepresentation(Representation):
         else:
             raise NotImplementedError("Specified FFT method not implemented.")
 
+        # allocate a temp array to hold derivatives
+        self.der = na.zeros_like(self.kdata)
+
     def __getitem__(self,space):
         """Returns data in specified space, transforming as necessary."""
         
@@ -385,9 +388,8 @@ class FourierRepresentation(Representation):
         
         if self._curr_space == 'xspace': 
             self.forward()
-        der = self.data * 1j * self.k[dim]
-        
-        return der
+        na.multiply(self.data, 1j*self.k[dim], self.der)
+        return self.der
 
     def k2(self, no_zero=False):
         """
