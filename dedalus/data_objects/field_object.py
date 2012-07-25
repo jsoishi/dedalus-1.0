@@ -25,7 +25,6 @@ License:
 """
 
 import weakref
-import h5py
 import numpy as na
 from dedalus.utils.logger import mylog
 
