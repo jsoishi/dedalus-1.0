@@ -274,8 +274,7 @@ class FourierRepresentation(Representation):
         mylog.debug("Setting FFT method to %s." % method)
         
         if method == 'fftw':
-            self.fplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'], direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
-            self.rplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'], direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+            self.create_fftw_plans()
             self.fft = self.fwd_fftw
             self.ifft = self.rev_fftw
             
@@ -287,6 +286,10 @@ class FourierRepresentation(Representation):
             
         else:
             raise NotImplementedError("Specified FFT method not implemented.")
+            
+    def create_fftw_plans(self):
+        self.fplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'], direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+        self.rplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'], direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
             
     def fwd_fftw(self):
         self.fplan()
@@ -390,7 +393,7 @@ class FourierRepresentation(Representation):
         
         if self._curr_space == 'xspace': 
             self.forward()
-        na.multiply(self.data, 1j*self.k[dim], self.deriv_data)
+        na.multiply(self.data, 1j * self.k[dim], self.deriv_data)
         
         return self.deriv_data
 
@@ -511,45 +514,87 @@ class FourierShearRepresentation(FourierRepresentation):
         # Store initial copy of ky, allocate a fleshed-out ky
         self.ky = self.k['y'].copy()
         self.k['y'] = self.k['y'] * na.ones_like(self.k['x'])
+    
+    def _update_k(self):
+        """Evolve wavenumbers due to shear."""
 
-    def set_fft(self, method):
-        if method == 'fftw':
-            self.fplan_yz = fftw.PlanPlane(self.data, 
-                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
-            self.rplan_yz = fftw.PlanPlane(self.data, 
-                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
-            self.fplan_x = fftw.PlanPencil(self.data, 
-                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
-            self.rplan_x = fftw.PlanPencil(self.data, 
-                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
-
-            self.fft = self.fwd_fftw
-            self.ifft = self.rev_fftw
-        if method == 'numpy':
-            self.fft = self.fwd_np
-            self.ifft = self.rev_np
-
-    def rev_np(self):
-        """IFFT method to go from kspace to xspace."""
+        # Add wavenumber shift
+        na.add(self.ky, self.shear_rate * self.sd.time * self.k['x'], self.k['y']
+    
+        # Wrap wavenumbers past Nyquist value
+        kny_y = self.kny[3 - self.ndim]
+        while self.k['y'].min() <= -kny_y:
+            self.k['y'][self.k['y'] <= -kny_y] += 2 * kny_y
+        while self.k['y'].max() > kny_y:
+            self.k['y'][self.k['y'] > kny_y] -= 2 * kny_y
         
+    def find_mode(self, mode):
+        """
+        Test if object has a given mode, return index for closest mode if so.
+
+        Parameters
+        ----------
+        mode : tuple of ints or floats
+            Tuple describing physical wavevector for which to search.  Recall 
+            kspace ordering (ky, kz, kx) for 3D, (kx, ky) for 2D.
+
+        Returns
+        -------
+        index : tuple of ints, or bool
+            Tuple of indexes to the closest mode, k, if input mode is present
+            in (k - dk/2 <= mode < k + dk/2) in all dimensions. None otherwise.
+
+        """
+        
+        raise NotImplementedError("Find_mode for shear rep is more advanced and needs to be done")
+
+    def create_fftw_plans(self):
+        raise NotImplementedError("TO DO")
+    
+        self.fplan_yz = fftw.PlanPlane(self.data, 
+                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+        self.rplan_yz = fftw.PlanPlane(self.data, 
+                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+        self.fplan_x = fftw.PlanPencil(self.data, 
+                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+        self.rplan_x = fftw.PlanPencil(self.data, 
+                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+                                           
+    def fwd_fftw(self):
+        raise NotImplementedError("TO DO")
+    
+        deltay = self.shear_rate * self.sd.time
+        x = (na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False) +
+             na.zeros(self.shape))
+
+        # do y-z fft
+        self.fplan_yz()
+
+        # Phase shift
+        self.data *= na.exp(1j * self.k['y'] * x * deltay)
+        
+        # Do x fft
+        self.fplan_x()
+        self.data /= (self.data.size * com_sys.nproc)
+
+    def rev_fftw(self):
+        raise NotImplementedError("TO DO")
+    
         deltay = self.shear_rate * self.sd.time 
         x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
         
         # Do x fft
-        self.data = fpack.ifft(self.data, axis=-1) * na.sqrt(self.shape[-1])
-        
+        self.rplan_x()
+
         # Phase shift
         self.data *= na.exp(-1j * self.k['y'] * x * deltay)
         
-        # Do y fft
-        self.data = fpack.ifft(self.data, axis=-2) * na.sqrt(self.shape[-2])
-        
-        # Do z fft
-        if self.ndim == 3:
-            self.data = fpack.ifft(self.data, axis=0) * na.sqrt(self.shape[0])
+        # Do y-z fft
+        self.rplan_yz()
+        self.data.imag = 0.
         
     def fwd_np(self):
-        """FFT method to go from xspace to kspace."""
+        raise NotImplementedError("TO DO")
         
         deltay = self.shear_rate * self.sd.time
         x = (na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False) +
@@ -568,43 +613,25 @@ class FourierShearRepresentation(FourierRepresentation):
         # Do x fft
         self.data = fpack.fft(self.data / na.sqrt(self.shape[-1]), axis=-1)
 
-    def fwd_fftw(self):
-        deltay = self.shear_rate * self.sd.time
-        x = (na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False) +
-             na.zeros(self.shape))
-
-        # do y-z fft
-        self.fplan_yz()
-
-        # Phase shift
-        self.data *= na.exp(1j * self.k['y'] * x * deltay)
+    def rev_np(self):
+        raise NotImplementedError("TO DO")
         
-        # Do x fft
-        self.fplan_x()
-        self.data /= (self.data.size * com_sys.nproc)
-
-    def rev_fftw(self):
         deltay = self.shear_rate * self.sd.time 
         x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
         
         # Do x fft
-        self.rplan_x()
-
+        self.data = fpack.ifft(self.data, axis=-1) * na.sqrt(self.shape[-1])
+        
         # Phase shift
         self.data *= na.exp(-1j * self.k['y'] * x * deltay)
         
-        # Do y-z fft
-        self.rplan_yz()
-        self.data.imag = 0.
+        # Do y fft
+        self.data = fpack.ifft(self.data, axis=-2) * na.sqrt(self.shape[-2])
+        
+        # Do z fft
+        if self.ndim == 3:
+            self.data = fpack.ifft(self.data, axis=0) * na.sqrt(self.shape[0])
 
-    def _update_k(self):
-        """Evolve modes due to shear."""
-
-        self.k['x'] = self.kx - self.shear_rate * self.sd.time * self.k['y']
-        while self.k['x'].min() < -self.kny[-1]:
-            self.k['x'][self.k['x'] < -self.kny[-1]] += 2 * self.kny[-1]
-        while self.k['x'].max() >= self.kny[-1]:
-            self.k['x'][self.k['x'] >= self.kny[-1]] -= 2 * self.kny[-1]
             
 # class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierShearRepresentation):
 #     def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
