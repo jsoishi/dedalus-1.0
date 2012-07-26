@@ -50,8 +50,8 @@ class Representation(object):
 
 class FourierRepresentation(Representation):
     """
-    Container for data that can be Fourier transformed. Includes a
-    wrapped and specifiable method for performing the FFT. 
+    Representation of a field component that can be Fourier transformed 
+    in all directions (i.e. periodic across the domain).
     
     """
     
@@ -60,21 +60,7 @@ class FourierRepresentation(Representation):
     def __init__(self, sd, shape, length):
         """
         Representation of a field component that can be Fourier transformed 
-        (i.e. periodic across the domain).
-        
-        When dealing with data, keep in mind that for parallelism, the
-        data is transposed between k and x spaces: currently, we use
-        FFTW's internal MPI parallelism. This may be updated later,
-        but for now, the transposition means that the first two
-        indexed dimensions are swapped when in k-space:
-
-        In 3D:
-            x-space: z, y, x
-            k-space: y, z, x
-    
-        In 2D:
-            x-space: y, x
-            k-space: x, y
+        in all directions (i.e. periodic across the domain).
         
         Parameters
         ----------
@@ -83,6 +69,21 @@ class FourierRepresentation(Representation):
             The shape of the data in xspace: (z, y, x) or (y, x)
         length : tuple of floats
             The length of the data in xspace: (z, y, x) or (y, x)
+            
+        Notes
+        -----
+        When dealing with data, keep in mind that for parallelism the data 
+        is transposed between k and x spaces following FFTW's internal MPI 
+        parallelism, in which the first two indexed dimensions are swapped 
+        when in k-space:
+
+        In 3D:
+            x-space: z, y, x
+            k-space: y, z, x
+    
+        In 2D:
+            x-space: y, x
+            k-space: x, y
             
         """
         
@@ -122,12 +123,13 @@ class FourierRepresentation(Representation):
         self.set_fft(method)
         self.set_dealiasing(dealiasing)
 
-        # for testing
+        # Set transform counters
         self.fwd_count = 0
         self.rev_count = 0
 
     @timer
     def _allocate_memory(self, method):
+        """Allocate memory for data and derivative."""
     
         # Compute global kspace shape for R2C FFT with transpose
         self.global_shape['kspace'] = self.global_shape['xspace'].copy()
@@ -154,8 +156,8 @@ class FourierRepresentation(Representation):
         else:
             raise NotImplementedError("Specified FFT method not implemented.")
 
-        # allocate a temp array to hold derivatives
-        self.der = na.zeros_like(self.kdata)
+        # Allocate a temp array to hold derivatives
+        self.deriv_data = na.zeros_like(self.kdata)
 
     def __getitem__(self,space):
         """Returns data in specified space, transforming as necessary."""
@@ -177,6 +179,7 @@ class FourierRepresentation(Representation):
         change for FFTW. Currently, we do that by slicing the entire data array. 
         
         """
+        
         if space == 'xspace':
             self.data = self.xdata
         elif space == 'kspace':
@@ -207,7 +210,6 @@ class FourierRepresentation(Representation):
         self.k = []
   
         for i,ksize in enumerate(self.global_shape['kspace']):
-            kshape = i * (1,) + (ksize,) + (self.ndim - i - 1) * (1,)
             xsize = swap_indices(self.global_shape['xspace'])[i]
             if ksize == xsize:
                 ki = fpack.fftfreq(ksize) * 2. * self.kny[i]
@@ -217,6 +219,7 @@ class FourierRepresentation(Representation):
                 ki = fpack.fftfreq(xsize)[:ksize] * 2. * self.kny[i]
                 if xsize % 2 == 0:
                     ki[-1] *= -1.
+            kshape = i * (1,) + (ksize,) + (self.ndim - i - 1) * (1,)
             ki.resize(kshape)
             self.k.append(ki)
         
@@ -284,12 +287,10 @@ class FourierRepresentation(Representation):
         else:
             raise NotImplementedError("Specified FFT method not implemented.")
             
-    #@timer
     def fwd_fftw(self):
         self.fplan()
         self.kdata /= self.global_shape['xspace'].prod()
         
-    #@timer
     def rev_fftw(self):
         self.rplan()
 
@@ -388,8 +389,8 @@ class FourierRepresentation(Representation):
         
         if self._curr_space == 'xspace': 
             self.forward()
-        na.multiply(self.data, 1j*self.k[dim], self.der)
-        return self.der
+        na.multiply(self.data, 1j*self.k[dim], self.deriv_data)
+        return self.deriv_data
 
     def k2(self, no_zero=False):
         """
@@ -447,9 +448,7 @@ class FourierRepresentation(Representation):
         dataset.attrs['space'] = self._curr_space
 
     def xspace_grid(self):
-        """returns the xspace grid for the local processor
-
-        """
+        """Return the xspace grid for the local processor."""
         gsh = self.global_shape['xspace']
         lsh = self.local_shape['xspace']
         offset = self.offset['xspace']
