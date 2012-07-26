@@ -154,7 +154,6 @@ class FourierRepresentation(Representation):
                                 'xspace': self.global_shape['xspace'].copy()}
             self.offset = {'xspace': 0,
                            'kspace': 0}
-        
         else:
             raise NotImplementedError("Specified FFT method not implemented.")
 
@@ -392,6 +391,7 @@ class FourierRepresentation(Representation):
         if self._curr_space == 'xspace': 
             self.forward()
         na.multiply(self.data, 1j*self.k[dim], self.deriv_data)
+        
         return self.deriv_data
 
     def k2(self, no_zero=False):
@@ -467,23 +467,50 @@ class FourierRepresentation(Representation):
 
 class FourierShearRepresentation(FourierRepresentation):
     """
-
+    Fourier representation in a shearing-box domain.
+        
     """
-    def __init__(self, sd, shape, length, left_edge=[0,0,-na.pi],**kwargs):    
+    
+    timer = Timer()
+    
+    def __init__(self, sd, shape, length):    
         """
-        Shearing box implementation.
-
+        Fourier representation in a shearing-box domain.
+        
         Parameters
         ----------
-        S : float
-            the *dimensional* shear rate in 1/t units
+        sd : StateData object
+        shape : tuple of ints
+            The shape of the data in xspace: (z, y, x) or (y, x)
+        length : tuple of floats
+            The length of the data in xspace: (z, y, x) or (y, x)
+            
+        Notes
+        -----
+        When dealing with data, keep in mind that for parallelism the data 
+        is transposed between k and x spaces following FFTW's internal MPI 
+        parallelism, in which the first two indexed dimensions are swapped 
+        when in k-space:
 
+        In 3D:
+            x-space: z, y, x
+            k-space: y, z, x
+    
+        In 2D:
+            x-space: y, x
+            k-space: x, y
+            
         """
         
-        FourierRepresentation.__init__(self, sd, shape, length, **kwargs)
+        # Fourier initialization
+        FourierRepresentation.__init__(self, sd, shape, length)
+        
+        # Calculate shear rate
         self.shear_rate = self.sd.parameters['S'] * self.sd.parameters['Omega']
-        self.kx = self.k['x'].copy()
-        self.left_edge = left_edge
+        
+        # Store initial copy of ky, allocate a fleshed-out ky
+        self.ky = self.k['y'].copy()
+        self.k['y'] = self.k['y'] * na.ones_like(self.k['x'])
 
     def set_fft(self, method):
         if method == 'fftw':
