@@ -300,11 +300,11 @@ class FourierRepresentation(Representation):
 
     def fwd_np(self):
         tr = [1, 0, 2][:self.ndim]
-        self.kdata = na.transpose(fpack.rfftn(self.xdata / self.global_shape['xspace'].prod()), tr)
+        self.kdata[:] = na.transpose(fpack.rfftn(self.xdata / self.global_shape['xspace'].prod()), tr)
 
     def rev_np(self):
         tr = [1, 0, 2][:self.ndim]
-        self.xdata = fpack.irfftn(na.transpose(self.kdata, tr)) * self.global_shape['xspace'].prod()
+        self.xdata[:] = fpack.irfftn(na.transpose(self.kdata, tr)) * self.global_shape['xspace'].prod()
 
     def forward(self):
         """FFT method to go from xspace to kspace."""
@@ -416,7 +416,7 @@ class FourierRepresentation(Representation):
         """Zero out the Nyquist space in each dimension."""
         
         # Zeroing mask   
-        if self.ndim ==2:
+        if self.ndim == 2:
             dmask = ((na.abs(self.k['x']) == self.kny[0]) | 
                      (na.abs(self.k['y']) == self.kny[1]))
         else:
@@ -519,7 +519,7 @@ class FourierShearRepresentation(FourierRepresentation):
         """Evolve wavenumbers due to shear."""
 
         # Add wavenumber shift
-        na.add(self.ky, self.shear_rate * self.sd.time * self.k['x'], self.k['y']
+        na.add(self.ky, self.shear_rate * self.sd.time * self.k['x'], self.k['y'])
     
         # Wrap wavenumbers past Nyquist value
         kny_y = self.kny[3 - self.ndim]
@@ -594,43 +594,54 @@ class FourierShearRepresentation(FourierRepresentation):
         self.data.imag = 0.
         
     def fwd_np(self):
-        raise NotImplementedError("TO DO")
+
+        if self.ndim == 2:
+            ysize = self.local_shape['xspace'][0]
+            y = na.linspace(0, 1, ysize, endpoint=False) * self.length[0]
+            y = na.reshape(y, (1, ysize))
+        else:
+            ysize = self.local_shape['xspace'][1]
+            y = na.linspace(0, 1, ysize, endpoint=False) * self.length[1]
+            y = na.reshape(y, (ysize, 1, 1))
+        dx = - self.shear_rate * y * self.sd.time
+        tr = [1, 0, 2][:self.ndim]
+
+        # Do x fft and transpose
+        self.kdata[:] = na.transpose(fpack.rfft(self.xdata / self.global_shape['xspace'].prod(), axis=-1), tr)
         
-        deltay = self.shear_rate * self.sd.time
-        x = (na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False) +
-             na.zeros(self.shape))
-
-        # Do z fft
-        if self.ndim == 3:
-            self.data = fpack.fft(self.data / na.sqrt(self.shape[0]), axis=0)
-
-        # Do y fft
-        self.data = fpack.fft(self.data / na.sqrt(self.shape[-2]), axis=-2)
-
         # Phase shift
-        self.data *= na.exp(1j * self.k['y'] * x * deltay)
-        
-        # Do x fft
-        self.data = fpack.fft(self.data / na.sqrt(self.shape[-1]), axis=-1)
+        self.kdata *= na.exp(1j * self.k['x'] * dx)
+
+        # Do y and z ffts
+        if self.ndim == 2:
+            self.kdata[:] = fpack.fft(self.kdata, axis=1)
+        else:
+            self.kdata[:] = fpack.fftn(self.kdata, axes=[0,1])
 
     def rev_np(self):
-        raise NotImplementedError("TO DO")
-        
-        deltay = self.shear_rate * self.sd.time 
-        x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
-        
-        # Do x fft
-        self.data = fpack.ifft(self.data, axis=-1) * na.sqrt(self.shape[-1])
-        
+    
+        if self.ndim == 2:
+            ysize = self.local_shape['xspace'][0]
+            y = na.linspace(0, 1, ysize, endpoint=False) * self.length[0]
+            y = na.reshape(y, (1, ysize))
+        else:
+            ysize = self.local_shape['xspace'][1]
+            y = na.linspace(0, 1, ysize, endpoint=False) * self.length[1]
+            y = na.reshape(y, (ysize, 1, 1))
+        dx = - self.shear_rate * y * self.sd.time
+        tr = [1, 0, 2][:self.ndim]
+    
+        # Do y and z ffts
+        if self.ndim == 2:
+            self.kdata[:] = fpack.ifft(self.kdata, axis=1)
+        else:
+            self.kdata[:] = fpack.ifftn(self.kdata, axes=[0,1])
+
         # Phase shift
-        self.data *= na.exp(-1j * self.k['y'] * x * deltay)
+        self.kdata *= na.exp(-1j * self.k['x'] * dx)
         
-        # Do y fft
-        self.data = fpack.ifft(self.data, axis=-2) * na.sqrt(self.shape[-2])
-        
-        # Do z fft
-        if self.ndim == 3:
-            self.data = fpack.ifft(self.data, axis=0) * na.sqrt(self.shape[0])
+        # Do x fft and transpose
+        self.xdata[:] = fpack.irfft(na.transpose(self.kdata, tr), axis=-1) * self.global_shape['xspace'].prod()
 
             
 # class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierShearRepresentation):

@@ -386,10 +386,10 @@ class ShearHydro(Hydro):
         Compute right hand side of fluid equations, populating self._RHS with
         the time derivatives of the fields.
 
-        u_t + nu k^2 u = -ugradu - i k p / rho0 + rotation + shear
+        u_t + nu K^2 u = -ugradu - i K p / rho0 + rotation + shear
         
-        rotation =  [2 Omega u_y,  0                 ,  0]
-        shear =     [0          ,  -(2 + S) Omega u_x,  0]
+        rotation = -2 Omega u_x e_y
+        shear = (2 + S) Omega u_y e_x
 
         """
         
@@ -399,20 +399,20 @@ class ShearHydro(Hydro):
         
         # Compute terms
         Hydro.RHS(self, data)
-        self._RHS['u']['x']['kspace'] += 2. * Omega * data['u']['y']['kspace']
-        self._RHS['u']['y']['kspace'] += -(2 + S) * Omega * data['u']['x']['kspace']
+        self._RHS['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
+        self._RHS['u']['x']['kspace'] += (2. + S) * Omega * data['u']['y']['kspace']
         
         return self._RHS
 
     def pressure(self, data):
         """
-        Compute pressure term for ufields: i k p / rho0
+        Compute pressure term for ufields: i K p / rho0
         
-        p / rho0 = i (k * ugradu + rotation + shear)/ k^2
-        ==> pressure term = - k (k * ugradu + rotation + shear) / k^2
+        p / rho0 = i (K * ugradu + rotation + shear)/ K^2
+        ==> pressure term = - K (K * ugradu + rotation + shear) / K^2
         
-        rotation = -2 Omega u_y K_x
-        shear = (1 + S) 2 Omega u_x K_y
+        rotation = 2 Omega u_x K_y
+        shear = -(1 + S) 2 Omega u_y K_x
         
         """
         
@@ -427,13 +427,13 @@ class ShearHydro(Hydro):
         tmp = na.zeros_like(sampledata.data)
         k2 = sampledata.k2(no_zero=True)
         
-        # Construct k * ugradu
+        # Construct K * ugradu
         for i in self.dims:
             tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace'] 
 
         # Add rotation + shear
-        tmp += (2. * (1 + S) * Omega * data['u']['x'].k['y'] * data['u']['x']['kspace'] - 
-                2. * Omega * data['u']['y'].k['x'] * data['u']['y']['kspace'])
+        tmp += (2. * Omega * data['u']['x']['kspace'] * data['u']['x'].k['y'] -
+                (1. + S) * 2. * Omega * data['u']['y']['kspace'] * data['u']['x'].k['x'])
 
         # Construct full term
         for i in self.dims:            
