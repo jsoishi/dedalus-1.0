@@ -387,7 +387,7 @@ def MIT_vortices(data):
     http://math.mit.edu/cse/codes/mit18336_spectral_ns2d.m
 
     """
-    x, y = data['u']['x'].xspace_grid()
+    y, x = data['u']['x'].xspace_grid()
     aux = data.clone()
     aux.add_field('w','ScalarField')
     aux.add_field('psi','ScalarField')
