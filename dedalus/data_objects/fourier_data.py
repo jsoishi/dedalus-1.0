@@ -449,12 +449,18 @@ class FourierRepresentation(Representation):
 
     def xspace_grid(self):
         """Return the xspace grid for the local processor."""
-        gsh = self.global_shape['xspace']
-        lsh = self.local_shape['xspace']
-        offset = self.offset['xspace']
+        
+        # Create integer array based on local shape and offset
+        grid = na.mgrid[[slice(i) for i in self.local_shape['xspace']]]
+        grid = na.asfarray(grid)
+        grid[0] += self.offset['xspace']
+        
+        # Multiply integer array by grid spacing
+        dx = self.length / self.global_shape['xspace']
+        for i in xrange(self.ndim):
+            grid[i] *= dx[i]
 
-        x, y = na.meshgrid(na.r_[0:lsh[1]]*2*na.pi/gsh[1],na.r_[offset:lsh[0]+offset]*2*na.pi/gsh[0])
-        return x, y
+        return grid
 
 
 class FourierShearRepresentation(FourierRepresentation):
