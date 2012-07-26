@@ -94,8 +94,10 @@ class FourierRepresentation(Representation):
         self.ndim = len(shape)
         
         # Flexible datatypes not currently supported
-        self.dtype = 'complex128'
-        self.__eps = na.finfo(self.dtype).eps
+        self.dtype = {'kspace': 'complex128', 
+                      'xspace': 'float64'}
+        self.__eps = {'kspace': na.finfo(self.dtype['kspace']).eps,
+                      'xspace': na.finfo(self.dtype['xspace']).eps}
         
         # Make sure all dimensions make sense
         if self.ndim not in (2, 3):
@@ -146,8 +148,8 @@ class FourierRepresentation(Representation):
             self.offset = {'xspace': local_n0_start,
                            'kspace': local_n1_start}
         elif method == 'numpy':
-            self.kdata = na.zeros(self.global_shape['kspace'], dtype=self.dtype)
-            self.xdata = na.zeros(self.global_shape['xspace'])
+            self.kdata = na.zeros(self.global_shape['kspace'], dtype=self.dtype['kspace'])
+            self.xdata = na.zeros(self.global_shape['xspace'], dtype=self.dtype['xspace'])
             self.local_shape = {'kspace': self.global_shape['kspace'].copy(),
                                 'xspace': self.global_shape['xspace'].copy()}
             self.offset = {'xspace': 0,
@@ -428,7 +430,7 @@ class FourierRepresentation(Representation):
         
         if self._curr_space == 'xspace': 
             self.forward()
-        self.data[na.abs(self.data) < self.__eps] = 0.
+        self.data[na.abs(self.data) < self.__eps['kspace']] = 0.
 
     def save(self, dataset):
         """
