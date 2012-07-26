@@ -128,38 +128,7 @@ class FourierRepresentation(Representation):
         # Set transform counters
         self.fwd_count = 0
         self.rev_count = 0
-
-    @timer
-    def _allocate_memory(self, method):
-        """Allocate memory for data and derivative."""
     
-        # Compute global kspace shape for R2C FFT with transpose
-        self.global_shape['kspace'] = self.global_shape['xspace'].copy()
-        self.global_shape['kspace'][-1]  = self.global_shape['kspace'][-1] / 2 + 1
-        self.global_shape['kspace'] = swap_indices(self.global_shape['kspace'])
-        
-        # Assign data arrays and compute local shapes and offsets
-        if method == 'fftw':
-            self.kdata, self.xdata, local_n0, local_n0_start, local_n1, local_n1_start = fftw.create_data(self.global_shape['xspace'], com_sys)
-            self.local_shape = {'kspace': self.global_shape['kspace'].copy(),
-                                'xspace': self.global_shape['xspace'].copy()}
-            self.local_shape['kspace'][0] = local_n1
-            self.local_shape['xspace'][0] = local_n0
-            self.offset = {'xspace': local_n0_start,
-                           'kspace': local_n1_start}
-        elif method == 'numpy':
-            self.kdata = na.zeros(self.global_shape['kspace'], dtype=self.dtype['kspace'])
-            self.xdata = na.zeros(self.global_shape['xspace'], dtype=self.dtype['xspace'])
-            self.local_shape = {'kspace': self.global_shape['kspace'].copy(),
-                                'xspace': self.global_shape['xspace'].copy()}
-            self.offset = {'xspace': 0,
-                           'kspace': 0}
-        else:
-            raise NotImplementedError("Specified FFT method not implemented.")
-
-        # Allocate a temp array to hold derivatives
-        self.deriv_data = na.zeros_like(self.kdata)
-
     def __getitem__(self,space):
         """Returns data in specified space, transforming as necessary."""
         
@@ -199,6 +168,37 @@ class FourierRepresentation(Representation):
             self.data[:] = data[sli]
 
         self._curr_space = space
+
+    @timer
+    def _allocate_memory(self, method):
+        """Allocate memory for data and derivative."""
+    
+        # Compute global kspace shape for R2C FFT with transpose
+        self.global_shape['kspace'] = self.global_shape['xspace'].copy()
+        self.global_shape['kspace'][-1]  = self.global_shape['kspace'][-1] / 2 + 1
+        self.global_shape['kspace'] = swap_indices(self.global_shape['kspace'])
+        
+        # Assign data arrays and compute local shapes and offsets
+        if method == 'fftw':
+            self.kdata, self.xdata, local_n0, local_n0_start, local_n1, local_n1_start = fftw.create_data(self.global_shape['xspace'], com_sys)
+            self.local_shape = {'kspace': self.global_shape['kspace'].copy(),
+                                'xspace': self.global_shape['xspace'].copy()}
+            self.local_shape['kspace'][0] = local_n1
+            self.local_shape['xspace'][0] = local_n0
+            self.offset = {'xspace': local_n0_start,
+                           'kspace': local_n1_start}
+        elif method == 'numpy':
+            self.kdata = na.zeros(self.global_shape['kspace'], dtype=self.dtype['kspace'])
+            self.xdata = na.zeros(self.global_shape['xspace'], dtype=self.dtype['xspace'])
+            self.local_shape = {'kspace': self.global_shape['kspace'].copy(),
+                                'xspace': self.global_shape['xspace'].copy()}
+            self.offset = {'xspace': 0,
+                           'kspace': 0}
+        else:
+            raise NotImplementedError("Specified FFT method not implemented.")
+
+        # Allocate a temp array to hold derivatives
+        self.deriv_data = na.zeros_like(self.kdata)
 
     def _setup_k(self):
         """Create local wavenumber arrays."""
