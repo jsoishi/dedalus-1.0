@@ -199,6 +199,12 @@ class FourierRepresentation(Representation):
 
         # Allocate an array to hold derivatives
         self.deriv_data = na.zeros_like(self.kdata)
+        
+        # Incorporate ability to add extra views, etc.
+        self._additional_allocation(method)
+        
+    def _additional_allocation(self, method):
+        pass
 
     def _setup_k(self):
         """Create local wavenumber arrays."""
@@ -510,18 +516,41 @@ class FourierShearRepresentation(FourierRepresentation):
         # Fourier initialization
         FourierRepresentation.__init__(self, sd, shape, length)
         
-        # Calculate shear rate
-        self.shear_rate = self.sd.parameters['S'] * self.sd.parameters['Omega']
-        
         # Store initial copy of ky, allocate a fleshed-out ky
-        self.ky = self.k['y'].copy()
+        self._ky = self.k['y'].copy()
         self.k['y'] = self.k['y'] * na.ones_like(self.k['x'])
+        
+        # Construct global kx in x-space layout
+
+        
+        # Calculate phase rate for use in x-orientation transpose
+        ksize = self.global_shape['kspace'][self.ktrans['x']]
+        xsize = self.global_shape['xspace'][self.xtrans['x']]
+        xkx = fpack.fftfreq(xsize)[:ksize] * 2. * self.kny[self.ktrans['x']]
+        if xsize % 2 == 0:
+            xkx[-1] *= -1.
+        xkx.resize((self.ndim - 1) * (1,) + (ksize,))
+        y = self.xspace_grid(open=True)[self.xtrans['y']]
+        self._phase_rate = -self.sd.parameters['S'] * self.sd.parameters['Omega'] * xkx * y
+        
+        # Calculate wave rate for use in wavenumber update
+        self._wave_rate = -self.sd.parameters['S'] * self.sd.parameters['Omega'] * self.k['x']
+        
+    def _additional_allocation(self, method):
+        """Allocate memory for intermediate transformation arrays."""
+
+        if method == 'fftw':
+            pass
+        elif method == 'numpy':
+            tempshape = self.global_shape['xspace'].copy()
+            tempshape[-1] = tempshape[-1] / 2 + 1
+            self._tempdata = na.zeros(tempshape, dtype= self.dtype['kspace'])
     
     def _update_k(self):
         """Evolve wavenumbers due to shear."""
 
-        # Add wavenumber shift
-        na.add(self.ky, self.shear_rate * self.sd.time * self.k['x'], self.k['y'])
+        # Wavenumber shift
+        na.subtract(self._ky, self._wave_rate * self.sd.time , self.k['y'])
     
         # Wrap wavenumbers past Nyquist value
         kny_y = self.kny[3 - self.ndim]
@@ -597,135 +626,44 @@ class FourierShearRepresentation(FourierRepresentation):
         
     def fwd_np(self):
 
-        tr = [1, 0, 2][:self.ndim]
-        if self.ndim == 2:
-            y, _ = self.xspace_grid(open=True)
-            y = na.transpose(y, tr)
-        else:
-            _, y, _ = self.xspace_grid(open=True)
-            y = na.transpose(y, tr)
-        dx = - self.shear_rate * y * self.sd.time
-
-        # Do x fft and transpose
-        self.kdata[:] = na.transpose(fpack.rfft(self.xdata / self.global_shape['xspace'].prod(), axis=-1), tr)
+        # Do x fft
+        self._tempdata[:] = fpack.rfft(self.xdata / self.global_shape['xspace'].prod(), axis=-1)
         
         # Phase shift
-        self.kdata *= na.exp(1j * self.k['x'] * dx)
-
+        self._tempdata *= na.exp(1j * self._phase_rate * self.sd.time)
+        
+        # Transpose
+        tr = [1, 0, 2][:self.ndim]
+        self.kdata[:] = na.transpose(self._tempdata, tr)
+        
         # Do y and z ffts
         if self.ndim == 2:
             self.kdata[:] = fpack.fft(self.kdata, axis=1)
         else:
-            self.kdata[:] = fpack.fftn(self.kdata, axes=[0,1])
+            self.kdata[:] = fpack.fftn(self.kdata, axes=(0,1))
 
     def rev_np(self):
-    
-        tr = [1, 0, 2][:self.ndim]
-        if self.ndim == 2:
-            y, _ = self.xspace_grid(open=True)
-            y = na.transpose(y, tr)
-        else:
-            _, y, _ = self.xspace_grid(open=True)
-            y = na.transpose(y, tr)
-        dx = - self.shear_rate * y * self.sd.time
     
         # Do y and z ffts
         if self.ndim == 2:
             self.kdata[:] = fpack.ifft(self.kdata, axis=1)
         else:
-            self.kdata[:] = fpack.ifftn(self.kdata, axes=[0,1])
+            self.kdata[:] = fpack.ifftn(self.kdata, axes=(0,1))
+            
+        # Transpose
+        tr = [1, 0, 2][:self.ndim]
+        self._tempdata[:] = na.transpose(self.kdata, tr)        
 
         # Phase shift
-        self.kdata *= na.exp(-1j * self.k['x'] * dx)
+        self._tempdata *= na.exp(-1j * self._phase_rate * self.sd.time)
         
-        # Do x fft and transpose
-        self.xdata[:] = fpack.irfft(na.transpose(self.kdata, tr), axis=-1) * self.global_shape['xspace'].prod()
-
-            
-# class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierShearRepresentation):
-#     def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
-#                  dealiasing='2/3 cython'):
-#         ParallelFourierRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
-#         FourierShearRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
-#         self.nproc = com_sys.nproc
-#         self.myproc = com_sys.myproc
-#         self.offset = na.array([0, 0, self.myproc * shape[2]])
-
-#     def fwd_np(self):
-#         """FFT method to go from xspace to kspace."""
-        
-#         deltay = self.shear_rate * self.sd.time
-#         x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False)
-
-#         # Do y-z fft
-#         self.data = fpack.fftn(self.data, axes=(0,1))
-
-#         # communicate
-#         recvbuf = self.communicate('forward')
-
-#         # Phase shift
-#         recvbuf *= na.exp(1j * self.k['y'] * x * deltay)
-        
-#         # Do x fft
-#         self.data = fpack.fft(recvbuf, axis=2)
-#         self.data /= (self.data.size * com_sys.nproc)
-
-#     def rev_np(self):
-#         """IFFT method to go from kspace to xspace."""
-#         deltay = self.shear_rate * self.sd.time 
-#         x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
-
-#         # Do x fft
-#         self.data = fpack.ifft(self.data, axis=2)
-        
-#         # Phase shift
-#         self.data *= na.exp(-1j * self.k['y'] * x * deltay)
-
-#         # communicate
-#         recvbuf = self.communicate('backward')
-        
-#         # Do y-z fft
-#         self.data = fpack.ifftn(recvbuf, axes=(0,1))
-#         self.data *= (self.data.size * com_sys.nproc)
-
-#     def fwd_fftw(self):
-#         deltay = self.shear_rate * self.sd.time
-#         x = na.linspace(self.left_edge[-1], self.left_edge[-1] + self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False)
-
-#         # do y-z fft
-#         self.fplan_yz()
-#         a = self.communicate('forward')
-#         self.data.shape = self._shape['kspace']
-#         self.data[:] = a[:]
-
-#         # Phase shift
-#         self.data *= na.exp(1j * self.k['y'] * x * deltay)
-        
-#         # Do x fft
-#         self.fplan_x()
-#         self.data /= (self.data.size * com_sys.nproc)
-
-#     def rev_fftw(self):
-#         deltay = self.shear_rate * self.sd.time
-#         x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
-
-#         # Do x fft
-#         self.rplan_x()
-
-#         # Phase shift
-#         self.data *= na.exp(-1j * self.k['y'] * x * deltay)
-        
-#         # Communicate
-#         a = self.communicate('backward')
-#         self.data.shape = self._shape['xspace']
-#         self.data[:] = a[:]
-
-#         # Do y-z fft
-#         self.rplan_yz()
-#         self.data.imag = 0.
+        # Do x fft
+        self.xdata[:] = fpack.irfft(self._tempdata, axis=-1) * self.global_shape['xspace'].prod()
 
 class SphericalHarmonicRepresentation(FourierRepresentation):
-    """Dedalus should eventually support spherical and cylindrical geometries.
+    """
+    Dedalus should eventually support spherical and cylindrical geometries.
 
     """
+    
     pass
