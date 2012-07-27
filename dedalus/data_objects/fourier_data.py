@@ -520,9 +520,6 @@ class FourierShearRepresentation(FourierRepresentation):
         self._ky = self.k['y'].copy()
         self.k['y'] = self.k['y'] * na.ones_like(self.k['x'])
         
-        # Construct global kx in x-space layout
-
-        
         # Calculate phase rate for use in x-orientation transpose
         ksize = self.global_shape['kspace'][self.ktrans['x']]
         xsize = self.global_shape['xspace'][self.xtrans['x']]
@@ -535,6 +532,9 @@ class FourierShearRepresentation(FourierRepresentation):
         
         # Calculate wave rate for use in wavenumber update
         self._wave_rate = -self.sd.parameters['S'] * self.sd.parameters['Omega'] * self.k['x']
+        
+        # Update wavenumbers in case component is initialized at non-zero time
+        self._update_k()
         
     def _additional_allocation(self, method):
         """Allocate memory for intermediate transformation arrays."""
