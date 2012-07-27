@@ -27,6 +27,9 @@ License:
 import weakref
 import numpy as na
 from dedalus.utils.logger import mylog
+from dedalus.data_objects.fourier_data import \
+    FourierRepresentation, \
+    FourierShearRepresentation
 
 def create_field_classes(representation, shape, length):
     """
@@ -147,41 +150,33 @@ class VectorFieldBase(BaseField):
         self.trans = {'x': 0, 'y': 1, 'z': 2,
                       0:'x', 1:'y', 2:'z'} # for vector fields
 
-    def div_free(self, verbose=False):
+    def div_free(self):
         """
         Project off irrotational part of the vector field.
         
+        Notes
+        -----
         F = -grad(phi) + curl(A)
-        
-        ==> laplace(phi) = - div(F) 
+        ==> laplace(phi) = -div(F) 
+        ==> phi = inv_laplace(-div(F))
+        ==> F_proj = F - grad(inv_laplace(div(F)))
         
         """
         
-        mylog.debug("Projecting off irrotational part of vector field.")
+        if self.representation not in [FourierRepresentation,
+                                       FourierShearRepresentation]:
+            raise NotImplementedError("Solenoidal projection not implemented for this representation.")
         
-        if verbose:
-            # Compute pre-projection power
-            power0 = 0.
-            for i in xrange(self.ncomp):
-                power0 += 0.5 * na.sum(na.abs(self[i]['kspace']) ** 2)
-            mylog.debug("Pre-projection power : %f" % power0)
-    
-        KF = 0
-        for i in xrange(self.ncomp):
-            KF += self[i].k[self.trans[i]] * self[i]['kspace']
+        mylog.debug("Performing solenoidal projection.")
+        
+        divF = 0
+        for i,c in self:
+            divF += c.deriv(self.trans[i])
 
         k2 = self[i].k2(no_zero=True)
         
-        for i in xrange(self.ncomp):
-            self[i]['kspace'] -= self[i].k[self.trans[i]] * KF / k2
-        
-        if verbose:
-            # Compute post-projection power
-            power1 = 0.
-            for i in xrange(self.ncomp):
-                power1 += 0.5 * na.sum(na.abs(self[i]['kspace']) ** 2)
-            mylog.debug("Post-projection power: %f" % power1)
-            mylog.debug("Power projected off  : %f" % (power1 - power0))
+        for i,c in self:
+            c['kspace'] -= -1j * c.k[self.trans[i]] * divF / k2
     
 class ScalarFieldBase(BaseField):
     """Scalar class. One component."""
