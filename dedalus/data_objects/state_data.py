@@ -1,4 +1,5 @@
-"""The Main Dedalus data object. Has a dictionary of fields, each of
+"""
+The main Dedalus data object. Has a dictionary of fields, each of
 which can be a Tensor, Vector, or Scalar object.
 
 Author: J. S. Oishi <jsoishi@gmail.com>
@@ -20,7 +21,9 @@ License:
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  
 """
+
 from collections import OrderedDict
 import h5py
 import numpy as na

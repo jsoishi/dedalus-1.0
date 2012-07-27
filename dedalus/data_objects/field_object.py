@@ -88,16 +88,16 @@ class BaseField(object):
         self.integrating_factor = None
         
         # Translation table to be specified in derived classes
-        self.trans = {}
+        self.ctrans = {}
         
     def __getitem__(self, item):
         if type(item) == str:
-            item = self.trans[item]
+            item = self.ctrans[item]
         return self.components[item]
         
     def __setitem__(self, item, data):
         if type(item) == str:
-            item = self.trans[item]
+            item = self.ctrans[item]
         self.components[item] = data
 
     def __iter__(self):
@@ -108,7 +108,7 @@ class BaseField(object):
         """Zero specified component, setting space if needed."""
         
         if type(comp) == str:
-            comp = self.trans[comp]
+            comp = self.ctrans[comp]
         self.components[comp][space] = 0.
 
     def zero_all(self, space='kspace'):
@@ -146,9 +146,11 @@ class VectorFieldBase(BaseField):
     def __init__(self, sd):
         ncomp = sd.ndim
         BaseField.__init__(self, sd, ncomp)
-        #self.trans = self.components[0].trans
-        self.trans = {'x': 0, 'y': 1, 'z': 2,
-                      0:'x', 1:'y', 2:'z'} # for vector fields
+        
+        if self.ncomp == 2:
+            self.ctrans = {'x':0, 0:'x', 'y':1, 1:'y'}
+        else:
+            self.ctrans = {'x':0, 0:'x', 'y':1, 1:'y', 'z':2, 2:'z'}
 
     def div_free(self):
         """
@@ -171,12 +173,12 @@ class VectorFieldBase(BaseField):
         
         divF = 0
         for i,c in self:
-            divF += c.deriv(self.trans[i])
+            divF += c.deriv(self.ctrans[i])
 
         k2 = self[i].k2(no_zero=True)
         
         for i,c in self:
-            c['kspace'] -= -1j * c.k[self.trans[i]] * divF / k2
+            c['kspace'] -= -1j * c.k[self.ctrans[i]] * divF / k2
     
 class ScalarFieldBase(BaseField):
     """Scalar class. One component."""
