@@ -93,17 +93,17 @@ class FourierRepresentation(Representation):
         self.length = na.asfarray(length)
         self.ndim = len(shape)
         
+        # Make sure all dimensions make sense
+        if self.ndim not in (2, 3):
+            raise ValueError("Must use either 2 or 3 dimensions.")
+        if len(shape) != len(length):
+            raise ValueError("Shape and Length must have same dimensions.")
+        
         # Flexible datatypes not currently supported
         self.dtype = {'kspace': 'complex128', 
                       'xspace': 'float64'}
         self.__eps = {'kspace': na.finfo(self.dtype['kspace']).eps,
                       'xspace': na.finfo(self.dtype['xspace']).eps}
-        
-        # Make sure all dimensions make sense
-        if self.ndim not in (2, 3):
-            raise ValueError("Must use either 2 or 3 dimensions.")
-        if self.ndim != len(self.length):
-            raise ValueError("Shape and Length must have same dimensions.")
         
         # Retrieve FFT method and dealiasing method from config
         method = decfg.get('FFT', 'method')
@@ -111,26 +111,25 @@ class FourierRepresentation(Representation):
         
         # Translation tables
         if self.ndim == 2:
-            self.xtrans = {'x':1, 1:'x', 'y':0, 0:'y'}
             self.ktrans = {'x':0, 0:'x', 'y':1, 1:'y'}
+            self.xtrans = {'x':1, 1:'x', 'y':0, 0:'y'}
         else:
-            self.xtrans = {'x':2, 2:'x', 'y':1, 1:'y', 'z':0, 0:'z'}
             self.ktrans = {'x':2, 2:'x', 'y':0, 0:'y', 'z':1, 1:'z'}
+            self.xtrans = {'x':2, 2:'x', 'y':1, 1:'y', 'z':0, 0:'z'}
             
         # Complete setup
-        self._allocate_memory(method)
+        self.set_fft(method)
+        self.set_dealiasing(dealiasing)
         self._setup_k()
         self._curr_space = 'kspace'
         self.data = self.kdata
-        self.set_fft(method)
-        self.set_dealiasing(dealiasing)
 
         # Set transform counters
         self.fwd_count = 0
         self.rev_count = 0
     
     def __getitem__(self,space):
-        """Returns data in specified space, transforming as necessary."""
+        """Return data in specified space, transforming as necessary."""
         
         if space == self._curr_space:
             pass
@@ -145,8 +144,8 @@ class FourierRepresentation(Representation):
 
     def __setitem__(self, space, data):
         """
-        This needs to ensure the pointer for the field's data member doesn't 
-        change for FFTW. Currently, we do that by slicing the entire data array. 
+        Set data while ensuring the pointer for the field's data member doesn't 
+        change for FFTW. Currently done by slicing the entire data array. 
         
         """
         
@@ -157,12 +156,15 @@ class FourierRepresentation(Representation):
         else:
             raise KeyError("space must be either xspace or kspace.")
 
+        # Scalar assignment
         if type(data) == float or type(data) == complex:
             self.data[:] = data
+        # Mis-matched size assignment
         elif data.size < self.data.size:
             mylog.warning("Size of assignment and data don't agree. This may be disallowed in future versions.")
             sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
             self.data[sli] = data
+        # Regular assignment by slicing
         else:
             sli = [slice(i) for i in self.data.shape]
             self.data[:] = data[sli]
@@ -194,10 +196,8 @@ class FourierRepresentation(Representation):
                                 'xspace': self.global_shape['xspace'].copy()}
             self.offset = {'xspace': 0,
                            'kspace': 0}
-        else:
-            raise NotImplementedError("Specified FFT method not implemented.")
 
-        # Allocate a temp array to hold derivatives
+        # Allocate an array to hold derivatives
         self.deriv_data = na.zeros_like(self.kdata)
 
     def _setup_k(self):
@@ -208,31 +208,26 @@ class FourierRepresentation(Representation):
         self.kny = swap_indices(self.kny)
         
         # Setup global wavenumber arrays
-        self.k = []
-  
+        rcomp = self.ktrans['x']
+        self.k = {}
+
         for i,ksize in enumerate(self.global_shape['kspace']):
             xsize = swap_indices(self.global_shape['xspace'])[i]
-            if ksize == xsize:
-                ki = fpack.fftfreq(ksize) * 2. * self.kny[i]
-                if xsize % 2 == 0:
-                    ki[ksize / 2] *= -1.
-            else:
+            if i == rcomp:
                 ki = fpack.fftfreq(xsize)[:ksize] * 2. * self.kny[i]
                 if xsize % 2 == 0:
                     ki[-1] *= -1.
+            else:
+                ki = fpack.fftfreq(ksize) * 2. * self.kny[i]
+                if xsize % 2 == 0:
+                    ki[ksize / 2] *= -1.
             kshape = i * (1,) + (ksize,) + (self.ndim - i - 1) * (1,)
             ki.resize(kshape)
-            self.k.append(ki)
-        
-        names = ['z','y','x'][3-self.ndim:]
-        names = swap_indices(names)
-        self.k = dict(zip(names, self.k))
+            self.k[self.ktrans[i]] = ki
 
         # Restrict to local
-        if self.ndim == 2:
-            self.k['x'] = self.k['x'][self.offset['kspace']:self.offset['kspace'] + self.local_shape['kspace'][0]]
-        else:
-            self.k['y'] = self.k['y'][self.offset['kspace']:self.offset['kspace'] + self.local_shape['kspace'][0]]
+        scomp = self.ktrans[0]
+        self.k[scomp] = self.k[scomp][self.offset['kspace']:self.offset['kspace'] + self.local_shape['kspace'][0]]
 
     def find_mode(self, mode):
         """
@@ -272,6 +267,9 @@ class FourierRepresentation(Representation):
         """Assign fft method."""
         
         mylog.debug("Setting FFT method to %s." % method)
+        
+        # Allocate memory
+        self._allocate_memory(method)
         
         if method == 'fftw':
             self.create_fftw_plans()
