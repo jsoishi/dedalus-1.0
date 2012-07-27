@@ -412,7 +412,9 @@ def shearing_wave(data, wampl, kinit):
     aux = data.clone()
     aux.add_field('w','ScalarField')
     aux.add_field('psi','ScalarField')
-    cos_k(aux['w']['kspace'],kinit,ampl=wampl)
+    aux['w']['kspace'][tuple(kinit)] = wampl / 2.
+    print aux['w']['kspace']
+    #cos_k(aux['w']['kspace'],kinit,ampl=wampl)
     aux['psi']['kspace'] = aux['w']['kspace']/aux['w'].k2(no_zero=True)
 
     data['u']['x']['kspace'] = aux['psi'].deriv('y')

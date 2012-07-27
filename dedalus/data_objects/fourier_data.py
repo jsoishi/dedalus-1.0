@@ -452,12 +452,16 @@ class FourierRepresentation(Representation):
             dataset[:] = self.data
         dataset.attrs['space'] = self._curr_space
 
-    def xspace_grid(self):
+    def xspace_grid(self, open=False):
         """Return the xspace grid for the local processor."""
         
+        if open:
+            refgrid = na.ogrid
+        else:
+            refgrid = na.mgrid
+        
         # Create integer array based on local shape and offset
-        grid = na.mgrid[[slice(i) for i in self.local_shape['xspace']]]
-        grid = na.asfarray(grid)
+        grid = refgrid[[slice(i) for i in na.asfarray(self.local_shape['xspace'])]]
         grid[0] += self.offset['xspace']
         
         # Multiply integer array by grid spacing
@@ -595,16 +599,14 @@ class FourierShearRepresentation(FourierRepresentation):
         
     def fwd_np(self):
 
-        if self.ndim == 2:
-            ysize = self.local_shape['xspace'][0]
-            y = na.linspace(0, 1, ysize, endpoint=False) * self.length[0]
-            y = na.reshape(y, (1, ysize))
-        else:
-            ysize = self.local_shape['xspace'][1]
-            y = na.linspace(0, 1, ysize, endpoint=False) * self.length[1]
-            y = na.reshape(y, (ysize, 1, 1))
-        dx = - self.shear_rate * y * self.sd.time
         tr = [1, 0, 2][:self.ndim]
+        if self.ndim == 2:
+            y, _ = self.xspace_grid(open=True)
+            y = na.transpose(y, tr)
+        else:
+            _, y, _ = self.xspace_grid(open=True)
+            y = na.transpose(y, tr)
+        dx = - self.shear_rate * y * self.sd.time
 
         # Do x fft and transpose
         self.kdata[:] = na.transpose(fpack.rfft(self.xdata / self.global_shape['xspace'].prod(), axis=-1), tr)
@@ -620,16 +622,14 @@ class FourierShearRepresentation(FourierRepresentation):
 
     def rev_np(self):
     
-        if self.ndim == 2:
-            ysize = self.local_shape['xspace'][0]
-            y = na.linspace(0, 1, ysize, endpoint=False) * self.length[0]
-            y = na.reshape(y, (1, ysize))
-        else:
-            ysize = self.local_shape['xspace'][1]
-            y = na.linspace(0, 1, ysize, endpoint=False) * self.length[1]
-            y = na.reshape(y, (ysize, 1, 1))
-        dx = - self.shear_rate * y * self.sd.time
         tr = [1, 0, 2][:self.ndim]
+        if self.ndim == 2:
+            y, _ = self.xspace_grid(open=True)
+            y = na.transpose(y, tr)
+        else:
+            _, y, _ = self.xspace_grid(open=True)
+            y = na.transpose(y, tr)
+        dx = - self.shear_rate * y * self.sd.time
     
         # Do y and z ffts
         if self.ndim == 2:
