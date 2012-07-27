@@ -128,7 +128,7 @@ class FourierRepresentation(Representation):
         self.fwd_count = 0
         self.rev_count = 0
     
-    def __getitem__(self,space):
+    def __getitem__(self, space):
         """Return data in specified space, transforming as necessary."""
         
         if space == self._curr_space:
