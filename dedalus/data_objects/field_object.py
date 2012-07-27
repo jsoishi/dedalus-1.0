@@ -75,12 +75,6 @@ class BaseField(object):
         self.sd = weakref.proxy(sd)
         self.ncomp = ncomp
         self.ndim = len(self.shape)
-        
-        # Make sure all dimensions make sense
-        if self.ndim not in (2, 3):
-            raise ValueError("Must use either 2 or 3 dimensions.")
-        if self.ndim != len(self.length):
-            raise ValueError("Shape and Length must have same dimensions.")
 
         # Construct components
         self.components = []
@@ -106,6 +100,10 @@ class BaseField(object):
         if type(item) == str:
             item = self.trans[item]
         self.components[item] = data
+
+    def __iter__(self):
+        for i in xrange(self.ncomp):
+            yield (i, self.components[i])
 
     def zero(self, comp, space='kspace'):
         if type(comp) == str:
