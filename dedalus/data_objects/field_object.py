@@ -88,15 +88,11 @@ class BaseField(object):
         self.trans = {}
         
     def __getitem__(self, item):
-        """If item is not a component number, lookup in translation table."""
-        
         if type(item) == str:
             item = self.trans[item]
         return self.components[item]
         
     def __setitem__(self, item, data):
-        """If item is not a component number, lookup in translation table."""
-        
         if type(item) == str:
             item = self.trans[item]
         self.components[item] = data
@@ -106,28 +102,31 @@ class BaseField(object):
             yield (i, self.components[i])
 
     def zero(self, comp, space='kspace'):
+        """Zero specified component, setting space if needed."""
+        
         if type(comp) == str:
             comp = self.trans[comp]
         self.components[comp][space] = 0.
 
     def zero_all(self, space='kspace'):
-        """zero all field components, setting space if needed
-        """
+        """Zero all field components, setting space if needed."""
+        
         for c in self.components:
             c[space] = 0.
 
     def save(self, group):
         group.attrs["representation"] = self.representation.__name__
         group.attrs["type"] = self.__class__.__name__
-        for i in xrange(self.ncomp):
+        for i,c in self:
             dset = group.create_dataset(str(i), 
-                                        self.components[i].local_shape[self.components[i]._curr_space], 
-                                        dtype=self.components[i].data.dtype)
-            
-            self.components[i].save(dset)
+                                        c.local_shape[c._curr_space], 
+                                        dtype=c.data.dtype)
+            c.save(dset)
 
     def report_counts(self):
-        for i,c in enumerate(self.components):
+        """Include transform counts from all components in log."""
+    
+        for i,c in self:
             mylog.debug("component[%i] forward count = %i" % (i,c.fwd_count))
             mylog.debug("component[%i] rev count = %i" % (i,c.rev_count))
 
@@ -227,7 +226,7 @@ class ScalarFieldBase(BaseField):
         
         return self.components[0].__getattribute__(attr)
 
-    def zero(self, comp=0):
-        self.components[comp].data[:] = 0.
-            
-
+    def zero(self, space='kspace'):
+        """Zero specified component, setting space if needed."""
+        
+        self.components[0][space] = 0.
