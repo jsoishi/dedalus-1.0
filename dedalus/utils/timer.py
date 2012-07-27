@@ -66,8 +66,8 @@ if __name__ == "__main__":
     timer = Timer()
 
     @timer
-    def SleepTwoSec():
+    def sleep_two_sec():
         time.sleep(2.0)
 
-    SleepTwoSec()
+    sleep_two_sec()
     timer.print_stats()
