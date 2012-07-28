@@ -1,4 +1,5 @@
-"""Physics class. This defines fields, and provides a right hand side
+"""
+Physics classes. These defines fields, and provides a right hand side
 to time integrators.
 
 Authors: J. S. Oishi <jsoishi@gmail.com>
@@ -21,6 +22,7 @@ License:
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  
 """
 
 import numpy as na
@@ -38,20 +40,44 @@ def _reconstruct_object(*args, **kwargs):
 
 class Physics(object):
     """
-    This is a base class for a physics object. It needs to provide
-    a right hand side for a time integration scheme.
+    Base class for a physics object. Defines fields and provides
+    a right hand side for the time integration scheme.
+    
     """
     
     def __init__(self, shape, representation, length=None, visc_order=1):
+        """
+        Base class for a physics object. Defines fields and provides
+        a right hand side for the time integration scheme.
+        
+        Parameters
+        ----------
+        shape : tuple of ints
+            The shape of the data in xspace: (z, y, x) or (y, x)
+        representation : class
+            A Dedalus representation class
+        length : tuple of floats, optional
+            The length of the data in xspace: (z, y, x) or (y, x), 
+            defaults to 2 pi in all directions.
+        visc_order : int, optional
+            Hyperviscosity order, defaults to 1.
+            
+        """
+    
+        # Store inputs
         self.shape = shape
-        self.ndim = len(self.shape)
+        self._representation = representation
         if length:
             self.length = length
         else:
             self.length = (2 * na.pi,) * self.ndim
         self.visc_order = visc_order
+        
+        # Dimensionality
+        self.ndim = len(self.shape)
         self.dims = xrange(self.ndim)
-        self._representation = representation
+        
+        # Additional setup
         self._field_classes = create_field_classes(
                 self._representation, self.shape, self.length)
         self.parameters = {}
@@ -71,10 +97,10 @@ class Physics(object):
                 savedict[k] = v
         return (_reconstruct_object, (self.__class__, savedict))
 
-    def create_fields(self, t, field_list=None):        
+    def create_fields(self, time, field_list=None):        
         if field_list == None:
             field_list = self.fields
-        return StateData(t, self.shape, self.length, self._field_classes, 
+        return StateData(time, self.shape, self.length, self._field_classes, 
                          field_list=field_list, params=self.parameters)
 
     def _setup_parameters(self, params):
@@ -103,9 +129,12 @@ class Physics(object):
         """
         Compute Jacobian: gradX[N * i + j] = dX_i/dx_j
         
-        Inputs:
-            X           Input Scalar/VectorField object
-            output      Output Vector/TensorField object
+        Parameters
+        ----------
+        X : Scalar/VectorField object
+            Input field
+        output : Vector/TensorField object
+            Field for storing output
 
         """
 
