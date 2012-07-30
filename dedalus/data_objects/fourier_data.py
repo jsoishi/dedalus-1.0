@@ -102,7 +102,7 @@ class FourierRepresentation(Representation):
         # Flexible datatypes not currently supported
         self.dtype = {'kspace': 'complex128', 
                       'xspace': 'float64'}
-        self.__eps = {'kspace': na.finfo(self.dtype['kspace']).eps,
+        self._eps = {'kspace': na.finfo(self.dtype['kspace']).eps,
                       'xspace': na.finfo(self.dtype['xspace']).eps}
         
         # Retrieve FFT method and dealiasing method from config
@@ -234,6 +234,18 @@ class FourierRepresentation(Representation):
         # Restrict to local
         scomp = self.ktrans[0]
         self.k[scomp] = self.k[scomp][self.offset['kspace']:self.offset['kspace'] + self.local_shape['kspace'][0]]
+
+    def require_space(self, space):
+        """Transform to required space if not there already."""
+        
+        if self._curr_space == space:
+            pass
+        elif space == 'xspace':
+            self.backward()
+        elif space == 'kspace':
+            self.forward()
+        else:
+            raise ValueError("space must be either xspace or kspace.")
 
     def find_mode(self, mode):
         """
@@ -437,7 +449,7 @@ class FourierRepresentation(Representation):
         
         if self._curr_space == 'xspace': 
             self.forward()
-        self.data[na.abs(self.data) < self.__eps['kspace']] = 0.
+        self.data[na.abs(self.data) < self._eps['kspace']] = 0.
 
     def save(self, dataset):
         """
@@ -550,6 +562,7 @@ class FourierShearRepresentation(FourierRepresentation):
         """Evolve wavenumbers due to shear."""
 
         # Wavenumber shift
+        #self.k['y'] = self._ky - self._wave_rate * self.sd.time
         na.subtract(self._ky, self._wave_rate * self.sd.time , self.k['y'])
     
         # Wrap wavenumbers past Nyquist value
@@ -558,6 +571,9 @@ class FourierShearRepresentation(FourierRepresentation):
             self.k['y'][self.k['y'] <= -kny_y] += 2 * kny_y
         while self.k['y'].max() > kny_y:
             self.k['y'][self.k['y'] > kny_y] -= 2 * kny_y
+            
+        # Dealias
+        self.dealias()
         
     def find_mode(self, mode):
         """
