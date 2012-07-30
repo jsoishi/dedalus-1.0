@@ -112,13 +112,7 @@ def get_plane(data, field, comp=0, space='xspace', axis='z', index='middle'):
     global_shape = comp.global_shape[space]
     
     # Make sure component is in proper space
-    if comp._curr_space != space:
-        if space == 'kspace':
-            comp.forward()
-        elif space == 'xspace':
-            comp.backward()
-        else:
-            raise ValueError("space must be either xspace or kspace")
+    comp.require_space(space)
     
     # Retrieve translation table for requested space
     if space == 'kspace':

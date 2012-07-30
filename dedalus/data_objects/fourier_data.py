@@ -131,15 +131,7 @@ class FourierRepresentation(Representation):
     def __getitem__(self, space):
         """Return data in specified space, transforming as necessary."""
         
-        if space == self._curr_space:
-            pass
-        elif space == 'xspace':
-            self.backward()
-        elif space == 'kspace':
-            self.forward()
-        else:
-            raise KeyError("space must be either xspace or kspace.")
-        
+        self.require_space(space)
         return self.data
 
     def __setitem__(self, space, data):
@@ -379,15 +371,13 @@ class FourierRepresentation(Representation):
                      (na.abs(self.k['y']) >= 2 / 3. * self.kny[0]) |
                      (na.abs(self.k['z']) >= 2 / 3. * self.kny[1]))
 
-        if self._curr_space == 'xspace': 
-            self.forward()
+        self.require_space('kspace')
         self.data[dmask] = 0.
         
     def dealias_23_cython(self):
         """Orszag 2/3 dealiasing rule implemented in cython."""
         
-        if self._curr_space == 'xspace': 
-            self.forward()
+        self.require_space('kspace')
         
         if self.ndim == 2:
             self._cython_dealias_function(self.data, self.k['x'], self.k['y'], self.kny)
@@ -400,15 +390,13 @@ class FourierRepresentation(Representation):
         # Zeroing mask   
         dmask = (na.sqrt(self.k2()) >= 2 / 3. * na.min(self.kny))
 
-        if self._curr_space == 'xspace': 
-            self.forward()
+        self.require_space('kspace')
         self.data[dmask] = 0.
         
     def deriv(self, dim):
         """Calculate derivative along specified dimension."""
         
-        if self._curr_space == 'xspace': 
-            self.forward()
+        self.require_space('kspace')
         na.multiply(self.data, 1j * self.k[dim], self.deriv_data)
         
         return self.deriv_data
@@ -440,15 +428,13 @@ class FourierRepresentation(Representation):
                      (na.abs(self.k['y']) == self.kny[0]) |
                      (na.abs(self.k['z']) == self.kny[1]))
 
-        if self._curr_space == 'xspace': 
-            self.forward()
+        self.require_space('kspace')
         self.data[dmask] = 0.
 
     def zero_under_eps(self):
         """Zero out any modes with coefficients smaller than machine epsilon."""
         
-        if self._curr_space == 'xspace': 
-            self.forward()
+        self.require_space('kspace')
         self.data[na.abs(self.data) < self._eps['kspace']] = 0.
 
     def save(self, dataset):
