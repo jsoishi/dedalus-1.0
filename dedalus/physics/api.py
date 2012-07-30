@@ -23,6 +23,7 @@ License:
 
 from .physics import \
     Hydro,\
+    BoussinesqHydro,\
     ShearHydro, \
     MHD, \
     ShearMHD, \
