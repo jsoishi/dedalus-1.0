@@ -440,6 +440,76 @@ class ShearHydro(Hydro):
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             #pressure[i].zero_nyquist()
 
+class BoussinesqHydro(Hydro):
+    def __init__(self, *args, **kwargs):
+        Physics.__init__(self, *args, **kwargs)
+        
+        # Setup data fields
+        self.fields = [('u', 'VectorField'),
+                       ('T', 'ScalarField')]
+        self._aux_fields = [('pressure', 'VectorField'),
+                            ('mathtmp', 'ScalarField'),
+                            ('ucopy','VectorField'),
+                            ('Tcopy','VectorField'),
+                            ('ugradu', 'VectorField'),
+                            ('ugradT', 'VectorField')]
+        
+        self._trans = {0: 'x', 1: 'y', 2: 'z'}
+        params = {'nu': 0., 'rho0': 1., 'kappa': 0., 'g': 1.,
+                  'alpha_t': 1., 'T0': 0., 'beta': 1.}
+        self._setup_parameters(params)
+        self._finalized = False
+
+
+    def RHS(self, data):
+        """
+        Compute right hand side of fluid equations, populating self._RHS with
+        the time derivatives of the fields.
+
+        u_t + nu k^2 u = -ugradu - i k p / rho0 + buoyancy
+        T_t + kappa k^2 T = -ugradT + stratification term
+
+        """
+        
+        # Place references
+        g = self.parameters['g']
+        alpha_t = self.parameters['alpha_T']
+        T0 = self.parameters['T0']
+        beta = self.parameters['beta']
+
+        # Compute terms
+        Hydro.RHS(self, data)
+        # add buoyancy term
+        if self.ndim == 2:
+            self._RHS['u']['y']['kspace'] += g * alpha_t * (self._RHS['T']['kspace'] - T0)
+
+        # temperature equation
+        self.XlistgradY([u], T, mathtmp, [Tcopy], [ugradT])
+        self._RHS['T']['kspace'] = -ugradT['kspace'] + beta * data['u']['z']['kspace']
+
+        self._RHS['T'].integrating_factor = self.parameters['kappa'] * k2 ** self.visc_order
+
+        return self._RHS
+
+    def pressure(self, data):
+        """
+        Compute pressure term for ufields: i k p / rho0
+        
+        p / rho0 = i (k * ugradu + rotation + shear)/ k^2
+        ==> pressure term = - k (k * ugradu + rotation + shear) / k^2
+        
+        """
+        # Setup temporary data container
+        sampledata = data['u']['x']
+
+        sampledata['kspace']
+        tmp = na.zeros_like(sampledata.data)
+        k2 = sampledata.k2(no_zero=True)
+        
+        pressure = self.aux_fields['pressure']
+        Hydro.pressure(self, data)
+        pressure['z']['kspace'] += self.parameters['g'] * self.parameters['alpha_T'] * data.k['z'] * data['T']['kspace']/k2
+
 class MHD(Hydro):
     """Incompressible magnetohydrodynamics."""
     
