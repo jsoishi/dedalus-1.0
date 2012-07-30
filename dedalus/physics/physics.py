@@ -452,7 +452,7 @@ class BoussinesqHydro(Hydro):
                             ('ucopy','VectorField'),
                             ('Tcopy','VectorField'),
                             ('ugradu', 'VectorField'),
-                            ('ugradT', 'VectorField')]
+                            ('ugradT', 'ScalarField')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1., 'kappa': 0., 'g': 1.,
@@ -470,24 +470,30 @@ class BoussinesqHydro(Hydro):
         T_t + kappa k^2 T = -ugradT + stratification term
 
         """
+        Hydro.RHS(self, data)
         
         # Place references
         g = self.parameters['g']
-        alpha_t = self.parameters['alpha_T']
+        alpha_t = self.parameters['alpha_t']
         T0 = self.parameters['T0']
         beta = self.parameters['beta']
 
+        u = data['u']
+        T = data['T']
+        mathtmp = self.aux_fields['mathtmp']
+        Tcopy = self.aux_fields['Tcopy']
+        ugradT = self.aux_fields['ugradT']
         # Compute terms
-        Hydro.RHS(self, data)
+
         # add buoyancy term
         if self.ndim == 2:
             self._RHS['u']['y']['kspace'] += g * alpha_t * (self._RHS['T']['kspace'] - T0)
 
         # temperature equation
         self.XlistgradY([u], T, mathtmp, [Tcopy], [ugradT])
-        self._RHS['T']['kspace'] = -ugradT['kspace'] + beta * data['u']['z']['kspace']
+        self._RHS['T']['kspace'] = -ugradT['kspace'] + beta * u['z']['kspace']
 
-        self._RHS['T'].integrating_factor = self.parameters['kappa'] * k2 ** self.visc_order
+        self._RHS['T'].integrating_factor = self.parameters['kappa'] * data['T'].k2() ** self.visc_order
 
         return self._RHS
 
@@ -508,7 +514,7 @@ class BoussinesqHydro(Hydro):
         
         pressure = self.aux_fields['pressure']
         Hydro.pressure(self, data)
-        pressure['z']['kspace'] += self.parameters['g'] * self.parameters['alpha_T'] * data.k['z'] * data['T']['kspace']/k2
+        pressure['z']['kspace'] += self.parameters['g'] * self.parameters['alpha_t'] * data['T'].k['z'] * data['T']['kspace']/k2
 
 class MHD(Hydro):
     """Incompressible magnetohydrodynamics."""
