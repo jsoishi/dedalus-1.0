@@ -55,6 +55,7 @@ from dedalus.init_cond.api import \
 
 from dedalus.physics.api import \
     Hydro, \
+    BoussinesqHydro, \
     ShearHydro, \
     MHD, \
     ShearMHD, \
