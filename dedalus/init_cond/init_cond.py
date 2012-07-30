@@ -135,14 +135,6 @@ def kida_vortex(data, a, chi=None, smooth=False):
     data['u']['x']['kspace'] = aux['psi'].deriv('y')
     data['u']['y']['kspace'] = -aux['psi'].deriv('x')
 
-def sin_x(f,ampl=1.):
-    f.data[0,1] = ampl*1j
-    f.data[0,-1] = -f.data[0,1]
-
-def sin_y(f,ampl=1.):
-    f.data[1,0] = ampl*1j
-    f.data[-1,0] = -f.data[1,0]
-
 def sin_k(f, kindex, ampl=1.):
     f[tuple(kindex)] = ampl*1j/2.
     f[tuple(-1*na.array(kindex))] = f[tuple(kindex)].conjugate()
