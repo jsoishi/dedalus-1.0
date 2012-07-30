@@ -70,7 +70,7 @@ class Physics(object):
         if length:
             self.length = length
         else:
-            self.length = (2 * na.pi,) * self.ndim
+            self.length = (2 * na.pi,) * len(self.shape)
         self.visc_order = visc_order
         
         # Dimensionality
@@ -393,9 +393,7 @@ class Hydro(Physics):
         
         # Setup temporary data container
         sampledata = data['u']['x']
-
-        sampledata['kspace']
-        tmp = na.zeros_like(sampledata.data)
+        tmp = na.zeros_like(sampledata.kdata)
         k2 = sampledata.k2(no_zero=True)
         
         # Construct k * ugradu
@@ -444,7 +442,7 @@ class ShearHydro(Hydro):
         shear = -(1 + S) 2 Omega u_y K_x
         
         """
-        
+
         # Place references
         ugradu = self.aux_fields['ugradu']
         pressure = self.aux_fields['pressure']
@@ -453,7 +451,7 @@ class ShearHydro(Hydro):
         
         # Setup temporary data container
         sampledata = data['u']['x']
-        tmp = na.zeros_like(sampledata.data)
+        tmp = na.zeros_like(sampledata.kdata)
         k2 = sampledata.k2(no_zero=True)
         
         # Construct K * ugradu

@@ -64,6 +64,189 @@ class AnalysisSet(object):
 @AnalysisSet.register_task
 def volume_average(data, it, va_obj=None):
     va_obj.run()
+    
+def get_plane(data, field, comp=0, space='xspace', axis='z', index='middle'):
+    """
+    Return 2D slice of data, assembling across processes if needed.
+    
+    Parameters
+    ----------
+    data : StateData object
+        Input data
+    field : str
+        Name of field to assemble
+    comp : int, optional
+        Index of field component to assemble, defaults to 0.
+    space : str, optional
+        'xspace' (default) or 'kspace'
+    axis : str, optional
+        Axis normal to desired slice, defaults to 'z'. Must be 'z' for 2D data.
+        i.e. 'x' for a y-z plane
+             'y' for a x-z plane
+             'z' for a x-y plane
+    index : int or string, optional
+        Index for slicing as an integer, or 'top', 'middle' (default), or 'bottom'
+        
+    Returns
+    -------
+    arr0 : ndarray
+        Array indexing the 0th-dimension of the output plane
+        i.e. 'x' for axis = 'y' or 'z'
+             'y' for axis = 'x'
+    arr1 : ndarray
+        Array indexing the 1st-dimension of the output plane
+        i.e. 'z' for axis = 'x' or 'y'
+             'y' for axis = 'z'
+    data : ndarray
+        Output plane
+        
+    Examples
+    --------
+    >>> get_plane(data, 'u', 'x', 'kspace', 'x', 0) 
+    (global_ky, global_kz, global_ux[:, :, 0])
+        
+    """
+    
+    # Grab specified component
+    comp = data[field][comp]
+    global_shape = comp.global_shape[space]
+    
+    # Make sure component is in proper space
+    if comp._curr_space != space:
+        if space == 'kspace':
+            comp.forward()
+        elif space == 'xspace':
+            comp.backward()
+        else:
+            raise ValueError("space must be either xspace or kspace")
+    
+    # Retrieve translation table for requested space
+    if space == 'kspace':
+        trans = comp.ktrans
+    elif space == 'xspace':
+        trans = comp.xtrans
+
+    # Set output directions based on requested axis
+    if axis == 'x':
+        dir0 = 'y'
+        dir1 = 'z':
+    elif axis == 'y':
+        dir0 = 'x'
+        dir1 = 'z':
+    elif axis == 'z':
+        dir0 = 'x'
+        dir1 = 'y'
+    else:
+        raise ValueError("axis must be x, y, or z")
+        
+    # Determine slice index for string inputs
+    if index == 'top':
+        index = global_shape[trans[axis]]
+    elif index == 'middle':
+        index = global_shape[trans[axis]] / 2
+    elif index == 'bottom':
+        index = 0
+    else:
+        index = int(index)
+
+
+
+
+
+
+
+    plot_slice = [slice(None), slice(None), slice(None)]
+    plot_slice[slice_axis] = index
+    has_data = False
+    concat_axis = None
+    if data.ndim == 2:
+        com_pattern = 'gather'
+        concat_axis = 0
+    elif data.ndim == 3:
+        if (slice_axis == 0 and space == 'xspace') or (slice_axis == 1 and space == 'kspace'):
+            com_pattern = 'locate'
+        elif (slice_axis == 1 and space == 'xspace'):
+            com_pattern = 'gather'
+            concat_axis = 0
+        elif (slice_axis == 2 and space == 'xspace'):
+            com_pattern = 'gather'
+            concat_axis = 0
+        elif (slice_axis == 0 and space == 'kspace'):
+            com_pattern = 'gather'
+            concat_axis = 1
+        elif (slice_axis == 2 and space == 'kspace'):
+            com_pattern = 'gather'
+            concat_axis = 0
+
+                    
+    # Plot field components
+    i = -1
+    for k,f in data.fields.iteritems():
+        i += 1
+        for j in xrange(f.ncomp):
+            I = i * ncol + j
+
+            if f[j].ndim == 3:
+                if com_pattern == 'locate':
+                    f[j][space] # make sure to switch spaces with all procs first
+
+                    if I == 0:
+                        test_mode = [q if type(q) == int else 0 for q in plot_slice]
+                        local_mode = f[j].find_mode(test_mode)
+                        if local_mode:
+                            mylog.debug("local mode = (%i, %i, %i)" % tuple(local_mode))
+                            plot_slice[slice_axis] = local_mode[slice_axis]
+                            has_data = True
+                        else:
+                            has_data = False
+                
+                if has_data or com_pattern == 'gather':
+                    plot_array = st.as_strided(f[j][space][plot_slice],
+                                               shape=f[j][space][plot_slice].shape,
+                                               strides=f[j][space][plot_slice].strides)
+                else:
+                    plot_array = False
+            else:
+                plot_array = st.as_strided(f[j][space],shape=f[j][space].shape,strides=f[j][space].strides)
+                
+            if space == 'kspace':
+                plot_array = na.abs(plot_array)
+                plot_array[plot_array == 0] = na.nan
+                plot_array = na.log10(plot_array)
+                dtype = com_sys.MPI.COMPLEX
+            else:
+                #plot_array = plot_array.real
+                dtype = com_sys.MPI.DOUBLE
+
+            # collect all slices
+            if plot_array is not False:
+                proc = com_sys.myproc
+            else:
+                proc = 0
+
+            if com_pattern == 'gather':
+                gplot_array = com_sys.comm.gather(plot_array, root=0)
+            elif com_pattern == 'locate':
+                recv_proc = com_sys.comm.reduce(proc,op=com_sys.MPI.SUM)
+                if plot_array is not False and com_sys.myproc == 0:
+                    gplot_array = plot_array
+                elif plot_array is not False and com_sys.myproc != 0:
+                    com_sys.comm.send(plot_array, dest=0, tag=11)
+                elif com_sys.myproc == 0:
+                    gplot_array = com_sys.comm.recv(source=recv_proc, tag=11)
+                com_sys.comm.barrier()
+
+            # Plot
+            if com_sys.myproc == 0:
+                if com_pattern == 'gather':
+                    gplot_array = na.concatenate(gplot_array, axis=concat_axis)
+                im = grid[I].imshow(gplot_array, extent=extent, origin='lower', 
+                                    interpolation='nearest', **kwargs)
+                grid[I].text(0.05, 0.95, k + str(j), transform=grid[I].transAxes, size=24, color='white')
+                grid.cbar_axes[I].colorbar(im)
+            
+
+
 
 @AnalysisSet.register_task
 def field_snap(data, it, use_extent=False, space='xspace', **kwargs):
@@ -485,7 +668,7 @@ def mode_track(data, it, flist=[], klist=[], log=True, write=True):
 @AnalysisSet.register_task
 def k_plot(data, it, zcut=0):
     """
-    Plot k-power for moving k modes (i.e. ShearReps)
+    Plot k-space power over a slice.
     
     Inputs:
         data        Data object
@@ -495,6 +678,9 @@ def k_plot(data, it, zcut=0):
         zcut        kz index for the kx,ky plane being plotted
 
     """
+    
+    xloc = data['u']['x'].ktrans['x']
+    yloc = data['u']['x'].ktrans['y']
     
     # Determine image grid size
     nrow = len(data.fields.keys())
@@ -515,40 +701,49 @@ def k_plot(data, it, zcut=0):
                     
     # Plot field components
     i = -1
-    z_ = na.zeros(data.shape[-2:])
+    z_ = na.ones(data['u']['x'].local_shape['kspace'][-2:])
     ny = data['u']['x'].kny
+    eps = data['u']['x']._eps['kspace']
     
     for k,f in data.fields.iteritems():
         i += 1
         for j in xrange(f.ncomp):
             I = i * ncol + j
         
-            x = f[j].k['x'] + z_
-            y = f[j].k['y'] + z_
+            kx = f[j].k['x'] * z_
+            ky = f[j].k['y'] * z_
 
             if f[j].ndim == 3:
-                plot_array = f[j]['kspace'][zcut]
+                kmag = na.abs(f[j]['kspace'][zcut])
             else:
-                plot_array = f[j]['kspace']
-                
-            plot_array = na.abs(plot_array)
-            plot_array = na.log10(plot_array)
-            mask = ~na.isnan(plot_array)
-
-            # Plot
-            im = grid[I].scatter(x[mask], y[mask], c=plot_array[mask], linewidth=0, 
-                                 vmax=na.max([plot_array[mask].max(), -39]))
+                kmag = na.abs(f[j]['kspace'])
+            
+            zero_mask = (kmag == 0)    
+            kmag[kmag < eps] = eps
+            
+            logkmag = na.log10(kmag)
+            
+            # Plot nonzero
+            im = grid[I].scatter(kx[~zero_mask], ky[~zero_mask], 
+                                 c=logkmag[~zero_mask], lw=0, s=40, zorder=2)
+                                 
+            # Plot zeros
+            grid[I].scatter(kx[zero_mask], ky[zero_mask], c='w', s=40, zorder=2)
+            
+            # Zero lines
+            grid[I].axhline(0, c='k', zorder=1)
+            grid[I].axvline(0, c='k', zorder=1)
             
             # Nyquist boundary
-            nysquarex = na.array([-ny[-1], -ny[-1], ny[-1], ny[-1], -ny[-1]])
-            nysquarey = na.array([-ny[-2], ny[-2], ny[-2], -ny[-2], -ny[-2]])
-            grid[I].plot(nysquarex, nysquarey, 'k--')
+            nysquarex = na.array([0, ny[xloc], ny[xloc], 0])
+            nysquarey = na.array([ny[yloc], ny[yloc], -ny[yloc], -ny[yloc]])
+            grid[I].plot(nysquarex, nysquarey, 'k--', zorder=1)
             
             # Dealiasing boundary
-            grid[I].plot(2/3. * nysquarex, 2/3. * nysquarey, 'k:')
+            grid[I].plot(2/3. * nysquarex, 2/3. * nysquarey, 'k:', zorder=1)
             
             # Plot range and labels
-            grid[I].axis(padrange([-ny[-1], ny[1], -ny[-2], ny[-2]], 0.2))
+            grid[I].axis(padrange([0, ny[xloc], -ny[yloc], ny[yloc]], 0.2))
             grid[I].text(0.05, 0.95, k + str(j), transform=grid[I].transAxes, size=24, color='black')
             grid.cbar_axes[I].colorbar(im)
             
