@@ -39,8 +39,8 @@ from dedalus.data_objects.api import \
 
 from dedalus.init_cond.api import \
     taylor_green, \
-    sin_x, \
-    sin_y, \
+    sin_k, \
+    cos_k, \
     turb,  \
     turb_new, \
     mcwilliams_spec, \
