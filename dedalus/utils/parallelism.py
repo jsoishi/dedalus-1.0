@@ -203,6 +203,8 @@ def get_plane(data, field, comp=0, space='xspace', axis='z', index='middle',
     -------
     plane_data : ndarray
         Component values in the output plane
+    index : int
+        Slice index, transformed if input index was string
     name0 : str, optional
         Name of direction along 0th-dimension of the output plane, e.g. 'x' or 'ky'
     grid0 : ndarray, optional
@@ -235,7 +237,7 @@ def get_plane(data, field, comp=0, space='xspace', axis='z', index='middle',
         
     # Determine slice index for string inputs
     if comp.ndim == 2:
-        pass
+        index = 0
     elif index == 'top':
         index = comp.global_shape[space][trans[axis]] - 1
     elif index == 'middle':
@@ -294,7 +296,7 @@ def get_plane(data, field, comp=0, space='xspace', axis='z', index='middle',
 
     # Position arrays
     if not return_position_arrays:
-        return plane_data
+        return (plane_data, index)
     else:
         if axis == 'x':
             name0, name1 = ('y', 'z')
@@ -304,6 +306,9 @@ def get_plane(data, field, comp=0, space='xspace', axis='z', index='middle',
             name0, name1 = ('x', 'y')
             
         if space == 'xspace':
+            if com_sys.myproc != 0:
+                return (None,) * 6
+            
             grid1, grid0 = na.mgrid[slice(float(comp.global_shape[space][trans[name1]])),
                               slice(float(comp.global_shape[space][trans[name0]]))]
             grid0 *= comp.length[trans[name0]] / comp.global_shape[space][trans[name0]]            
@@ -320,7 +325,7 @@ def get_plane(data, field, comp=0, space='xspace', axis='z', index='middle',
                     if com_sys.myproc == 0:
                         k['x'] = na.transpose(na.concatenate(gathered_kx))
                     else:
-                        return (None,) * 5
+                        return (None,) * 6
             elif comp.ndim == 3:
                 k['x'] = comp.k['x'][0, :, :]
                 k['z'] = comp.k['z'][:, :, 0]
@@ -331,12 +336,12 @@ def get_plane(data, field, comp=0, space='xspace', axis='z', index='middle',
                     if com_sys.myproc == 0:
                         k['y'] = na.transpose(na.concatenate(gathered_ky)[:, 0, :])
                     else:
-                        return (None,) * 5
+                        return (None,) * 6
                     
             grid0 = k[name0] * na.ones(plane_data.shape)
             grid1 = na.transpose(k[name1]) * na.ones(plane_data.shape)
             name0 = 'k' + name0
             name1 = 'k' + name1
             
-        return (plane_data, name0, grid0, name1, grid1)
+        return (plane_data, index, name0, grid0, name1, grid1)
         
