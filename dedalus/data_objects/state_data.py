@@ -85,18 +85,7 @@ class StateData(object):
         # Add fields
         for name,type in field_list:
             self.add_field(name, type)
-                                
-    def clone(self):
-        return self.__class__(self.time, self.shape, self.length, self._field_classes, 
-                              params=self.parameters)
-                              
-    def set_time(self, time):
-        self.time = time
-        for name, field in self.fields.iteritems():
-            if field.representation.__name__ == 'FourierShearRepresentation':
-                for i,c in field:
-                    c._update_k()
-        
+            
     def __getitem__(self, item):
         return self.fields[item]
 
@@ -113,6 +102,23 @@ class StateData(object):
             if k not in exclude:
                 savedict[k] = v
         return (_reconstruct_data, (self.__class__, savedict, field_class_rep, field_keys))
+        
+    def __iter__(self):
+        """Iterate over field objects."""
+    
+        for name, field in self.fields.iteritems():
+            yield (name, field)
+                                
+    def clone(self):
+        return self.__class__(self.time, self.shape, self.length, self._field_classes, 
+                              params=self.parameters)
+                              
+    def set_time(self, time):
+        self.time = time
+        for name, field in self.fields.iteritems():
+            if field.representation.__name__ == 'FourierShearRepresentation':
+                for i,c in field:
+                    c._update_k()
 
     def add_field(self, name, type):
         """
