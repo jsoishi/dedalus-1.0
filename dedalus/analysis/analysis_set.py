@@ -69,153 +69,103 @@ def volume_average(data, it, va_obj=None):
     va_obj.run()
        
 @AnalysisSet.register_task
-def field_snap(data, it, use_extent=False, space='xspace', **kwargs):
+def array_snapshot(data, it, space='xspace', axis='z', index='middle'):
     """
-    Take a snapshot of all fields defined.
+    Take image snapshot of data in array configuration.
     
+    Parameters
+    ----------
+    data : StateData object
+        Data input
+    it : int
+        Iteration number
+    space: str
+        'xspace' or 'kspace'
+    axis : str, optional
+        Axis normal to desired slice, defaults to 'z'. Ignored for 2D data.
+        i.e. 'x' for a y-z plane
+             'y' for a x-z plane
+             'z' for a x-y plane
+    index : int or string, optional
+        Index for slicing as an integer, or 'top', 'middle' (default), or 'bottom'.
+        Ignored for 2D data.
+
     """
-    # plot_slice is only for 3D. 
-    saveas = decfg.get('analysis', 'slice_name')
-    slice_axis = int(decfg.get('analysis', 'slice_axis'))
-    slice_index = decfg.get('analysis', 'slice_index')
 
-    if slice_index == 'top':
-        index = data.shape[slice_axis]
-    elif slice_index == 'bottom':
-        index = 0
-    elif slice_index == 'middle':
-        index = data.shape[slice_axis]/2 # round down
-    else:
-        index = int(slice_index)
-
-    plot_slice = [slice(None), slice(None), slice(None)]
-    plot_slice[slice_axis] = index
-    has_data = False
-    concat_axis = None
-    if data.ndim == 2:
-        com_pattern = 'gather'
-        concat_axis = 0
-    elif data.ndim == 3:
-        if (slice_axis == 0 and space == 'xspace') or (slice_axis == 1 and space == 'kspace'):
-            com_pattern = 'locate'
-        elif (slice_axis == 1 and space == 'xspace'):
-            com_pattern = 'gather'
-            concat_axis = 0
-        elif (slice_axis == 2 and space == 'xspace'):
-            com_pattern = 'gather'
-            concat_axis = 0
-        elif (slice_axis == 0 and space == 'kspace'):
-            com_pattern = 'gather'
-            concat_axis = 1
-        elif (slice_axis == 2 and space == 'kspace'):
-            com_pattern = 'gather'
-            concat_axis = 0
-
-    # Determine image grid size
-    nrow = len(data.fields.keys())
-    ncol = na.max([f.ncomp for f in data.fields.values()])
-
+    # Figure setup
     if com_sys.myproc == 0:
-        # Figure setup
-        fig = P.figure(4, figsize=(8 * ncol, 8 * nrow))
-
-        if use_extent:
-            extent = [0., data.length[-1], 0., data.length[-2]]
-        else:
-            extent = None
-
-        # Figure setup
-        fig = P.figure(1, figsize=(8 * ncol, 8 * nrow))
-
+    
+        # Determine grid size
+        nrows = len(data.fields.keys())
+        ncols = na.max([f.ncomp for f in data.fields.values()])
+        
+        # Create figure and axes grid
+        fig = P.figure(1, figsize=(8 * ncols, 8 * nrows))
         grid = AxesGrid(fig, 111,
-                        nrows_ncols = (nrow, ncol),
+                        nrows_ncols = (nrows, ncols),
+                        aspect=False,
+                        share_all=True,
                         axes_pad=0.3,
                         cbar_pad=0.,
-                        share_all=True,
-                        label_mode="1",
+                        label_mode="L",
                         cbar_location="top",
                         cbar_mode="each")
                     
     # Plot field components
-    i = -1
-    for k,f in data.fields.iteritems():
-        i += 1
-        for j in xrange(f.ncomp):
-            I = i * ncol + j
+    row = -1
+    for fname, field in data:
+        row += 1
+        for cindex, comp in field:
+            axnum = row * ncols + cindex
 
-            if f[j].ndim == 3:
-                if com_pattern == 'locate':
-                    f[j][space] # make sure to switch spaces with all procs first
-
-                    if I == 0:
-                        test_mode = [q if type(q) == int else 0 for q in plot_slice]
-                        local_mode = f[j].find_mode(test_mode)
-                        if local_mode:
-                            mylog.debug("local mode = (%i, %i, %i)" % tuple(local_mode))
-                            plot_slice[slice_axis] = local_mode[slice_axis]
-                            has_data = True
-                        else:
-                            has_data = False
-                
-                if has_data or com_pattern == 'gather':
-                    plot_array = st.as_strided(f[j][space][plot_slice],
-                                               shape=f[j][space][plot_slice].shape,
-                                               strides=f[j][space][plot_slice].strides)
-                else:
-                    plot_array = False
-            else:
-                plot_array = st.as_strided(f[j][space],shape=f[j][space].shape,strides=f[j][space].strides)
-                
-            if space == 'kspace':
-                plot_array = na.abs(plot_array)
-                plot_array[plot_array == 0] = na.nan
-                plot_array = na.log10(plot_array)
-                dtype = com_sys.MPI.COMPLEX
-            else:
-                #plot_array = plot_array.real
-                dtype = com_sys.MPI.DOUBLE
-
-            # collect all slices
-            if plot_array is not False:
-                proc = com_sys.myproc
-            else:
-                proc = 0
-
-            if com_pattern == 'gather':
-                gplot_array = com_sys.comm.gather(plot_array, root=0)
-            elif com_pattern == 'locate':
-                recv_proc = com_sys.comm.reduce(proc,op=com_sys.MPI.SUM)
-                if plot_array is not False and com_sys.myproc == 0:
-                    gplot_array = plot_array
-                elif plot_array is not False and com_sys.myproc != 0:
-                    com_sys.comm.send(plot_array, dest=0, tag=11)
-                elif com_sys.myproc == 0:
-                    gplot_array = com_sys.comm.recv(source=recv_proc, tag=11)
-                com_sys.comm.barrier()
-
+            # Retrieve correct slice
+            plane_data, outindex, name0, x0, name1, x1 = get_plane(data, 
+                    fname, cindex, space=space, axis=axis, index=index)
+                    
+            # Bail of not process 0
+            if com_sys.myproc != 0:
+                return
+                     
             # Plot
-            if com_sys.myproc == 0:
-                if com_pattern == 'gather':
-                    gplot_array = na.concatenate(gplot_array, axis=concat_axis)
-                im = grid[I].imshow(gplot_array, extent=extent, origin='lower', 
-                                    interpolation='nearest', **kwargs)
-                grid[I].text(0.05, 0.95, k + str(j), transform=grid[I].transAxes, size=24, color='white')
-                grid.cbar_axes[I].colorbar(im)
-            
-    if com_sys.myproc == 0:
-        # Time label     
-        tstr = 't = %5.2f' % data.time
-        grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes,size=24,color='black')
+            if space == 'kspace':
+                # Take logarithm of magnitude, flooring at eps
+                kmag = na.abs(plane_data)
+                zero_mask = (kmag == 0)    
+                kmag[kmag < comp._eps['kspace']] = comp._eps['kspace']
+                logkmag = na.log10(kmag)
+                logkmag[zero_mask] = na.nan
+                    
+                im = grid[axnum].imshow(logkmag, origin='lower', aspect='auto',
+                        interpolation='nearest', zorder=2)
 
-        if not os.path.exists('frames'):
-            os.mkdir('frames')
-        if space == 'kspace':
-            outfile = "frames/k_" + saveas + "ax_%i_zone_%s_%07i.png" % (slice_axis, slice_index, it)
-        else:
-            outfile = "frames/" + saveas + "ax_%i_zone_%s_%07i.png" % (slice_axis, slice_index, it)
-        fig.savefig(outfile)
-        fig.clf()
-    mylog.debug("exiting field_snap")
+            elif space == 'xspace':
+                im = grid[axnum].imshow(plane_data, origin='lower', aspect='auto',
+                        interpolation='nearest', zorder=2)
+                        
+            grid.cbar_axes[axnum].colorbar(im)
+
+            # Labels
+            grid[axnum].text(0.05, 0.95, fname + field.ctrans[cindex], 
+                    transform=grid[axnum].transAxes, size=24, color='w')
+            if row == nrows - 1:
+                grid[axnum].set_xlabel(name0)
+            if cindex == 0:
+                grid[axnum].set_ylabel(name1)
+            
+    # Add time to figure title
+    tstr = 't = %6.3f' % data.time
+    fig.suptitle(tstr, size=24, color='k')
+    
+    # Save in frames folder
+    if not os.path.exists('frames'):
+        os.mkdir('frames')
+    if data.ndim == 2:
+        slicestr = ''
+    elif data.ndim == 3:
+        slicestr = '%s_%i_' %(axis, outindex)
+    outfile = "frames/%s_array_%sn%07i.png" %(space[0], slicestr, it)
+    fig.savefig(outfile)
+    fig.clf()
 
 @AnalysisSet.register_task
 def print_energy(data, it):
@@ -486,9 +436,9 @@ def mode_track(data, it, flist=[], klist=[], log=True, write=True):
     fig.clf()
     
 @AnalysisSet.register_task
-def k_plot(data, it, axis='z', index='middle'):
+def scatter_snapshot(data, it, space='kspace', axis='z', index='middle'):
     """
-    Plot k-space power over a slice.
+    Take scatterplot snapshot of data in physical configuration.
     
     Parameters
     ----------
@@ -496,9 +446,8 @@ def k_plot(data, it, axis='z', index='middle'):
         Data input
     it : int
         Iteration number
-    
-        data        Data object
-        it          Iteration number
+    space: str
+        'xspace' or 'kspace'
     axis : str, optional
         Axis normal to desired slice, defaults to 'z'. Ignored for 2D data.
         i.e. 'x' for a y-z plane
@@ -507,87 +456,128 @@ def k_plot(data, it, axis='z', index='middle'):
     index : int or string, optional
         Index for slicing as an integer, or 'top', 'middle' (default), or 'bottom'.
         Ignored for 2D data.
-        zcut        kz index for the kx,ky plane being plotted
 
     """
 
-    # Determine image grid size
-    nrow = len(data.fields.keys())
-    ncol = na.max([f.ncomp for f in data.fields.values()])
-    
     # Figure setup
-    fig = P.figure(4, figsize=(8 * ncol, 8 * nrow))
+    if com_sys.myproc == 0:
     
-    grid = AxesGrid(fig, 111,
-                    nrows_ncols = (nrow, ncol),
-                    aspect=False,
-                    share_all=True,
-                    axes_pad=0.3,
-                    cbar_pad=0.,
-                    label_mode="1",
-                    cbar_location="top",
-                    cbar_mode="each")
+        # Determine grid size
+        nrows = len(data.fields.keys())
+        ncols = na.max([f.ncomp for f in data.fields.values()])
+        
+        # Create figure and axes grid
+        fig = P.figure(4, figsize=(8 * ncols, 8 * nrows))
+        grid = AxesGrid(fig, 111,
+                        nrows_ncols = (nrows, ncols),
+                        aspect=False,
+                        share_all=True,
+                        axes_pad=0.3,
+                        cbar_pad=0.,
+                        label_mode="L",
+                        cbar_location="top",
+                        cbar_mode="each")
                     
     # Plot field components
-    i = -1
-    ny = data['u']['x'].kny
-    eps = data['u']['x']._eps['kspace']
-    xloc = data['u']['x'].ktrans['x']
-    yloc = data['u']['x'].ktrans['y']
-    
-    for k,f in data.fields.iteritems():
-        i += 1
-        for j in xrange(f.ncomp):
-            I = i * ncol + j
+    row = -1
+    for fname, field in data:
+        row += 1
+        for cindex, comp in field:
+            axnum = row * ncols + cindex
             
-            plane_data, name0, kx, name1, ky = get_plane(data, k, j, space='kspace', axis='z', index='middle')
-            kmag = na.abs(plane_data)
+            # Retrieve correct slice
+            plane_data, outindex, name0, x0, name1, x1 = get_plane(data, 
+                    fname, cindex, space=space, axis=axis, index=index)
             
-            zero_mask = (kmag == 0)    
-            kmag[kmag < eps] = eps
+            # Bail of not process 0
+            if com_sys.myproc != 0:
+                return
             
-            logkmag = na.log10(kmag)
+            # Plot
+            if space == 'kspace':
+                # Take logarithm of magnitude, flooring at eps
+                kmag = na.abs(plane_data)
+                zero_mask = (kmag == 0)    
+                kmag[kmag < comp._eps['kspace']] = comp._eps['kspace']
+                logkmag = na.log10(kmag)
+                    
+                # Plot nonzero
+                if na.sum(~zero_mask):
+                    im = grid[axnum].scatter(x0[~zero_mask], x1[~zero_mask], 
+                            c=logkmag[~zero_mask], lw=0, s=40, zorder=2)
+                                     
+                # Plot zeros
+                grid[axnum].scatter(x0[zero_mask], x1[zero_mask], c='w', s=40, zorder=2)
+                    
+            elif space == 'xspace':
+                im = grid[axnum].scatter(x0, x1, c=plane_data, lw=0, s=40, zorder=2)
+                
+            grid.cbar_axes[axnum].colorbar(im)
+                
+            # Lines
+            if space == 'kspace':
+                # Zero lines
+                grid[axnum].axhline(0, c='k', zorder=1)
+                grid[axnum].axvline(0, c='k', zorder=1)
+                
+                # Nyquist boundary
+                ny0 = comp.kny[comp.ktrans[name0[1]]]
+                ny1 = comp.kny[comp.ktrans[name1[1]]]
+                if name0 == 'kx':
+                    nysquare0 = na.array([0, ny0, ny0, 0])
+                    nysquare1 = na.array([ny1, ny1, -ny1, -ny1])
+                else:
+                    nysquare0 = na.array([-ny0, ny0, ny0, -ny0, -ny0])
+                    nysquare1 = na.array([ny1, ny1, -ny1, -ny1, ny1])
+                grid[axnum].plot(nysquare0, nysquare1, 'k--', zorder=1)
+                
+                # Dealiasing boundary
+                grid[axnum].plot(2./3. * nysquare0, 2./3. * nysquare1, 'k:', zorder=1)
+                
+                plot_extent = [nysquare0[0], nysquare0[1], nysquare1[2], nysquare1[0]]
             
-            # Plot nonzero
-            if na.sum(~zero_mask):
-                im = grid[I].scatter(kx[~zero_mask], ky[~zero_mask], 
-                                 c=logkmag[~zero_mask], lw=0, s=40, zorder=2)
-                grid.cbar_axes[I].colorbar(im)
-                                 
-            # Plot zeros
-            grid[I].scatter(kx[zero_mask], ky[zero_mask], c='w', s=40, zorder=2)
-            
-            # Zero lines
-            grid[I].axhline(0, c='k', zorder=1)
-            grid[I].axvline(0, c='k', zorder=1)
-            
-            # Nyquist boundary
-            nysquarex = na.array([0, ny[xloc], ny[xloc], 0])
-            nysquarey = na.array([ny[yloc], ny[yloc], -ny[yloc], -ny[yloc]])
-            grid[I].plot(nysquarex, nysquarey, 'k--', zorder=1)
-            
-            # Dealiasing boundary
-            grid[I].plot(2/3. * nysquarex, 2/3. * nysquarey, 'k:', zorder=1)
-            
+            elif space == 'xspace':
+                # Real space boundary
+                x0len = comp.length[comp.xtrans[name0]]
+                x1len = comp.length[comp.xtrans[name1]]
+                dx0 = x0[0, 1] - x0[0, 0]
+                dx1 = x1[1, 0] - x1[0, 0]
+                xsquare0 = na.array([0, x0len, x0len, 0, 0]) - dx0 / 2.
+                xsquare1 = na.array([x1len, x1len, 0, 0, x1len]) - dx1 / 2.
+                grid[axnum].plot(xsquare0, xsquare1, 'k', zorder=1)
+                
+                plot_extent = [xsquare0[0], xsquare0[1], xsquare1[2], xsquare1[0]]
+                
             # Plot range and labels
-            grid[I].axis(padrange([0, ny[xloc], -ny[yloc], ny[yloc]], 0.2))
-            grid[I].text(0.05, 0.95, k + str(j), transform=grid[I].transAxes, size=24, color='black')
+            grid[axnum].axis(padrange(plot_extent, 0.1))
+            grid[axnum].text(0.05, 0.95, fname + field.ctrans[cindex], 
+                    transform=grid[axnum].transAxes, size=24, color='k')
+            if row == nrows - 1:
+                grid[axnum].set_xlabel(name0)
+            if cindex == 0:
+                grid[axnum].set_ylabel(name1)
             
-    # Time label
+    # Add time to figure title
     tstr = 't = %6.3f' % data.time
-    grid[0].text(-0.3,1.,tstr, transform=grid[0].transAxes, size=24, color='black')
+    fig.suptitle(tstr, size=24, color='k')
     
-    grid[0].set_xlabel('kx')
-    grid[0].set_ylabel('ky')
-    
+    # Save in frames folder
     if not os.path.exists('frames'):
         os.mkdir('frames')
-    outfile = "frames/k_plot_%07i.png" % it
+    if data.ndim == 2:
+        slicestr = ''
+    elif data.ndim == 3:
+        slicestr = '%s_%i_' %(axis, outindex)
+    outfile = "frames/%s_scatter_%sn%07i.png" %(space[0], slicestr, it)
     fig.savefig(outfile)
     fig.clf()
-
     
-def padrange(range, pad=0.05):
+def padrange(range, pad=0.1):
+    """Pad a list of the form [x0, x1, y0, y1] by specified fraction."""
+    
+    if pad == 0.:
+        return range
+    
     xmin, xmax, ymin, ymax = range
     dx = xmax - xmin
     dy = ymax - ymin
