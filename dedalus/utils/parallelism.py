@@ -24,6 +24,7 @@ License:
 """
 
 import numpy as na
+import numpy.lib.stride_tricks as st
 
 class CommunicationSystem(object):
     comm = None
@@ -166,3 +167,176 @@ def pickle(data,name):
     outf = open(filen,'w')
     cPickle.dump(data,outf)
     outf.close()
+    
+def strided_copy(input):
+    """Helper function to 'deep copy' a view using stridetricks."""
+    
+    return st.as_strided(input, shape=input.shape, strides=input.strides)
+
+def get_plane(data, field, comp=0, space='xspace', axis='z', index='middle',
+              return_position_arrays=True):
+    """
+    Return 2D slice of data, assembling across processes if needed.
+    
+    Parameters
+    ----------
+    data : StateData object
+        Input data
+    field : str
+        Name of field to assemble
+    comp : int, optional
+        Index of field component to assemble, defaults to 0.
+    space : str, optional
+        'xspace' (default) or 'kspace'
+    axis : str, optional
+        Axis normal to desired slice, defaults to 'z'. Ignored for 2D data.
+        i.e. 'x' for a y-z plane
+             'y' for a x-z plane
+             'z' for a x-y plane
+    index : int or string, optional
+        Index for slicing as an integer, or 'top', 'middle' (default), or 'bottom'.
+        Ignored for 2D data.
+    return_position_arrays : boolean, optional
+        Return arrays of the x or k positions of the output plane data. Defaults True.
+        
+    Returns
+    -------
+    plane_data : ndarray
+        Component values in the output plane
+    name0 : str, optional
+        Name of direction along 0th-dimension of the output plane, e.g. 'x' or 'ky'
+    grid0 : ndarray, optional
+        Array of positions along 0th-dimension of the output plane
+        i.e. 'x' for axis = 'y' or 'z'
+             'y' for axis = 'x'
+    name1 : str, optional
+        Name of direction along 1st-dimension of the output plane
+    grid1 : ndarray, optional
+        Array of positions along 1st-dimension of the output plane
+        i.e. 'z' for axis = 'x' or 'y'
+             'y' for axis = 'z'
+        
+    Examples
+    --------
+    >>> get_plane(data, 'u', 'x', 'kspace', 'x', 0) 
+    (global_ux[:, :, 0], 'ky', global_ky, 'kz', global_kz)
+        
+    """
+    
+    # Grab specified component and check space
+    comp = data[field][comp]
+    comp.require_space(space)
+    
+    # Retrieve translation table for requested space
+    if space == 'kspace':
+        trans = comp.ktrans
+    elif space == 'xspace':
+        trans = comp.xtrans
+        
+    # Determine slice index for string inputs
+    if comp.ndim == 2:
+        pass
+    elif index == 'top':
+        index = comp.global_shape[space][trans[axis]] - 1
+    elif index == 'middle':
+        index = comp.global_shape[space][trans[axis]] / 2
+    elif index == 'bottom':
+        index = 0
+    else:
+        index = int(index)
+        if index < 0: index = index % comp.global_shape[space][trans[axis]]
+                    
+    # Prepare data from each process
+    gather = False
+    reduce = False
+    
+    if comp.ndim == 2:
+        if com_sys.nproc == 1:
+            plane_data = strided_copy(comp.data)
+        else:
+            proc_data = strided_copy(comp.data)
+            gather = True
+                
+    elif comp.ndim == 3:
+        slicelist = [slice(None)] * 3
+        if com_sys.nproc == 1:
+            slicelist[trans[axis]] = index
+            plane_data = strided_copy(comp.data[slicelist])
+        else:
+            if trans[axis] == 0:
+                if ((index >= comp.offset[space]) and
+                    (index < comp.offset[space] + comp.local_shape[space][0])):
+                    slicelist[trans[axis]] = index - comp.offset[space]
+                    proc_data = strided_copy(comp.data[slicelist])
+                else:
+                    proc_data = 0.    
+                reduce = True
+            else:
+                slicelist[trans[axis]] = index
+                proc_data = strided_copy(comp.data[slicelist])
+                gather = True
+                
+    # Gather or reduce if necessary
+    if gather: 
+        gathered_data = com_sys.comm.gather(proc_data, root=0)
+        if com_sys.myproc == 0:
+            plane_data = na.concatenate(gathered_data)
+        else:
+            plane_data = None
+    elif reduce:
+        plane_data = com_sys.comm.reduce(proc_data, op=com_sys.MPI.SUM, root=0)
+        
+    # Transpose if necessary
+    if (comp.ndim == 2) and (space == 'kspace'):
+        plane_data = na.transpose(plane_data)
+    if (comp.ndim == 3) and (space == 'kspace') and (axis == 'x'):
+        plane_data = na.transpose(plane_data)
+
+    # Position arrays
+    if not return_position_arrays:
+        return plane_data
+    else:
+        if axis == 'x':
+            name0, name1 = ('y', 'z')
+        elif axis == 'y':
+            name0, name1 = ('x', 'z')
+        elif axis == 'z':
+            name0, name1 = ('x', 'y')
+            
+        if space == 'xspace':
+            grid1, grid0 = na.mgrid[slice(float(comp.global_shape[space][trans[name1]])),
+                              slice(float(comp.global_shape[space][trans[name0]]))]
+            grid0 *= comp.length[trans[name0]] / comp.global_shape[space][trans[name0]]            
+            grid1 *= comp.length[trans[name1]] / comp.global_shape[space][trans[name1]]  
+            
+        elif space == 'kspace':
+            k = {}
+            if comp.ndim == 2:
+                k['y'] = comp.k['y']
+                if com_sys.nproc == 1:
+                    k['x'] = na.transpose(comp.k['x'])
+                else:
+                    gathered_kx = com_sys.comm.gather(comp.k['x'], root=0)
+                    if com_sys.myproc == 0:
+                        k['x'] = na.transpose(na.concatenate(gathered_kx))
+                    else:
+                        return (None,) * 5
+            elif comp.ndim == 3:
+                k['x'] = comp.k['x'][0, :, :]
+                k['z'] = comp.k['z'][:, :, 0]
+                if com_sys.nproc == 1:
+                    k['y'] = na.transpose(comp.k['y'][:, 0, :])
+                else:
+                    gathered_ky = com_sys.comm.gather(comp.k['y'], root=0)
+                    if com_sys.myproc == 0:
+                        k['y'] = na.transpose(na.concatenate(gathered_ky)[:, 0, :])
+                    else:
+                        return (None,) * 5
+                    
+            grid0 = k[name0] * na.ones(plane_data.shape)
+            grid1 = na.transpose(k[name1]) * na.ones(plane_data.shape)
+            name0 = 'k' + name0
+            name1 = 'k' + name1
+            
+        return (plane_data, name0, grid0, name1, grid1)
+        
