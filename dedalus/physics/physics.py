@@ -491,7 +491,7 @@ class BoussinesqHydro(Hydro):
 
         # temperature equation
         self.XlistgradY([u], T, mathtmp, [Tcopy], [ugradT])
-        self._RHS['T']['kspace'] = -ugradT['kspace'] + beta * u['z']['kspace']
+        self._RHS['T']['kspace'] = -ugradT['kspace'] - beta * u['z']['kspace']
 
         self._RHS['T'].integrating_factor = self.parameters['kappa'] * data['T'].k2() ** self.visc_order
 
