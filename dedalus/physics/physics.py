@@ -486,8 +486,7 @@ class BoussinesqHydro(Hydro):
         # Compute terms
 
         # add buoyancy term
-        if self.ndim == 2:
-            self._RHS['u']['z']['kspace'] += g * alpha_t * (self._RHS['T']['kspace'] - T0)
+        self._RHS['u']['z']['kspace'] += g * alpha_t * (self._RHS['T']['kspace'] - T0)
 
         # temperature equation
         self.XlistgradY([u], T, mathtmp, [Tcopy], [ugradT])
@@ -514,7 +513,8 @@ class BoussinesqHydro(Hydro):
         
         pressure = self.aux_fields['pressure']
         Hydro.pressure(self, data)
-        pressure['z']['kspace'] += self.parameters['g'] * self.parameters['alpha_t'] * data['T'].k['z'] * data['T']['kspace']/k2
+        for i in self.dims:
+            pressure[i]['kspace'] += data['T'].k[self._trans[i]] * self.parameters['g'] * self.parameters['alpha_t'] * data['T'].k['z'] * data['T']['kspace']/k2
 
 class MHD(Hydro):
     """Incompressible magnetohydrodynamics."""
