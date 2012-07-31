@@ -486,7 +486,7 @@ class BoussinesqHydro(Hydro):
         # Compute terms
 
         # add buoyancy term
-        self._RHS['u']['z']['kspace'] += g * alpha_t * (self._RHS['T']['kspace'] - T0)
+        self._RHS['u']['z']['kspace'] += g * alpha_t * (data['T']['kspace'] - T0)
 
         # temperature equation
         self.XlistgradY([u], T, mathtmp, [Tcopy], [ugradT])
