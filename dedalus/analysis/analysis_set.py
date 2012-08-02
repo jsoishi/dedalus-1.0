@@ -69,7 +69,7 @@ def volume_average(data, it, va_obj=None):
     va_obj.run()
        
 @AnalysisSet.register_task
-def array_snapshot(data, it, space='xspace', axis='z', index='middle'):
+def array_snapshot(data, it, space='xspace', axis='z', index='middle', aspect='auto'):
     """
     Take image snapshot of data in array configuration.
     
@@ -89,6 +89,9 @@ def array_snapshot(data, it, space='xspace', axis='z', index='middle'):
     index : int or string, optional
         Index for slicing as an integer, or 'top', 'middle' (default), or 'bottom'.
         Ignored for 2D data.
+    aspect : str
+        'auto' stretches image to match axis
+        'equal' stretches axis to match image
 
     """
 
@@ -132,16 +135,11 @@ def array_snapshot(data, it, space='xspace', axis='z', index='middle'):
                 kmag = na.abs(plane_data)
                 zero_mask = (kmag == 0)    
                 kmag[kmag < comp._eps['kspace']] = comp._eps['kspace']
-                logkmag = na.log10(kmag)
-                logkmag[zero_mask] = na.nan
-                    
-                im = grid[axnum].imshow(logkmag, origin='lower', aspect='auto',
-                        interpolation='nearest', zorder=2)
+                plane_data = na.log10(kmag)
+                plane_data[zero_mask] = na.nan
 
-            elif space == 'xspace':
-                im = grid[axnum].imshow(plane_data, origin='lower', aspect='auto',
-                        interpolation='nearest', zorder=2)
-                        
+            im = grid[axnum].imshow(plane_data, origin='lower', aspect='auto',
+                    interpolation='nearest', zorder=2)     
             grid.cbar_axes[axnum].colorbar(im)
 
             # Labels
@@ -505,14 +503,14 @@ def scatter_snapshot(data, it, space='kspace', axis='z', index='middle'):
                 if na.sum(~zero_mask):
                     im = grid[axnum].scatter(x0[~zero_mask], x1[~zero_mask], 
                             c=logkmag[~zero_mask], lw=0, s=40, zorder=2)
-                                     
+                    grid.cbar_axes[axnum].colorbar(im)
                 # Plot zeros
                 grid[axnum].scatter(x0[zero_mask], x1[zero_mask], c='w', s=40, zorder=2)
                     
             elif space == 'xspace':
                 im = grid[axnum].scatter(x0, x1, c=plane_data, lw=0, s=40, zorder=2)
-                
-            grid.cbar_axes[axnum].colorbar(im)
+                grid.cbar_axes[axnum].colorbar(im)    
+            
                 
             # Lines
             if space == 'kspace':
