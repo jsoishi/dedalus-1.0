@@ -33,6 +33,33 @@ cdef extern from "fftw3.h":
         int ins "is"
         int ous "os"
 
+
+    fftw_plan fftw_plan_many_dft_r2c(int rank, 
+                                     int *n, 
+                                     int howmany,
+                                     double *in_, 
+                                     int *inembed,
+                                     int istride, 
+                                     int idist,
+                                     complex *out, 
+                                     int *onembed,
+                                     int ostride, 
+                                     int odist,
+                                     unsigned flags)
+                                     
+    fftw_plan fftw_plan_many_dft_c2r(int rank, 
+                                     int *n, 
+                                     int howmany,
+                                     complex *out,
+                                     int *inembed,
+                                     int istride, 
+                                     int idist, 
+                                     double *in_,
+                                     int *onembed,
+                                     int ostride, 
+                                     int odist,
+                                     unsigned flags)
+
     fftw_plan fftw_plan_dft_2d(int n0,
                                int n1,
                                complex* in_,
@@ -47,13 +74,13 @@ cdef extern from "fftw3.h":
                                int sign,
                                unsigned flags)
     fftw_plan fftw_plan_many_dft(int rank,
-                                 int* n_,
+                                 int *n_,
                                  int howmany,
-                                 complex* in_,
-                                 int* inembed_,
+                                 complex *in_,
+                                 int *inembed_,
                                  int istride,
                                  int idist,
-                                 complex* out_,
+                                 complex *out_,
                                  int *onembed_,
                                  int ostride,
                                  int odist,

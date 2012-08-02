@@ -174,7 +174,7 @@ class FourierRepresentation(Representation):
         
         # Assign data arrays and compute local shapes and offsets
         if method == 'fftw':
-            self.kdata, self.xdata, local_n0, local_n0_start, local_n1, local_n1_start = fftw.create_data(self.global_shape['xspace'], com_sys)
+            self.kdata, self._mdata, self.xdata, local_n0, local_n0_start, local_n1, local_n1_start = fftw.create_data(self.global_shape['xspace'], com_sys)
             self.local_shape = {'kspace': self.global_shape['kspace'].copy(),
                                 'xspace': self.global_shape['xspace'].copy()}
             self.local_shape['kspace'][0] = local_n1
@@ -473,7 +473,6 @@ class FourierRepresentation(Representation):
 
         return grid
 
-
 class FourierShearRepresentation(FourierRepresentation):
     """
     Fourier representation in a shearing-box domain.
@@ -540,9 +539,9 @@ class FourierShearRepresentation(FourierRepresentation):
         if method == 'fftw':
             pass
         elif method == 'numpy':
-            tempshape = self.global_shape['xspace'].copy()
-            tempshape[-1] = tempshape[-1] / 2 + 1
-            self._tempdata = na.zeros(tempshape, dtype= self.dtype['kspace'])
+            mshape = self.local_shape['xspace'].copy()
+            mshape[-1] = tempshape[-1] / 2 + 1
+            self._mdata = na.zeros(mshape, dtype=self.dtype['kspace'])
     
     def _update_k(self):
         """Evolve wavenumbers due to shear."""
@@ -582,61 +581,56 @@ class FourierShearRepresentation(FourierRepresentation):
         raise NotImplementedError("Find_mode for shear rep is more advanced and needs to be done")
 
     def create_fftw_plans(self):
-        raise NotImplementedError("TO DO")
-    
-        self.fplan_yz = fftw.PlanPlane(self.data, 
-                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
-        self.rplan_yz = fftw.PlanPlane(self.data, 
-                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
-        self.fplan_x = fftw.PlanPencil(self.data, 
-                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
-        self.rplan_x = fftw.PlanPencil(self.data, 
-                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+        self.fplan_x = fftw.rPlanPencil(self.xdata, self._mdata, 
+                direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+        self.rplan_x = fftw.rPlanPencil(self.xdata, self._mdata, 
+                direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+                
+#         self.fplan_yz = fftw.PlanPlane(self.data, 
+#                                            direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
+#         self.rplan_yz = fftw.PlanPlane(self.data, 
+#                                            direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
                                            
     def fwd_fftw(self):
-        raise NotImplementedError("TO DO")
     
-        deltay = self.shear_rate * self.sd.time
-        x = (na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False) +
-             na.zeros(self.shape))
-
-        # do y-z fft
-        self.fplan_yz()
-
-        # Phase shift
-        self.data *= na.exp(1j * self.k['y'] * x * deltay)
-        
         # Do x fft
         self.fplan_x()
-        self.data /= (self.data.size * com_sys.nproc)
+        
+        # Phase shift
+        self._mdata *= na.exp(1j * self._phase_rate * self.sd.time)
+           
+#         # Transpose
+#         tr = [1, 0, 2][:self.ndim]
+#         self.kdata[:] = na.transpose(self._tempdata, tr)
+#         
+#         # Do y and z ffts
+#         if self.ndim == 2:
+#             self.kdata[:] = fpack.fft(self.kdata, axis=1)
+#         else:
+#             self.kdata[:] = fpack.fftn(self.kdata, axes=(0,1))
+
+        # Normalize
+        self._mdata /= self.global_shape['xspace'].prod()
+        #self.kdata /= self.global_shape['xspace'].prod()
 
     def rev_fftw(self):
-        raise NotImplementedError("TO DO")
-    
-        deltay = self.shear_rate * self.sd.time 
-        x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
         
-        # Do x fft
+        # DO ALL
+        
+        # Do x ifft
         self.rplan_x()
-
-        # Phase shift
-        self.data *= na.exp(-1j * self.k['y'] * x * deltay)
-        
-        # Do y-z fft
-        self.rplan_yz()
-        self.data.imag = 0.
         
     def fwd_np(self):
 
         # Do x fft
-        self._tempdata[:] = fpack.rfft(self.xdata / self.global_shape['xspace'].prod(), axis=-1)
+        self._mdata[:] = fpack.rfft(self.xdata, axis=-1)
         
         # Phase shift
-        self._tempdata *= na.exp(1j * self._phase_rate * self.sd.time)
+        self._mdata *= na.exp(1j * self._phase_rate * self.sd.time)
         
         # Transpose
         tr = [1, 0, 2][:self.ndim]
-        self.kdata[:] = na.transpose(self._tempdata, tr)
+        self.kdata[:] = na.transpose(self._mdata, tr)
         
         # Do y and z ffts
         if self.ndim == 2:
@@ -644,9 +638,12 @@ class FourierShearRepresentation(FourierRepresentation):
         else:
             self.kdata[:] = fpack.fftn(self.kdata, axes=(0,1))
 
+        # Correct numpy normalization
+        self.kdata /= self.global_shape['xspace'].prod()
+
     def rev_np(self):
     
-        # Do y and z ffts
+        # Do y and z iffts
         if self.ndim == 2:
             self.kdata[:] = fpack.ifft(self.kdata, axis=1)
         else:
@@ -654,13 +651,16 @@ class FourierShearRepresentation(FourierRepresentation):
             
         # Transpose
         tr = [1, 0, 2][:self.ndim]
-        self._tempdata[:] = na.transpose(self.kdata, tr)        
+        self._mdata[:] = na.transpose(self.kdata, tr)        
 
         # Phase shift
-        self._tempdata *= na.exp(-1j * self._phase_rate * self.sd.time)
+        self._mdata *= na.exp(-1j * self._phase_rate * self.sd.time)
         
-        # Do x fft
-        self.xdata[:] = fpack.irfft(self._tempdata, axis=-1) * self.global_shape['xspace'].prod()
+        # Do x ifft
+        self.xdata[:] = fpack.irfft(self._mdata, axis=-1)
+        
+        # Correct numpy normalization
+        self.kdata *= self.global_shape['xspace'].prod()
 
 class SphericalHarmonicRepresentation(FourierRepresentation):
     """
