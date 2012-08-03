@@ -486,13 +486,14 @@ class BoussinesqHydro(Hydro):
         # Compute terms
 
         # add buoyancy term
-        self._RHS['u']['z']['kspace'] += g * alpha_t * (data['T']['kspace'] - T0)
+        self._RHS['u']['z']['kspace'] += g * alpha_t * (T['kspace'] - T0)
 
         # temperature equation
         self.XlistgradY([u], T, mathtmp, [Tcopy], [ugradT])
         self._RHS['T']['kspace'] = -ugradT['kspace'] - beta * u['z']['kspace']
-
-        self._RHS['T'].integrating_factor = self.parameters['kappa'] * data['T'].k2() ** self.visc_order
+        
+        self._RHS['T']['kspace'][0,0,0] = 0. # must ensure (0,0,0) T mode does not grow.
+        self._RHS['T'].integrating_factor = self.parameters['kappa'] * T.k2() ** self.visc_order
 
         return self._RHS
 
@@ -504,12 +505,7 @@ class BoussinesqHydro(Hydro):
         ==> pressure term = - k (k * ugradu + rotation + shear) / k^2
         
         """
-        # Setup temporary data container
-        sampledata = data['u']['x']
-
-        sampledata['kspace']
-        tmp = na.zeros_like(sampledata.data)
-        k2 = sampledata.k2(no_zero=True)
+        k2 = data['T'].k2(no_zero=True)
         
         pressure = self.aux_fields['pressure']
         Hydro.pressure(self, data)
