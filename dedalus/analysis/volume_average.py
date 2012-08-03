@@ -115,6 +115,18 @@ def ekin(data, space='kspace'):
     return volume_average(aux['ekin'], space=space)
 
 @VolumeAverageSet.register_task
+def ux2(data, space='kspace'):
+    return volume_average(data['u']['x']['kspace']*data['u']['x']['kspace'].conj(), kdict=data['u']['x'].k)
+
+@VolumeAverageSet.register_task
+def uy2(data, space='kspace'):
+    return volume_average(data['u']['y']['kspace']*data['u']['y']['kspace'].conj(), kdict=data['u']['y'].k)
+
+@VolumeAverageSet.register_task
+def uz2(data, space='kspace'):
+    return volume_average(data['u']['z']['kspace']*data['u']['z']['kspace'].conj(), kdict=data['u']['z'].k)
+
+@VolumeAverageSet.register_task
 def emag(data, space='kspace'):
     aux = data.clone()
     aux.add_field('emag', 'ScalarField')
@@ -191,6 +203,20 @@ def energy_dissipation(data):
     return volume_average(en_dis,kdict=aux['enstr'].k)
 
 @VolumeAverageSet.register_task
+def thermal_energy_dissipation(data):
+    """energy dissipation rate: kappa <d_i T>**2
+
+    """
+    aux = data.clone()
+    aux.add_field('t_en_dis', 'ScalarField')
+
+    aux['t_en_dis']['kspace'] = data.parameters['kappa'] * ((na.abs(data['T'].deriv('x')))**2 
+        + (na.abs(data['T'].deriv('y')))**2 \
+        + (na.abs(data['T'].deriv('z')))**2)
+
+    return volume_average(aux['t_en_dis'])
+
+@VolumeAverageSet.register_task
 def divergence(data):
     aux = data.clone()
     aux.add_field('div','ScalarField')
@@ -200,3 +226,14 @@ def divergence(data):
         + data['u']['z'].deriv('z')
 
     return volume_average(aux['div'])
+
+@VolumeAverageSet.register_task
+def divergence_sum(data):
+    aux = data.clone()
+    aux.add_field('div','ScalarField')
+
+    aux['div']['kspace'] = data['u']['x'].deriv('x') \
+        + data['u']['y'].deriv('y') \
+        + data['u']['z'].deriv('z')
+
+    return abs(aux['div']['kspace']).sum()
