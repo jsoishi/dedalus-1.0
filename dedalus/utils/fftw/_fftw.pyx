@@ -27,7 +27,7 @@ from _fftw cimport fftw_iodim, FFTW_FORWARD, FFTW_BACKWARD, \
         FFTW_MEASURE, FFTW_DESTROY_INPUT, FFTW_UNALIGNED, \
         FFTW_CONSERVE_MEMORY, FFTW_EXHAUSTIVE, FFTW_PRESERVE_INPUT, \
         FFTW_PATIENT, FFTW_ESTIMATE, FFTW_MPI_TRANSPOSED_IN, \
-        FFTW_MPI_TRANSPOSED_OUT, fftw_plan
+        FFTW_MPI_TRANSPOSED_OUT, fftw_plan, FFTW_MPI_DEFAULT_BLOCK
 cimport _fftw as fftw
 cimport libc
 cimport numpy as np
@@ -35,19 +35,17 @@ import numpy as np
 from mpi4py cimport MPI
 from mpi4py.mpi_c cimport *
 from cpython cimport Py_INCREF
-
-fftw_flags = {'FFTW_FORWARD': FFTW_FORWARD,
-              'FFTW_BACKWARD': FFTW_BACKWARD,        
-              'FFTW_MEASURE': FFTW_MEASURE,
+              
+fftw_flags = {'FFTW_CONSERVE_MEMORY': FFTW_CONSERVE_MEMORY,
               'FFTW_DESTROY_INPUT': FFTW_DESTROY_INPUT,
-              'FFTW_UNALIGNED': FFTW_UNALIGNED,
-              'FFTW_CONSERVE_MEMORY': FFTW_CONSERVE_MEMORY,
-              'FFTW_EXHAUSTIVE': FFTW_EXHAUSTIVE,
-              'FFTW_PRESERVE_INPUT': FFTW_PRESERVE_INPUT,
-              'FFTW_PATIENT': FFTW_PATIENT,
               'FFTW_ESTIMATE': FFTW_ESTIMATE,
+              'FFTW_EXHAUSTIVE': FFTW_EXHAUSTIVE,
+              'FFTW_MEASURE': FFTW_MEASURE,
               'FFTW_MPI_TRANSPOSED_IN': FFTW_MPI_TRANSPOSED_IN,
-              'FFTW_MPI_TRANSPOSED_OUT': FFTW_MPI_TRANSPOSED_OUT}
+              'FFTW_MPI_TRANSPOSED_OUT': FFTW_MPI_TRANSPOSED_OUT,
+              'FFTW_PATIENT': FFTW_PATIENT,
+              'FFTW_PRESERVE_INPUT': FFTW_PRESERVE_INPUT,  
+              'FFTW_UNALIGNED': FFTW_UNALIGNED}
 
 cdef extern from "numpy/arrayobject.h":
     object PyArray_NewFromDescr(object subtype, np.dtype descr,
@@ -198,11 +196,11 @@ cdef class Plan:
     cdef np.ndarray _data
     cdef int direction
     cdef int flags
-    def __init__(self, data, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
+    def __init__(self, data, forward=True, flags=['FFTW_MEASURE']):
         """A custom wrapping of FFTW for use in Dedalus.
 
         """
-        if direction == 'FFTW_FORWARD':
+        if forward:
             self.direction = FFTW_FORWARD
         else:
             self.direction = FFTW_BACKWARD
@@ -244,114 +242,31 @@ cdef class Plan:
         def __set__(self, inp):
             self._data[:]=inp
 
-cdef class PlanPlane(Plan):
-    def __init__(self, data, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
-        """PlanPlane returns a special FFTW plan that will take a 2D
-        FFT along the z-y planes of a 3D, row-major data array.
-        """
-        if direction == 'FFTW_FORWARD':
-            self.direction = FFTW_FORWARD
-        else:
-            self.direction = FFTW_BACKWARD
-        for f in flags:
-            self.flags = self.flags | fftw_flags[f]
-        self._data = data
-
-        # allocate 
-        cdef int rank = 2
-        cdef fftw_iodim *dims = <fftw_iodim *> libc.stdlib.malloc(sizeof(fftw_iodim) * rank)
-        cdef int howmany_rank = 1
-        cdef fftw_iodim *howmany_dims = <fftw_iodim *> libc.stdlib.malloc(sizeof(fftw_iodim) * howmany_rank)
-
-        # setup transforms
-        if len(data.shape) == 2:
-            nz = 1
-            ny = data.shape[0]
-            nx = data.shape[1]
-        else:
-            nz = data.shape[0]
-            ny = data.shape[1]
-            nx = data.shape[2]
-        dims[0].n = nz #data.shape[0]
-        dims[0].ins = ny*nx # data.shape[1]*data.shape[2]
-        dims[0].ous = ny*nx # data.shape[1]*data.shape[2]
-        dims[1].n = ny # data.shape[1]
-        dims[1].ins = nx # data.shape[2]
-        dims[1].ous = nx # data.shape[2]
-
-        howmany_dims[0].n = nx #data.shape[2]
-        howmany_dims[0].ins = 1
-        howmany_dims[0].ous = 1
-        
-        self._fftw_plan = fftw.fftw_plan_guru_dft(rank, dims,
-                                             howmany_rank, howmany_dims,
-                                             <complex *> self._data.data,
-                                             <complex *> self._data.data,
-                                             self.direction, self.flags)
-
-        libc.stdlib.free(dims)
-        libc.stdlib.free(howmany_dims)
-
-cdef class PlanPencil(Plan):
-    def __init__(self, data, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
-        """PlanPencil returns a FFTW plan that will take a 1D
-        FFT along the x pencils of a 3D, row-major data array.
-        """
-        if direction == 'FFTW_FORWARD':
-            self.direction = FFTW_FORWARD
-        else:
-            self.direction = FFTW_BACKWARD
-        for f in flags:
-            self.flags = self.flags | fftw_flags[f]
-        self._data = data
-
-        nx = data.shape[-1]
-        ny = data.shape[-2]
-        try:
-            nz = data.shape[-3]
-        except IndexError:
-            nz = 1
-
-        cdef np.ndarray n = np.array(nx, dtype='int32')
-        cdef int rank = 1
-        cdef int howmany = nz*ny
-        cdef int istride = 1
-        cdef int ostride = istride
-        cdef int idist = nx
-        cdef int odist = idist
-
-        self._fftw_plan = fftw.fftw_plan_many_dft(rank, <int *> n.data,
-                                             howmany,
-                                             <complex *> self._data.data,
-                                             <int *> n.data,
-                                             istride, idist,
-                                             <complex *> self._data.data,
-                                             <int *> n.data,
-                                             ostride, odist,
-                                             self.direction,
-                                             self.flags)
 cdef class rPlan(Plan):
     cdef np.ndarray _xdata, _kdata
-    def __init__(self, xdata, kdata, com_sys,shape=None,direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
-        """rPlan implements out-of-place, real-to-complex,
-        complex-to-real transforms.
+    def __init__(self, xdata, kdata, com_sys, shape, forward=True, 
+            flags=['FFTW_MEASURE']):
+        """
+        Constructs a FFTW plan that will take a parallelized, full R2C DFT of a 
+        2D or 3D row-major data array.
 
         """
+        
+        # MPI communicators
         cdef MPI.Comm comm = com_sys.comm
         cdef MPI_Comm c_comm = comm.ob_mpi
-
-        if direction == 'FFTW_FORWARD':
-            self.direction = FFTW_FORWARD
-        else:
-            self.direction = FFTW_BACKWARD
-        for f in flags:
-            self.flags = self.flags | fftw_flags[f]
+        
+        # Store input arrays
         self._xdata = xdata
         self._kdata = kdata
-        if shape == None:
-            shape = xdata.shape
+            
+        # Build flags
+        for f in flags:
+            self.flags = self.flags | fftw_flags[f]
+
+        # Create plan
         if len(shape) == 2:
-            if self.direction == FFTW_FORWARD:
+            if forward:
                 self.flags = self.flags | fftw_flags['FFTW_MPI_TRANSPOSED_OUT']
                 self._fftw_plan = fftw.fftw_mpi_plan_dft_r2c_2d(shape[0],
                                                                 shape[1],
@@ -367,9 +282,8 @@ cdef class rPlan(Plan):
                                                                 <double *> self._xdata.data,
                                                                 c_comm,
                                                                 self.flags)
-
         elif len(shape) == 3:
-            if self.direction == FFTW_FORWARD:
+            if forward:
                 self.flags = self.flags | fftw_flags['FFTW_MPI_TRANSPOSED_OUT']
                 self._fftw_plan = fftw.fftw_mpi_plan_dft_r2c_3d(shape[0],
                                                                 shape[1],
@@ -393,36 +307,97 @@ cdef class rPlan(Plan):
         if self._fftw_plan == NULL:
             raise RuntimeError("FFTW could not create plan.")
             
-cdef class rPlanPencil(Plan):
+cdef class PencilPlan(Plan):
     cdef np.ndarray _xdata, _kdata
-    def __init__(self, xdata, kdata, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']):
+    def __init__(self, xdata, kdata, forward=True, flags=['FFTW_MEASURE']):
         """
-        Constructs a FFTW plan that will take a 1D R2C FFT along the x pencils
-        of a 2D or 3D, row-major data array.
+        Constructs a FFTW plan that will take a 1D C2C DFT along the last
+        dimension of a 2D or 3D row-major data array.
         
         """
 
-        # Store inputs
+        # Store input arrays
         self._xdata = xdata
         self._kdata = kdata
-
-        # Set direction
-        if direction == 'FFTW_FORWARD':
-            self.direction = FFTW_FORWARD
-        else:
-            self.direction = FFTW_BACKWARD
             
-        # Flag check???????
+        # Build flags
         for f in flags:
             self.flags = self.flags | fftw_flags[f]
             
         # Get array size
-        shape = xdata.shape
-        cdef int nx = shape[-1]
-        cdef int ny = shape[-2]
+        cdef int nx = xdata.shape[-1]
+        cdef int ny = xdata.shape[-2]
         cdef int nz = 1
-        if len(shape) == 3:
-            nz = shape[-3]
+        if len(xdata.shape) == 3:
+            nz = xdata.shape[-3]
+        
+        # Construct plan inputs
+        cdef int rank = 1
+        cdef int sign = 0
+        cdef int howmany = nz * ny
+        cdef int xstride = 1
+        cdef int kstride = 1
+        cdef int xdist = nx
+        cdef int kdist = nx
+
+        # Create plan
+        if forward:
+            sign = FFTW_FORWARD
+            self._fftw_plan = fftw.fftw_plan_many_dft(rank, 
+                                                      &nx,
+                                                      howmany,
+                                                      <complex *> self._xdata.data, 
+                                                      NULL,
+                                                      xstride, 
+                                                      xdist,
+                                                      <complex *> self._kdata.data, 
+                                                      NULL,
+                                                      kstride, 
+                                                      kdist,
+                                                      sign,
+                                                      self.flags)
+        else:
+            sign = FFTW_BACKWARD
+            self._fftw_plan = fftw.fftw_plan_many_dft(rank, 
+                                                      &nx,
+                                                      howmany,
+                                                      <complex *> self._kdata.data,
+                                                      NULL,
+                                                      kstride, 
+                                                      kdist,
+                                                      <complex *> self._xdata.data,
+                                                      NULL,
+                                                      xstride, 
+                                                      xdist,
+                                                      sign,
+                                                      self.flags)
+            
+        if self._fftw_plan == NULL:
+            raise RuntimeError("FFTW could not create plan.")
+            
+cdef class rPencilPlan(Plan):
+    cdef np.ndarray _xdata, _kdata
+    def __init__(self, xdata, kdata, forward=True, flags=['FFTW_MEASURE']):
+        """
+        Constructs a FFTW plan that will take a 1D R2C DFT along the last
+        dimension of a 2D or 3D row-major data array.
+        
+        """
+
+        # Store input arrays
+        self._xdata = xdata
+        self._kdata = kdata
+            
+        # Build flags
+        for f in flags:
+            self.flags = self.flags | fftw_flags[f]
+            
+        # Get local array size
+        cdef int nx = xdata.shape[-1]
+        cdef int ny = xdata.shape[-2]
+        cdef int nz = 1
+        if len(xdata.shape) == 3:
+            nz = xdata.shape[-3]
         
         # Construct plan inputs
         cdef int rank = 1
@@ -433,9 +408,9 @@ cdef class rPlanPencil(Plan):
         cdef int kdist = nx / 2 + 1
 
         # Create plan
-        if self.direction == FFTW_FORWARD:
+        if forward:
             self._fftw_plan = fftw.fftw_plan_many_dft_r2c(rank, 
-                                                          <int *> &nx,
+                                                          &nx,
                                                           howmany,
                                                           <double *> self._xdata.data, 
                                                           NULL,
@@ -448,7 +423,7 @@ cdef class rPlanPencil(Plan):
                                                           self.flags)
         else:
             self._fftw_plan = fftw.fftw_plan_many_dft_c2r(rank, 
-                                                          <int *> &nx,
+                                                          &nx,
                                                           howmany,
                                                           <complex *> self._kdata.data,
                                                           NULL,
@@ -463,3 +438,126 @@ cdef class rPlanPencil(Plan):
         if self._fftw_plan == NULL:
             raise RuntimeError("FFTW could not create plan.")
             
+cdef class TransposePlan(Plan):
+    cdef np.ndarray _xdata, _kdata
+    def __init__(self, xdata, kdata, com_sys, shape, forward=True,
+            flags=['FFTW_MEASURE']):
+        """
+        Constructs a FFTW plan that will perform a parallelized transpose of
+        the first two dimensions of a 2D or 3D row-major complex data array.
+        
+        """
+        
+        # MPI communicators
+        cdef MPI.Comm comm = com_sys.comm
+        cdef MPI_Comm c_comm = comm.ob_mpi
+
+        # Store input arrays
+        self._xdata = xdata
+        self._kdata = kdata
+        
+        # Build flags
+        for f in flags:
+            self.flags = self.flags | fftw_flags[f]
+            
+        # Get global array size
+        cdef size_t n0 = shape[0]
+        cdef size_t n1 = shape[1]
+        cdef size_t n2 = 1
+        if len(shape) == 3:
+            n2 = shape[2]
+            
+        # Items to be transformed are tuples of n2 complex numbers
+        cdef size_t howmany = 2 * n2  
+             
+        # Create plan
+        if forward:
+            self._fftw_plan = fftw.fftw_mpi_plan_many_transpose(n0,
+                                                                n1,
+                                                                howmany,
+                                                                <size_t> FFTW_MPI_DEFAULT_BLOCK,
+                                                                <size_t> FFTW_MPI_DEFAULT_BLOCK,
+                                                                <double *> self._xdata.data, 
+                                                                <double *> self._kdata.data,
+                                                                c_comm, 
+                                                                self.flags)
+        else:
+            self._fftw_plan = fftw.fftw_mpi_plan_many_transpose(n1,
+                                                                n0,
+                                                                howmany,
+                                                                <size_t> FFTW_MPI_DEFAULT_BLOCK,
+                                                                <size_t> FFTW_MPI_DEFAULT_BLOCK,
+                                                                <double *> self._kdata.data, 
+                                                                <double *> self._xdata.data,
+                                                                c_comm, 
+                                                                self.flags)                                                    
+        
+        if self._fftw_plan == NULL:
+            raise RuntimeError("FFTW could not create plan.")
+            
+cdef class PlanePlan(Plan):
+    cdef np.ndarray _xdata, _kdata
+    def __init__(self, xdata, kdata, com_sys, shape=None, forward=True, 
+            flags=['FFTW_MEASURE']):
+        """
+        Constructs a FFTW plan that will take a parallelized 2D C2C DFT along 
+        the first two dimensions of a 3D, row-major data array (including an
+        MPI transpose of those dimensions).
+        
+        """
+        
+        # MPI communicators
+        cdef MPI.Comm comm = com_sys.comm
+        cdef MPI_Comm c_comm = comm.ob_mpi
+
+        # Store input arrays
+        self._xdata = xdata
+        self._kdata = kdata
+            
+        # Build flags
+        for f in flags:
+            self.flags = self.flags | fftw_flags[f]
+            
+        # Get global array size
+        cdef size_t n0 = shape[0]
+        cdef size_t n1 = shape[1]
+        cdef size_t n2 = shape[2]
+        
+        # Construct plan inputs
+        cdef int rank = 2
+        cdef int sign = 0
+        cdef size_t n[2]
+        n[0] = n0
+        n[1] = n1
+            
+        # Create plan
+        if forward:
+            sign = FFTW_FORWARD
+            self.flags = self.flags | fftw_flags['FFTW_MPI_TRANSPOSED_OUT']
+            self._fftw_plan = fftw.fftw_mpi_plan_many_dft(rank, 
+                                                          n,
+                                                          n2,
+                                                          <size_t> FFTW_MPI_DEFAULT_BLOCK,
+                                                          <size_t> FFTW_MPI_DEFAULT_BLOCK,
+                                                          <complex *> self._xdata.data, 
+                                                          <complex *> self._kdata.data, 
+                                                          c_comm,
+                                                          sign,
+                                                          self.flags)
+        else:
+            sign = FFTW_BACKWARD
+            self.flags = self.flags | fftw_flags['FFTW_MPI_TRANSPOSED_IN']
+            self._fftw_plan = fftw.fftw_mpi_plan_many_dft(rank, 
+                                                          n,
+                                                          n2,
+                                                          <size_t> FFTW_MPI_DEFAULT_BLOCK,
+                                                          <size_t> FFTW_MPI_DEFAULT_BLOCK,
+                                                          <complex *> self._kdata.data, 
+                                                          <complex *> self._xdata.data, 
+                                                          c_comm,
+                                                          sign,
+                                                          self.flags)
+            
+        if self._fftw_plan == NULL:
+            raise RuntimeError("FFTW could not create plan.")
+

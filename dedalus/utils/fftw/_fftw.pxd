@@ -32,8 +32,20 @@ cdef extern from "fftw3.h":
         int n
         int ins "is"
         int ous "os"
-
-
+        
+    fftw_plan fftw_plan_many_dft(int rank,
+                                 int *n,
+                                 int howmany,
+                                 complex *in_,
+                                 int *inembed,
+                                 int istride,
+                                 int idist,
+                                 complex *out,
+                                 int *onembed,
+                                 int ostride,
+                                 int odist,
+                                 int sign,
+                                 unsigned flags)
     fftw_plan fftw_plan_many_dft_r2c(int rank, 
                                      int *n, 
                                      int howmany,
@@ -45,8 +57,7 @@ cdef extern from "fftw3.h":
                                      int *onembed,
                                      int ostride, 
                                      int odist,
-                                     unsigned flags)
-                                     
+                                     unsigned flags)            
     fftw_plan fftw_plan_many_dft_c2r(int rank, 
                                      int *n, 
                                      int howmany,
@@ -73,19 +84,7 @@ cdef extern from "fftw3.h":
                                complex* out_,
                                int sign,
                                unsigned flags)
-    fftw_plan fftw_plan_many_dft(int rank,
-                                 int *n_,
-                                 int howmany,
-                                 complex *in_,
-                                 int *inembed_,
-                                 int istride,
-                                 int idist,
-                                 complex *out_,
-                                 int *onembed_,
-                                 int ostride,
-                                 int odist,
-                                 int sign,
-                                 unsigned flags)
+
     fftw_plan fftw_plan_guru_dft(int rank,
                                  fftw_iodim *dims,
                                  int howmany_rank,
@@ -136,32 +135,53 @@ cdef extern from "fftw3-mpi.h":
                                              size_t *local_n0, size_t *local_0_start,
                                              size_t *local_n1, size_t *local_1_start)
 
+
     fftw_plan fftw_mpi_plan_dft_r2c_2d(int n0,
                                        int n1,
-                                       double* in_,
-                                       complex* out_,
+                                       double *in_,
+                                       complex *out,
+                                       MPI.MPI_Comm comm,
+                                       unsigned flags)
+    fftw_plan fftw_mpi_plan_dft_c2r_2d(int n0,
+                                       int n1,
+                                       complex *in_,
+                                       double *out,
                                        MPI.MPI_Comm comm,
                                        unsigned flags)
     fftw_plan fftw_mpi_plan_dft_r2c_3d(int n0,
                                        int n1,
                                        int n2,
-                                       double* in_,
-                                       complex* out_,
-                                       MPI.MPI_Comm comm,
-                                       unsigned flags)
-    fftw_plan fftw_mpi_plan_dft_c2r_2d(int n0,
-                                       int n1,
-                                       complex* in_,
-                                       double* out_,
+                                       double *in_,
+                                       complex *out,
                                        MPI.MPI_Comm comm,
                                        unsigned flags)
     fftw_plan fftw_mpi_plan_dft_c2r_3d(int n0,
                                        int n1,
                                        int n2,
-                                       complex* in_,
-                                       double* out_,
+                                       complex *in_,
+                                       double *out,
                                        MPI.MPI_Comm comm,
                                        unsigned flags)
+                                       
+    fftw_plan fftw_mpi_plan_many_dft(int rank, 
+                                     size_t *n,
+                                     size_t howmany, 
+                                     size_t block0, 
+                                     size_t block1,
+                                     complex *in_, 
+                                     complex *out,
+                                     MPI.MPI_Comm comm, 
+                                     int sign, 
+                                     unsigned flags)
+    fftw_plan fftw_mpi_plan_many_transpose(size_t n0, 
+                                           size_t n1,
+                                           size_t howmany,
+                                           size_t block0,
+                                           size_t block1,
+                                           double *in_, 
+                                           double *out,
+                                           MPI.MPI_Comm comm, 
+                                           unsigned flags)
 
     void fftw_mpi_init()
     void fftw_mpi_cleanup()
@@ -179,6 +199,7 @@ cdef enum:
     FFTW_ESTIMATE = (1 << 6)
     FFTW_MPI_TRANSPOSED_IN = (1U << 29)
     FFTW_MPI_TRANSPOSED_OUT = (1U << 30)
+    FFTW_MPI_DEFAULT_BLOCK = 0
 
 
 

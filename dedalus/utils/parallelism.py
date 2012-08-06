@@ -226,7 +226,8 @@ def get_plane(data, field, comp=0, space='xspace', axis='z', index='middle',
     """
     
     # Grab specified component and check space
-    comp = data[field][comp]
+    cname = comp
+    comp = data[field][cname]
     comp.require_space(space)
     
     # Retrieve translation table for requested space
@@ -317,15 +318,19 @@ def get_plane(data, field, comp=0, space='xspace', axis='z', index='middle',
         elif space == 'kspace':
             k = {}
             if comp.ndim == 2:
-                k['y'] = comp.k['y']
                 if com_sys.nproc == 1:
                     k['x'] = na.transpose(comp.k['x'])
+                    k['y'] = comp.k['y']
                 else:
                     gathered_kx = com_sys.comm.gather(comp.k['x'], root=0)
                     if com_sys.myproc == 0:
                         k['x'] = na.transpose(na.concatenate(gathered_kx))
+                    if hasattr(comp, '_ky'):
+                        gathered_ky = com_sys.comm.gather(comp.k['y'], root=0)
+                        if com_sys.myproc == 0:
+                            k['y'] = na.concatenate(gathered_ky)
                     else:
-                        return (None,) * 6
+                        k['y'] = comp.k['y']
             elif comp.ndim == 3:
                 k['x'] = comp.k['x'][0, :, :]
                 k['z'] = comp.k['z'][:, :, 0]
@@ -335,13 +340,13 @@ def get_plane(data, field, comp=0, space='xspace', axis='z', index='middle',
                     gathered_ky = com_sys.comm.gather(comp.k['y'], root=0)
                     if com_sys.myproc == 0:
                         k['y'] = na.transpose(na.concatenate(gathered_ky)[:, 0, :])
-                    else:
-                        return (None,) * 6
-                    
+            if com_sys.myproc != 0:
+                return (None,) * 6
+            
             grid0 = k[name0] * na.ones(plane_data.shape)
             grid1 = na.transpose(k[name1]) * na.ones(plane_data.shape)
             name0 = 'k' + name0
             name1 = 'k' + name1
-            
+        
         return (plane_data, index, name0, grid0, name1, grid1)
         

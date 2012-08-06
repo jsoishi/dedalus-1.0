@@ -30,7 +30,6 @@ from dedalus.utils.logger import mylog
 from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
 from dedalus.utils.api import a_friedmann
 from dedalus.funcs import insert_ipython
-from dedalus.utils.parallelism import com_sys
 
 def _reconstruct_object(*args, **kwargs):
     new_args = [args[1]['shape'], args[1]['_representation'], args[1]['length']]
@@ -100,6 +99,7 @@ class Physics(object):
     def create_fields(self, time, field_list=None):        
         if field_list == None:
             field_list = self.fields
+            
         return StateData(time, self.shape, self.length, self._field_classes, 
                          field_list=field_list, params=self.parameters)
 

@@ -116,7 +116,7 @@ class FourierRepresentation(Representation):
         else:
             self.ktrans = {'x':2, 2:'x', 'y':0, 0:'y', 'z':1, 1:'z'}
             self.xtrans = {'x':2, 2:'x', 'y':1, 1:'y', 'z':0, 0:'z'}
-            
+        
         # Complete setup
         self.set_fft(method)
         self.set_dealiasing(dealiasing)
@@ -256,22 +256,26 @@ class FourierRepresentation(Representation):
             in (k - dk/2 <= mode < k + dk/2) in all dimensions. None otherwise.
 
         """
-        
+    
         # Get k-mode spacing
         dk = 2 * na.pi / swap_indices(self.length)
         
-        # Intersect applicable mode sets by dimension
-        index = [None] * self.ndim
+        # Intersect applicable mode sets by dimension  
+        test = na.ones(self.local_shape['kspace'], dtype=bool)
         for name, kn in self.k.iteritems():
             i = self.ktrans[name]
-            ilist = na.where((mode[i] >= kn - dk[i] / 2.) & 
-                             (mode[i] <  kn + dk[i] / 2.))
-            if ilist[i].size == 0:
-                return None
-            else:
-                index[i] = ilist[i][0]
-                
-        return index
+            itest = ((kn <= mode[i] + dk[i] / 2.) & 
+                     (kn >  mode[i] - dk[i] / 2.))
+            test *= itest
+        
+        index = zip(*test.nonzero())
+        
+        if len(index) == 0:
+            return None
+        elif len(index) == 1:
+            return index[0]
+        else:
+            raise ValueError("Multiple modes tested true.  This shouldn't happen.")
 
     def set_fft(self, method):
         """Assign fft method."""
@@ -296,8 +300,10 @@ class FourierRepresentation(Representation):
             raise NotImplementedError("Specified FFT method not implemented.")
             
     def create_fftw_plans(self):
-        self.fplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'], direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
-        self.rplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'], direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+        self.fplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'],
+                forward=True, flags=['FFTW_MEASURE'])
+        self.rplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'], 
+                forward=False, flags=['FFTW_MEASURE'])
             
     def fwd_fftw(self):
         self.fplan()
@@ -536,11 +542,9 @@ class FourierShearRepresentation(FourierRepresentation):
     def _additional_allocation(self, method):
         """Allocate memory for intermediate transformation arrays."""
 
-        if method == 'fftw':
-            pass
-        elif method == 'numpy':
+        if method == 'numpy':
             mshape = self.local_shape['xspace'].copy()
-            mshape[-1] = tempshape[-1] / 2 + 1
+            mshape[-1] = mshape[-1] / 2 + 1
             self._mdata = na.zeros(mshape, dtype=self.dtype['kspace'])
     
     def _update_k(self):
@@ -559,66 +563,62 @@ class FourierShearRepresentation(FourierRepresentation):
             
         # Dealias
         self.dealias()
-        
-    def find_mode(self, mode):
-        """
-        Test if object has a given mode, return index for closest mode if so.
-
-        Parameters
-        ----------
-        mode : tuple of ints or floats
-            Tuple describing physical wavevector for which to search.  Recall 
-            kspace ordering (ky, kz, kx) for 3D, (kx, ky) for 2D.
-
-        Returns
-        -------
-        index : tuple of ints, or bool
-            Tuple of indexes to the closest mode, k, if input mode is present
-            in (k - dk/2 <= mode < k + dk/2) in all dimensions. None otherwise.
-
-        """
-        
-        raise NotImplementedError("Find_mode for shear rep is more advanced and needs to be done")
 
     def create_fftw_plans(self):
-        self.fplan_x = fftw.rPlanPencil(self.xdata, self._mdata, 
-                direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
-        self.rplan_x = fftw.rPlanPencil(self.xdata, self._mdata, 
-                direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
-                
-#         self.fplan_yz = fftw.PlanPlane(self.data, 
-#                                            direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
-#         self.rplan_yz = fftw.PlanPlane(self.data, 
-#                                            direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
-                                           
+        gmshape = self.global_shape['xspace'].copy()
+        gmshape[-1] = gmshape[-1] / 2 + 1
+    
+        self._fplan_x = fftw.rPencilPlan(self.xdata, self._mdata, forward=True, 
+                flags=['FFTW_MEASURE'])
+        self._rplan_x = fftw.rPencilPlan(self.xdata, self._mdata, forward=False, 
+                flags=['FFTW_MEASURE'])
+        if self.ndim == 2:
+            self._fplan_tr = fftw.TransposePlan(self._mdata, self.kdata, com_sys,
+                    gmshape, forward=True, flags=['FFTW_MEASURE'])
+            self._rplan_tr = fftw.TransposePlan(self._mdata, self.kdata, com_sys,
+                    gmshape, forward=False, flags=['FFTW_MEASURE'])
+            self._fplan_y = fftw.PencilPlan(self.kdata, self.kdata, forward=True, 
+                    flags=['FFTW_MEASURE'])
+            self._rplan_y = fftw.PencilPlan(self.kdata, self.kdata, forward=False, 
+                    flags=['FFTW_MEASURE'])
+        else:
+            self._fplan_yz = fftw.PlanePlan(self._mdata, self.kdata, com_sys, 
+                    gmshape, forward=True, flags=['FFTW_MEASURE'])
+            self._rplan_yz = fftw.PlanePlan(self._mdata, self.kdata, com_sys, 
+                    gmshape, forward=False, flags=['FFTW_MEASURE'])
+                          
     def fwd_fftw(self):
     
         # Do x fft
-        self.fplan_x()
+        self._fplan_x()
         
         # Phase shift
         self._mdata *= na.exp(1j * self._phase_rate * self.sd.time)
            
-#         # Transpose
-#         tr = [1, 0, 2][:self.ndim]
-#         self.kdata[:] = na.transpose(self._tempdata, tr)
-#         
-#         # Do y and z ffts
-#         if self.ndim == 2:
-#             self.kdata[:] = fpack.fft(self.kdata, axis=1)
-#         else:
-#             self.kdata[:] = fpack.fftn(self.kdata, axes=(0,1))
+        # Do y and z ffts (with MPI transpose)
+        if self.ndim == 2:
+            self._fplan_tr()
+            self._fplan_y()
+        else:
+            self._fplan_yz()
 
         # Normalize
-        self._mdata /= self.global_shape['xspace'].prod()
-        #self.kdata /= self.global_shape['xspace'].prod()
+        self.kdata /= self.global_shape['xspace'].prod()
 
     def rev_fftw(self):
         
-        # DO ALL
+        # Do y and z iffts (with MPI transpose)
+        if self.ndim == 2:
+            self._rplan_y()
+            self._rplan_tr()
+        else:
+            self._rplan_yz()
+        
+        # Phase shift
+        self._mdata *= na.exp(-1j * self._phase_rate * self.sd.time)
         
         # Do x ifft
-        self.rplan_x()
+        self._rplan_x()
         
     def fwd_np(self):
 
