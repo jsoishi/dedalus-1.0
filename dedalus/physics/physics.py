@@ -578,12 +578,12 @@ class ShearMHD(MHD):
         
         u_t + nu k^2 u = -ugradu + BgradB / (4 pi rho0) - i k Ptot / rho0 + rotation + shear
 
-        rotation =  [2 Omega u_y,  0                 ,  0]
-        shear =     [0          ,  -(2 + S) Omega u_x,  0]
+        rotation = -2 Omega u_x e_y
+        shear =  (2 + S) Omega u_y e_x
         
         B_t + eta k^2 B = Bgradu - ugradB + shear
         
-        shear = [0,  S Omega B_x,  0]
+        shear = -S Omega B_y e_x
         
         """
         
@@ -593,9 +593,9 @@ class ShearMHD(MHD):
         
         # Compute terms
         MHD.RHS(self, data)
-        self._RHS['u']['x']['kspace'] += 2. * Omega * data['u']['y']['kspace']
-        self._RHS['u']['y']['kspace'] += -(2 + S) * Omega * data['u']['x']['kspace']
-        self._RHS['B']['y']['kspace'] += S * Omega * data['B']['x']['kspace']
+        self._RHS['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
+        self._RHS['u']['x']['kspace'] += (2 + S) * Omega * data['u']['y']['kspace']
+        self._RHS['B']['x']['kspace'] += -S * Omega * data['B']['y']['kspace']
         
         return self._RHS
         
@@ -606,8 +606,8 @@ class ShearMHD(MHD):
         Ptot / rho0 = i (k * ugradu - k * BgradB / (4 pi rho0) + rotation + shear) / k^2  
         ==> pressure term = - k (k * ugradu - k * BgradB / (4 pi rho0) + rotation + shear) / k^2
         
-        rotation = -2 Omega u_y K_x
-        shear = (1 + S) 2 Omega u_x K_y
+        rotation = 2 Omega u_x K_y
+        shear = -(1 + S) 2 Omega u_y K_x
         
         """
 
@@ -631,8 +631,8 @@ class ShearMHD(MHD):
             tmp -= data['u'][i].k[self._trans[i]] * BgradB[i]['kspace'] / pr4
             
         # Add rotation + shear
-        tmp += (2. * (1 + S) * Omega * data['u']['x'].k['y'] * data['u']['x']['kspace'] - 
-                2. * Omega * data['u']['y'].k['x'] * data['u']['y']['kspace'])
+        tmp += (-2. * (1 + S) * Omega * data['u']['y'].k['x'] * data['u']['y']['kspace'] + 
+                2. * Omega * data['u']['x'].k['y'] * data['u']['x']['kspace'])
                 
         # Construct full term
         for i in self.dims:            
