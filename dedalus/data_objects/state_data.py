@@ -72,7 +72,7 @@ class StateData(object):
             Additional parameters
     
         """
-    
+        
         # Store inputs
         self.time = time
         self.shape = shape

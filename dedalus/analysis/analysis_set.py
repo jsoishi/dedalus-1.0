@@ -69,7 +69,7 @@ def volume_average(data, it, va_obj=None):
     va_obj.run()
        
 @AnalysisSet.register_task
-def array_snapshot(data, it, space='xspace', axis='z', index='middle', aspect='auto'):
+def array_snapshot(data, it, space='xspace', axis='z', index='middle', aspect='auto', figproc=0):
     """
     Take image snapshot of data in array configuration.
     
@@ -92,11 +92,13 @@ def array_snapshot(data, it, space='xspace', axis='z', index='middle', aspect='a
     aspect : str
         'auto' stretches image to match axis
         'equal' stretches axis to match image
+    figproc : int
+        Processor to handle figure creation and drawing
 
     """
 
     # Figure setup
-    if com_sys.myproc == 0:
+    if com_sys.myproc == figproc:
     
         # Determine grid size
         nrows = len(data.fields.keys())
@@ -119,17 +121,15 @@ def array_snapshot(data, it, space='xspace', axis='z', index='middle', aspect='a
     for fname, field in data:
         row += 1
         for cindex, comp in field:
-            axnum = row * ncols + cindex
 
             # Retrieve correct slice
             plane_data, outindex, name0, x0, name1, x1 = get_plane(data, 
                     fname, cindex, space=space, axis=axis, index=index)
-                    
-            # Bail of not process 0
-            if com_sys.myproc != 0:
-                return
-                     
+            if com_sys.myproc != figproc:
+                continue
+              
             # Plot
+            axnum = row * ncols + cindex
             if space == 'kspace':
                 # Take logarithm of magnitude, flooring at eps
                 kmag = na.abs(plane_data)
@@ -141,7 +141,7 @@ def array_snapshot(data, it, space='xspace', axis='z', index='middle', aspect='a
             im = grid[axnum].imshow(plane_data, origin='lower', aspect='auto',
                     interpolation='nearest', zorder=2)     
             grid.cbar_axes[axnum].colorbar(im)
-
+            
             # Labels
             grid[axnum].text(0.05, 0.95, fname + field.ctrans[cindex], 
                     transform=grid[axnum].transAxes, size=24, color='w')
@@ -149,6 +149,10 @@ def array_snapshot(data, it, space='xspace', axis='z', index='middle', aspect='a
                 grid[axnum].set_xlabel(name0)
             if cindex == 0:
                 grid[axnum].set_ylabel(name1)
+    
+    # Bail of not figproc
+    if com_sys.myproc != figproc:
+        return
             
     # Add time to figure title
     tstr = 't = %6.3f' % data.time
@@ -434,7 +438,7 @@ def mode_track(data, it, flist=[], klist=[], log=True, write=True):
     fig.clf()
     
 @AnalysisSet.register_task
-def scatter_snapshot(data, it, space='kspace', axis='z', index='middle'):
+def scatter_snapshot(data, it, space='kspace', axis='z', index='middle', figproc=0):
     """
     Take scatterplot snapshot of data in physical configuration.
     
@@ -454,11 +458,13 @@ def scatter_snapshot(data, it, space='kspace', axis='z', index='middle'):
     index : int or string, optional
         Index for slicing as an integer, or 'top', 'middle' (default), or 'bottom'.
         Ignored for 2D data.
+    figproc : int
+        Processor to handle figure creation and drawing
 
     """
 
     # Figure setup
-    if com_sys.myproc == 0:
+    if com_sys.myproc == figproc:
     
         # Determine grid size
         nrows = len(data.fields.keys())
@@ -478,20 +484,24 @@ def scatter_snapshot(data, it, space='kspace', axis='z', index='middle'):
                     
     # Plot field components
     row = -1
+    firstplot = True
     for fname, field in data:
         row += 1
         for cindex, comp in field:
-            axnum = row * ncols + cindex
             
             # Retrieve correct slice
-            plane_data, outindex, name0, x0, name1, x1 = get_plane(data, 
-                    fname, cindex, space=space, axis=axis, index=index)
-            
-            # Bail of not process 0
-            if com_sys.myproc != 0:
-                return
+            if firstplot:
+                plane_data, outindex, name0, x0, name1, x1 = get_plane(data, 
+                        fname, cindex, space=space, axis=axis, index=index)
+            else:
+                plane_data, outindex = get_plane(data, fname, cindex, space=space,
+                        axis=axis, index=index, return_position_arrays=False)
+            if com_sys.myproc != figproc:
+                firstplot = False
+                continue
             
             # Plot
+            axnum = row * ncols + cindex
             if space == 'kspace':
                 # Take logarithm of magnitude, flooring at eps
                 kmag = na.abs(plane_data)
@@ -511,7 +521,6 @@ def scatter_snapshot(data, it, space='kspace', axis='z', index='middle'):
                 im = grid[axnum].scatter(x0, x1, c=plane_data, lw=0, s=40, zorder=2)
                 grid.cbar_axes[axnum].colorbar(im)    
             
-                
             # Lines
             if space == 'kspace':
                 # Zero lines
@@ -519,14 +528,15 @@ def scatter_snapshot(data, it, space='kspace', axis='z', index='middle'):
                 grid[axnum].axvline(0, c='k', zorder=1)
                 
                 # Nyquist boundary
-                ny0 = comp.kny[comp.ktrans[name0[1]]]
-                ny1 = comp.kny[comp.ktrans[name1[1]]]
-                if name0 == 'kx':
-                    nysquare0 = na.array([0, ny0, ny0, 0])
-                    nysquare1 = na.array([ny1, ny1, -ny1, -ny1])
-                else:
-                    nysquare0 = na.array([-ny0, ny0, ny0, -ny0, -ny0])
-                    nysquare1 = na.array([ny1, ny1, -ny1, -ny1, ny1])
+                if firstplot:
+                    ny0 = comp.kny[comp.ktrans[name0[1]]]
+                    ny1 = comp.kny[comp.ktrans[name1[1]]]
+                    if name0 == 'kx':
+                        nysquare0 = na.array([0, ny0, ny0, 0])
+                        nysquare1 = na.array([ny1, ny1, -ny1, -ny1])
+                    else:
+                        nysquare0 = na.array([-ny0, ny0, ny0, -ny0, -ny0])
+                        nysquare1 = na.array([ny1, ny1, -ny1, -ny1, ny1])
                 grid[axnum].plot(nysquare0, nysquare1, 'k--', zorder=1)
                 
                 # Dealiasing boundary
@@ -536,12 +546,13 @@ def scatter_snapshot(data, it, space='kspace', axis='z', index='middle'):
             
             elif space == 'xspace':
                 # Real space boundary
-                x0len = comp.length[comp.xtrans[name0]]
-                x1len = comp.length[comp.xtrans[name1]]
-                dx0 = x0[0, 1] - x0[0, 0]
-                dx1 = x1[1, 0] - x1[0, 0]
-                xsquare0 = na.array([0, x0len, x0len, 0, 0]) - dx0 / 2.
-                xsquare1 = na.array([x1len, x1len, 0, 0, x1len]) - dx1 / 2.
+                if firstplot:
+                    x0len = comp.length[comp.xtrans[name0]]
+                    x1len = comp.length[comp.xtrans[name1]]
+                    dx0 = x0[0, 1] - x0[0, 0]
+                    dx1 = x1[1, 0] - x1[0, 0]
+                    xsquare0 = na.array([0, x0len, x0len, 0, 0]) - dx0 / 2.
+                    xsquare1 = na.array([x1len, x1len, 0, 0, x1len]) - dx1 / 2.
                 grid[axnum].plot(xsquare0, xsquare1, 'k', zorder=1)
                 
                 plot_extent = [xsquare0[0], xsquare0[1], xsquare1[2], xsquare1[0]]
@@ -554,6 +565,13 @@ def scatter_snapshot(data, it, space='kspace', axis='z', index='middle'):
                 grid[axnum].set_xlabel(name0)
             if cindex == 0:
                 grid[axnum].set_ylabel(name1)
+            
+            if firstplot:
+                firstplot = False
+                
+    # Bail if not figproc
+    if com_sys.myproc != figproc:
+        return
             
     # Add time to figure title
     tstr = 't = %6.3f' % data.time
