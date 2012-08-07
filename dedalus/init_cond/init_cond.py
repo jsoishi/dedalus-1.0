@@ -300,21 +300,32 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
     elif data.ndim == 3:
         ampl = na.sqrt(sp/(4*na.pi))/kk
 
+    eps = na.finfo(data['u']['x']['kspace'].dtype).eps
+
     data['u']['x']['xspace'] = na.random.random(data['u'][0]['xspace'].shape)
     theta1 = data['u']['x']['kspace'].copy()
-    theta1 /= na.abs(theta1)
+    theta1 /= na.abs(theta1 + eps)
+
     data['u']['x']['xspace'] = na.random.random(data['u'][0]['xspace'].shape)
     theta2 = data['u']['x']['kspace'].copy()
-    theta2 /= na.abs(theta2)
+    theta2 /= na.abs(theta2 + eps)
+
     data['u']['x']['xspace'] = na.random.random(data['u'][0]['xspace'].shape)
     phi    = data['u']['x']['kspace'].copy()
-    phi    /= na.abs(phi)
+    phi    /= na.abs(phi + eps)
     phi = na.arctan2(phi.imag, phi.real)
     alpha = ampl * theta1
 
     if data.ndim == 2:
         data['u']['x']['kspace'] = alpha * ky/kk
         data['u']['y']['kspace'] = -alpha * kx/kk
+        if com_sys.myproc == 0:
+            # force hermitian symmetry and zero the nyquist mode.
+            kshape = data['u']['x']['kspace'].shape[1]
+            kylim = kshape/2 + 1
+            data['u']['x']['kspace'][0,:] = alpha[0,:] * na.abs(ky[0,:])/kk[0,:]
+            data['u']['x']['kspace'][0,kylim] = 0.
+
     elif data.ndim == 3:
         kz = data['u']['x'].k['z']
         k2 = na.sqrt(data['u']['x']**2 + data['u']['y']**2)
@@ -324,6 +335,26 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
         data['u']['x']['kspace'] = (alpha * kk * ky + beta * kx * kz)/(kk * k2)
         data['u']['y']['kspace'] = (beta * ky * kz - alpha * kk*kx)/(kk * k2)
         data['u']['z']['kspace'] = (beta * k2)/kk
+
+    if com_sys.myproc == 0:
+        #filen = 'ux_hermitian_check.png'
+        filen = 'ux_nyquist_check.png'
+        import pylab as P
+
+        P.subplot(211)
+        P.title('imag')
+        #P.plot(data['u']['x']['kspace'][0,1:kylim-1].imag+data['u']['x']['kspace'][0,-1:kylim-1:-1].imag)
+        P.plot(data['u']['x']['kspace'][:,kylim].imag)
+        uxmin = data['u']['x']['kspace'][:,kylim].imag.min()
+        uxmax = data['u']['x']['kspace'][:,kylim].imag.max()
+        mylog.debug("ux nyquist plane imag (min, max) = (%10.5e, %10.5e)" % (uxmin, uxmax))
+        #P.plot(-data['u']['x']['kspace'][0,-1:kylim:-1].imag, 'kx')
+        P.subplot(212)
+        P.title('real')
+        #P.plot(data['u']['x']['kspace'][0,1:kylim-1].real-data['u']['x']['kspace'][0,-1:kylim-1:-1].real)
+        P.plot(data['u']['x']['kspace'][:,kylim].real)
+        #P.plot(data['u']['x']['kspace'][0,-1:kylim:-1].real, 'kx')
+        P.savefig(filen)
 
 def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     """generate noise with a random phase and a spectrum given by
