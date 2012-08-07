@@ -50,7 +50,6 @@ class AnalysisSet(object):
 
     def add(self, task):
         self.tasks.append(task)
-        task._set = self
         task._n = len(self.tasks)
         task.setup(self.data, self.ti.iter, **task.options)
 
@@ -161,19 +160,12 @@ class Snapshot(AnalysisTask):
                     # Plot
                     if self.firstplot:
                         self.add_patches(axnum, x, y, plane_data, units, space)
-                        self.add_lines(axnum, x, y, units, space, comp, namex, namey)
+                        self.add_lines(axnum, x, y, plane_data, units, space, 
+                                comp, namex, namey)
+                        self.add_labels(axnum, fname, field.ctrans[cindex],
+                                namex, namey, row, cindex, units)
                     else:
                         self.update_patches(axnum, x, y, plane_data, units, space)
-                        
-                    # Labels
-                    if self.firstplot:
-                        title = self.grid[axnum].set_title(fname + field.ctrans[cindex],
-                                size=20, color='k')
-                        title.set_y(1.08)
-                        if row == self.nrows - 1:
-                            self.grid[axnum].set_xlabel(namex)
-                        if cindex == 0:
-                            self.grid[axnum].set_ylabel(namey)
                               
         if com_sys.myproc == 0:
             # Add time to figure title
@@ -185,11 +177,14 @@ class Snapshot(AnalysisTask):
                 self.timestr.set_text(tstr)
             
             # Save in frames folder
+            spacestr = space[0]
+            if not units:
+                spacestr += '_ind'
             if data.ndim == 2:
                 slicestr = ''
-            elif data.ndim == 3:
+            else:
                 slicestr = '%s_%i_' %(axis, outindex)
-            outfile = "frames/%ssnap_%sn%07i.png" %(space[0], slicestr, it)
+            outfile = "frames/%s_snap_%sn%07i.png" %(spacestr, slicestr, it)
             self.fig.savefig(outfile)
                                   
     def add_patches(self, axnum, x, y, plane_data, units, space):
@@ -246,7 +241,7 @@ class Snapshot(AnalysisTask):
         pc.set_array(na.ma.ravel(plane_data))
         pc.set_clim(plane_data.min(), plane_data.max())
         
-    def add_lines(self, axnum, x, y, units, space, comp, namex, namey):
+    def add_lines(self, axnum, x, y, plane_data, units, space, comp, namex, namey):
         
         if units:
             dx = x[0, 1] - x[0, 0]
@@ -280,10 +275,27 @@ class Snapshot(AnalysisTask):
                 ylen = comp.length[comp.xtrans[namey]]
                 plot_extent = [0, xlen, 0, ylen]
         
-            # Plot range
-            self.grid[axnum].axis(plot_extent)
+        else:
+            shape = plane_data.shape
+            plot_extent = [-0.5, shape[1] - 0.5, -0.5, shape[0] - 0.5]
+        
+        # Plot range
+        self.grid[axnum].axis(plot_extent)
 
-                    
+    def add_labels(self, axnum, fname, cname, namex, namey, row, cindex, units):
+
+        # Title
+        title = self.grid[axnum].set_title(fname + cname, size=20, color='k')
+        title.set_y(1.08)
+        
+        # Axis labels
+        if not units:
+            namex += ' index'
+            namey += ' index'
+        if row == self.nrows - 1:
+            self.grid[axnum].set_xlabel(namex)
+        if cindex == 0:
+            self.grid[axnum].set_ylabel(namey)                    
 
 
 
@@ -295,106 +307,6 @@ class Snapshot(AnalysisTask):
 # def volume_average(data, it, va_obj=None):
 #     va_obj.run()
 #        
-# @AnalysisSet.register_task
-# def array_snapshot(data, it, space='xspace', axis='z', index='middle', aspect='auto', figproc=0):
-#     """
-#     Take image snapshot of data in array configuration.
-#     
-#     Parameters
-#     ----------
-#     data : StateData object
-#         Data input
-#     it : int
-#         Iteration number
-#     space: str
-#         'xspace' or 'kspace'
-#     axis : str, optional
-#         Axis normal to desired slice, defaults to 'z'. Ignored for 2D data.
-#         i.e. 'x' for a y-z plane
-#              'y' for a x-z plane
-#              'z' for a x-y plane
-#     index : int or string, optional
-#         Index for slicing as an integer, or 'top', 'middle' (default), or 'bottom'.
-#         Ignored for 2D data.
-#     aspect : str
-#         'auto' stretches image to match axis
-#         'equal' stretches axis to match image
-#     figproc : int
-#         Processor to handle figure creation and drawing
-# 
-#     """
-# 
-#     # Figure setup
-#     if com_sys.myproc == figproc:
-#     
-#         # Determine grid size
-#         nrows = len(data.fields.keys())
-#         ncols = na.max([f.ncomp for f in data.fields.values()])
-#         
-#         # Create figure and axes grid
-#         fig = P.figure(1, figsize=(8 * ncols, 8 * nrows))
-#         grid = AxesGrid(fig, 111,
-#                         nrows_ncols = (nrows, ncols),
-#                         aspect=False,
-#                         share_all=True,
-#                         axes_pad=0.3,
-#                         cbar_pad=0.,
-#                         label_mode="L",
-#                         cbar_location="top",
-#                         cbar_mode="each")
-#                     
-#     # Plot field components
-#     row = -1
-#     for fname, field in data:
-#         row += 1
-#         for cindex, comp in field:
-# 
-#             # Retrieve correct slice
-#             plane_data, outindex, name0, x0, name1, x1 = get_plane(data, 
-#                     fname, cindex, space=space, axis=axis, index=index)
-#             if com_sys.myproc != figproc:
-#                 continue
-#               
-#             # Plot
-#             axnum = row * ncols + cindex
-#             if space == 'kspace':
-#                 # Take logarithm of magnitude, flooring at eps
-#                 kmag = na.abs(plane_data)
-#                 zero_mask = (kmag == 0)    
-#                 kmag[kmag < comp._eps['kspace']] = comp._eps['kspace']
-#                 plane_data = na.log10(kmag)
-#                 plane_data[zero_mask] = na.nan
-# 
-#             im = grid[axnum].imshow(plane_data, origin='lower', aspect='auto',
-#                     interpolation='nearest', zorder=2)     
-#             grid.cbar_axes[axnum].colorbar(im)
-#             
-#             # Labels
-#             grid[axnum].text(0.05, 0.95, fname + field.ctrans[cindex], 
-#                     transform=grid[axnum].transAxes, size=24, color='w')
-#             if row == nrows - 1:
-#                 grid[axnum].set_xlabel(name0)
-#             if cindex == 0:
-#                 grid[axnum].set_ylabel(name1)
-#     
-#     # Bail of not figproc
-#     if com_sys.myproc != figproc:
-#         return
-#             
-#     # Add time to figure title
-#     tstr = 't = %6.3f' % data.time
-#     fig.suptitle(tstr, size=24, color='k')
-#     
-#     # Save in frames folder
-#     if not os.path.exists('frames'):
-#         os.mkdir('frames')
-#     if data.ndim == 2:
-#         slicestr = ''
-#     elif data.ndim == 3:
-#         slicestr = '%s_%i_' %(axis, outindex)
-#     outfile = "frames/%s_array_%sn%07i.png" %(space[0], slicestr, it)
-#     fig.savefig(outfile)
-#     fig.clf()
 # 
 # @AnalysisSet.register_task
 # def print_energy(data, it):
@@ -664,156 +576,7 @@ class Snapshot(AnalysisTask):
 #     fig.savefig(outfile)
 #     fig.clf()
 #     
-# @AnalysisSet.register_task
-# def scatter_snapshot(data, it, space='kspace', axis='z', index='middle', figproc=0):
-#     """
-#     Take scatterplot snapshot of data in physical configuration.
-#     
-#     Parameters
-#     ----------
-#     data : StateData object
-#         Data input
-#     it : int
-#         Iteration number
-#     space: str
-#         'xspace' or 'kspace'
-#     axis : str, optional
-#         Axis normal to desired slice, defaults to 'z'. Ignored for 2D data.
-#         i.e. 'x' for a y-z plane
-#              'y' for a x-z plane
-#              'z' for a x-y plane
-#     index : int or string, optional
-#         Index for slicing as an integer, or 'top', 'middle' (default), or 'bottom'.
-#         Ignored for 2D data.
-#     figproc : int
-#         Processor to handle figure creation and drawing
-# 
-#     """
-# 
-#     # Figure setup
-#     if com_sys.myproc == figproc:
-#     
-#         # Determine grid size
-#         nrows = len(data.fields.keys())
-#         ncols = na.max([f.ncomp for f in data.fields.values()])
-#         
-#         # Create figure and axes grid
-#         fig = P.figure(4, figsize=(8 * ncols, 8 * nrows))
-#         grid = AxesGrid(fig, 111,
-#                         nrows_ncols = (nrows, ncols),
-#                         aspect=False,
-#                         share_all=True,
-#                         axes_pad=0.3,
-#                         cbar_pad=0.,
-#                         label_mode="L",
-#                         cbar_location="top",
-#                         cbar_mode="each")
-#                     
-#     # Plot field components
-#     row = -1
-#     firstplot = True
-#     for fname, field in data:
-#         row += 1
-#         for cindex, comp in field:
-#             
-#             # Retrieve correct slice
-#             if firstplot:
-#                 plane_data, outindex, name0, x0, name1, x1 = get_plane(data, 
-#                         fname, cindex, space=space, axis=axis, index=index)
-#             else:
-#                 plane_data, outindex = get_plane(data, fname, cindex, space=space,
-#                         axis=axis, index=index, return_position_arrays=False)
-#             if com_sys.myproc != figproc:
-#                 firstplot = False
-#                 continue
-#             
-#             # Plot
-#             axnum = row * ncols + cindex
-#             if space == 'kspace':
-#                 # Take logarithm of magnitude, flooring at eps
-#                 kmag = na.abs(plane_data)
-#                 zero_mask = (kmag == 0)    
-#                 kmag[kmag < comp._eps['kspace']] = comp._eps['kspace']
-#                 logkmag = na.log10(kmag)
-#                     
-#                 # Plot nonzero
-#                 if na.sum(~zero_mask):
-#                     im = grid[axnum].scatter(x0[~zero_mask], x1[~zero_mask], 
-#                             c=logkmag[~zero_mask], lw=0, s=40, zorder=2)
-#                     grid.cbar_axes[axnum].colorbar(im)
-#                 # Plot zeros
-#                 grid[axnum].scatter(x0[zero_mask], x1[zero_mask], c='w', s=40, zorder=2)
-#                     
-#             elif space == 'xspace':
-#                 im = grid[axnum].scatter(x0, x1, c=plane_data, lw=0, s=40, zorder=2)
-#                 grid.cbar_axes[axnum].colorbar(im)    
-#             
-#             # Lines
-#             if space == 'kspace':
-#                 # Zero lines
-#                 grid[axnum].axhline(0, c='k', zorder=1)
-#                 grid[axnum].axvline(0, c='k', zorder=1)
-#                 
-#                 # Nyquist boundary
-#                 if firstplot:
-#                     ny0 = comp.kny[comp.ktrans[name0[1]]]
-#                     ny1 = comp.kny[comp.ktrans[name1[1]]]
-#                     if name0 == 'kx':
-#                         nysquare0 = na.array([0, ny0, ny0, 0])
-#                         nysquare1 = na.array([ny1, ny1, -ny1, -ny1])
-#                     else:
-#                         nysquare0 = na.array([-ny0, ny0, ny0, -ny0, -ny0])
-#                         nysquare1 = na.array([ny1, ny1, -ny1, -ny1, ny1])
-#                 grid[axnum].plot(nysquare0, nysquare1, 'k--', zorder=1)
-#                 
-#                 # Dealiasing boundary
-#                 grid[axnum].plot(2./3. * nysquare0, 2./3. * nysquare1, 'k:', zorder=1)
-#                 
-#                 plot_extent = [nysquare0[0], nysquare0[1], nysquare1[2], nysquare1[0]]
-#             
-#             elif space == 'xspace':
-#                 # Real space boundary
-#                 if firstplot:
-#                     x0len = comp.length[comp.xtrans[name0]]
-#                     x1len = comp.length[comp.xtrans[name1]]
-#                     dx0 = x0[0, 1] - x0[0, 0]
-#                     dx1 = x1[1, 0] - x1[0, 0]
-#                     xsquare0 = na.array([0, x0len, x0len, 0, 0]) - dx0 / 2.
-#                     xsquare1 = na.array([x1len, x1len, 0, 0, x1len]) - dx1 / 2.
-#                 grid[axnum].plot(xsquare0, xsquare1, 'k', zorder=1)
-#                 
-#                 plot_extent = [xsquare0[0], xsquare0[1], xsquare1[2], xsquare1[0]]
-#                 
-#             # Plot range and labels
-#             grid[axnum].axis(padrange(plot_extent, 0.1))
-#             grid[axnum].text(0.05, 0.95, fname + field.ctrans[cindex], 
-#                     transform=grid[axnum].transAxes, size=24, color='k')
-#             if row == nrows - 1:
-#                 grid[axnum].set_xlabel(name0)
-#             if cindex == 0:
-#                 grid[axnum].set_ylabel(name1)
-#             
-#             if firstplot:
-#                 firstplot = False
-#                 
-#     # Bail if not figproc
-#     if com_sys.myproc != figproc:
-#         return
-#             
-#     # Add time to figure title
-#     tstr = 't = %6.3f' % data.time
-#     fig.suptitle(tstr, size=24, color='k')
-#     
-#     # Save in frames folder
-#     if not os.path.exists('frames'):
-#         os.mkdir('frames')
-#     if data.ndim == 2:
-#         slicestr = ''
-#     elif data.ndim == 3:
-#         slicestr = '%s_%i_' %(axis, outindex)
-#     outfile = "frames/%s_scatter_%sn%07i.png" %(space[0], slicestr, it)
-#     fig.savefig(outfile)
-#     fig.clf()
+
     
 def padrange(range, pad=0.1):
     """Pad a list of the form [x0, x1, y0, y1] by specified fraction."""
@@ -834,4 +597,3 @@ def padrange(range, pad=0.1):
     return outrange
     
      
-
