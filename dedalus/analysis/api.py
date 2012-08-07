@@ -22,7 +22,8 @@ License:
 """
 
 from .analysis_set import \
-    AnalysisSet
+    AnalysisSet, \
+    Snapshot
 
 from .volume_average import \
     VolumeAverageSet
