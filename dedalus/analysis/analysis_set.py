@@ -170,8 +170,6 @@ class Snapshot(AnalysisTask):
                         title = self.grid[axnum].set_title(fname + field.ctrans[cindex],
                                 size=20, color='k')
                         title.set_y(1.08)
-#                         self.grid[axnum].text(0.05, 0.95, fname + field.ctrans[cindex], 
-#                                 transform=self.grid[axnum].transAxes, size=24, color='k')
                         if row == self.nrows - 1:
                             self.grid[axnum].set_xlabel(namex)
                         if cindex == 0:
@@ -214,9 +212,9 @@ class Snapshot(AnalysisTask):
                 rect = Rectangle(xy, dx, dy)
                 patches.append(rect) 
                   
-        cmap = matplotlib.cm.jet
-        cmap.set_bad('0.5')
-        pc = PatchCollection(patches, cmap=cmap, alpha=0.8, zorder=1, edgecolors='white') 
+        cmap = matplotlib.cm.Spectral_r
+        cmap.set_bad('0.7')
+        pc = PatchCollection(patches, cmap=cmap, alpha=1., zorder=1, edgecolors='white') 
                  
         # Store for updating        
         self.patch_lists[axnum] = patches
@@ -246,7 +244,7 @@ class Snapshot(AnalysisTask):
            
         # Update values and colorbar     
         pc.set_array(na.ma.ravel(plane_data))
-        pc.changed()
+        pc.set_clim(plane_data.min(), plane_data.max())
         
     def add_lines(self, axnum, x, y, units, space, comp, namex, namey):
         
@@ -260,7 +258,7 @@ class Snapshot(AnalysisTask):
                 self.grid[axnum].axhline(0, c='k', zorder=2, lw=2)
                 self.grid[axnum].axvline(0, c='k', zorder=2, lw=2)
                 
-                # Nyquist boundary
+                # Dealiasing boundary
                 nyx = comp.kny[comp.ktrans[namex[1]]]
                 nyy = comp.kny[comp.ktrans[namey[1]]]
                 if namex == 'kx':
@@ -271,28 +269,19 @@ class Snapshot(AnalysisTask):
                     ysq = na.array([nyy, nyy, -nyy, -nyy, nyy])
                 xsh = na.array([-dx / 2., dx / 2., dx / 2., -dx / 2., -dx / 2.])
                 ysh = na.array([dy / 2., dy / 2., -dy / 2., -dy / 2., dy / 2.])
-                #self.grid[axnum].plot(xsq + xsh, ysq + ysh, 'k--', zorder=2, lw=2)
-                
-                # Dealiasing boundary
                 self.grid[axnum].plot(2./3. * xsq + xsh, 2./3. * ysq + ysh, 
-                        'k:', zorder=2, lw=2)
+                        'k--', zorder=2, lw=2)
                 
                 plot_extent = [xsq[0] - dx / 2., xsq[1] + dx / 2., 
                                ysq[2] - dy / 2., ysq[0] + dy / 2.]
             
             elif space == 'xspace':
-            
-                # Real space boundary
                 xlen = comp.length[comp.xtrans[namex]]
                 ylen = comp.length[comp.xtrans[namey]]
-                xsq = na.array([0, xlen, xlen, 0, 0])
-                ysq = na.array([ylen, ylen, 0, 0, ylen])
-                #self.grid[axnum].plot(xsq, ysq, 'k', zorder=2)
-                
-                plot_extent = [xsq[0], xsq[1], ysq[2], ysq[0]]
+                plot_extent = [0, xlen, 0, ylen]
         
             # Plot range
-            self.grid[axnum].axis(padrange(plot_extent, 0.))
+            self.grid[axnum].axis(plot_extent)
 
                     
 
