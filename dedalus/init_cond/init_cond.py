@@ -30,7 +30,7 @@ from dedalus.funcs import insert_ipython
 import numpy as na
 from dedalus.data_objects import hermitianize
 from dedalus.utils.misc_numeric import find_zero, integrate_quad, interp_linear
-
+from dedalus.analysis.volume_average import volume_average
 def taylor_green(data):
     """The famous Taylor-Green vortex in 2 or 3D.
     
@@ -294,11 +294,20 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
 
     sp = spec(kk, **kwargs)
     kk[kk==0] = 1.
-
     if data.ndim == 2:
-        ampl = na.sqrt(sp/(2*na.pi*kk))
+        ampl = sp/(2*na.pi*kk)
     elif data.ndim == 3:
-        ampl = na.sqrt(sp/(4*na.pi))/kk
+        ampl = sp/(4*na.pi*kk**2)
+    #norm = ampl.sum()
+    #norm = com_sys.comm.allreduce(norm, op=com_sys.MPI.SUM)
+    norm = volume_average(ampl,kdict=data['u'][0].k)
+    ampl /= norm
+    ampl = na.sqrt(ampl)
+    import cPickle
+    outfile = 'ampl.cpkl'
+    outf = open(outfile,'w')
+    cPickle.dump(ampl, outf)
+    outf.close()
 
     eps = na.finfo(data['u']['x']['kspace'].dtype).eps
 
@@ -314,8 +323,7 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
     phi    = data['u']['x']['kspace'].copy()
     phi    /= na.abs(phi + eps)
     phi = na.arctan2(phi.imag, phi.real)
-    alpha = ampl * theta1
-
+    alpha = ampl #* theta1
     if data.ndim == 2:
         data['u']['x']['kspace'] = alpha * ky/kk
         data['u']['y']['kspace'] = -alpha * kx/kk
@@ -323,9 +331,8 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
             # force hermitian symmetry and zero the nyquist mode.
             kshape = data['u']['x']['kspace'].shape[1]
             kylim = kshape/2 + 1
-            data['u']['x']['kspace'][0,:] = alpha[0,:] * na.abs(ky[0,:])/kk[0,:]
-            data['u']['x']['kspace'][0,kylim] = 0.
-
+            #data['u']['x']['kspace'][0,:] = alpha[0,:] * na.abs(ky[0,:])/kk[0,:]
+            #data['u']['x']['kspace'][0,kylim] = 0.
     elif data.ndim == 3:
         kz = data['u']['x'].k['z']
         k2 = na.sqrt(data['u']['x']**2 + data['u']['y']**2)
