@@ -336,26 +336,6 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
         data['u']['y']['kspace'] = (beta * ky * kz - alpha * kk*kx)/(kk * k2)
         data['u']['z']['kspace'] = (beta * k2)/kk
 
-    if com_sys.myproc == 0:
-        #filen = 'ux_hermitian_check.png'
-        filen = 'ux_nyquist_check.png'
-        import pylab as P
-
-        P.subplot(211)
-        P.title('imag')
-        #P.plot(data['u']['x']['kspace'][0,1:kylim-1].imag+data['u']['x']['kspace'][0,-1:kylim-1:-1].imag)
-        P.plot(data['u']['x']['kspace'][:,kylim].imag)
-        uxmin = data['u']['x']['kspace'][:,kylim].imag.min()
-        uxmax = data['u']['x']['kspace'][:,kylim].imag.max()
-        mylog.debug("ux nyquist plane imag (min, max) = (%10.5e, %10.5e)" % (uxmin, uxmax))
-        #P.plot(-data['u']['x']['kspace'][0,-1:kylim:-1].imag, 'kx')
-        P.subplot(212)
-        P.title('real')
-        #P.plot(data['u']['x']['kspace'][0,1:kylim-1].real-data['u']['x']['kspace'][0,-1:kylim-1:-1].real)
-        P.plot(data['u']['x']['kspace'][:,kylim].real)
-        #P.plot(data['u']['x']['kspace'][0,-1:kylim:-1].real, 'kx')
-        P.savefig(filen)
-
 def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     """generate noise with a random phase and a spectrum given by
     the spec function.
