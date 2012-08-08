@@ -456,7 +456,7 @@ class BoussinesqHydro(Hydro):
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1., 'kappa': 0., 'g': 1.,
-                  'alpha_t': 1., 'T0': 0., 'beta': 1.}
+                  'alpha_t': 1., 'beta': 1.}
         self._setup_parameters(params)
         self._finalized = False
 
@@ -475,7 +475,6 @@ class BoussinesqHydro(Hydro):
         # Place references
         g = self.parameters['g']
         alpha_t = self.parameters['alpha_t']
-        T0 = self.parameters['T0']
         beta = self.parameters['beta']
 
         u = data['u']
@@ -486,7 +485,7 @@ class BoussinesqHydro(Hydro):
         # Compute terms
 
         # add buoyancy term
-        self._RHS['u']['z']['kspace'] += g * alpha_t * (T['kspace'] - T0)
+        self._RHS['u']['z']['kspace'] += g * alpha_t * T['kspace']
 
         # temperature equation
         self.XlistgradY([u], T, mathtmp, [Tcopy], [ugradT])
