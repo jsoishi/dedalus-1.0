@@ -110,14 +110,18 @@ def reduce_mean(data):
     if com_sys.myproc == 0:
         return total/global_size
 
-def reduce_sum(data):
+def reduce_sum(data, reduce_all=False):
     local_sum = data.sum()
     if com_sys.comm == None:
         return local_sum
 
-    total = com_sys.comm.reduce(local_sum,op=com_sys.MPI.SUM)
-    if com_sys.myproc == 0:
+    if reduce_all:
+        total = com_sys.comm.allreduce(local_sum,op=com_sys.MPI.SUM)
         return total
+    else:
+        total = com_sys.comm.reduce(local_sum,op=com_sys.MPI.SUM)
+        if com_sys.myproc == 0:
+            return total
 
 def reduce_min(data):
     local_min = data.min()

@@ -65,7 +65,7 @@ class VolumeAverageSet(object):
     def register_task(cls, func):
         cls.known_analysis[func.func_name] = func
 
-def volume_average(data, kdict=None, space='kspace'):
+def volume_average(data, kdict=None, space='kspace', reduce_all=False):
     """computes a volume average using either kspace or xspace. in
     kspace, must make sure to compute properly for kx = 0 zero plane.
 
@@ -92,7 +92,7 @@ def volume_average(data, kdict=None, space='kspace'):
             else:
                 local_sum = 2*data_values.sum()
 
-        return reduce_sum(local_sum)
+        return reduce_sum(local_sum,reduce_all=reduce_all)
     elif space == 'xspace':
         data_values = data['xspace']
         return reduce_mean(data_values)
