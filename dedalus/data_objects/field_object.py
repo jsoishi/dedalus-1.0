@@ -27,6 +27,9 @@ License:
 import weakref
 import numpy as na
 from dedalus.utils.logger import mylog
+from dedalus.data_objects.fourier_data import \
+    FourierRepresentation, \
+    FourierShearRepresentation
 
 def create_field_classes(representation, shape, length):
     """
@@ -75,12 +78,6 @@ class BaseField(object):
         self.sd = weakref.proxy(sd)
         self.ncomp = ncomp
         self.ndim = len(self.shape)
-        
-        # Make sure all dimensions make sense
-        if self.ndim not in (2, 3):
-            raise ValueError("Must use either 2 or 3 dimensions.")
-        if self.ndim != len(self.length):
-            raise ValueError("Shape and Length must have same dimensions.")
 
         # Construct components
         self.components = []
@@ -91,45 +88,48 @@ class BaseField(object):
         self.integrating_factor = None
         
         # Translation table to be specified in derived classes
-        self.trans = {}
+        self.ctrans = {}
         
     def __getitem__(self, item):
-        """If item is not a component number, lookup in translation table."""
-        
         if type(item) == str:
-            item = self.trans[item]
+            item = self.ctrans[item]
         return self.components[item]
         
     def __setitem__(self, item, data):
-        """If item is not a component number, lookup in translation table."""
-        
         if type(item) == str:
-            item = self.trans[item]
+            item = self.ctrans[item]
         self.components[item] = data
 
+    def __iter__(self):
+        for i in xrange(self.ncomp):
+            yield (i, self.components[i])
+
     def zero(self, comp, space='kspace'):
+        """Zero specified component, setting space if needed."""
+        
         if type(comp) == str:
-            comp = self.trans[comp]
+            comp = self.ctrans[comp]
         self.components[comp][space] = 0.
 
     def zero_all(self, space='kspace'):
-        """zero all field components, setting space if needed
-        """
+        """Zero all field components, setting space if needed."""
+        
         for c in self.components:
             c[space] = 0.
 
     def save(self, group):
         group.attrs["representation"] = self.representation.__name__
         group.attrs["type"] = self.__class__.__name__
-        for i in xrange(self.ncomp):
+        for i,c in self:
             dset = group.create_dataset(str(i), 
-                                        self.components[i].local_shape[self.components[i]._curr_space], 
-                                        dtype=self.components[i].data.dtype)
-            
-            self.components[i].save(dset)
+                                        c.local_shape[c._curr_space], 
+                                        dtype=c.data.dtype)
+            c.save(dset)
 
     def report_counts(self):
-        for i,c in enumerate(self.components):
+        """Include transform counts from all components in log."""
+    
+        for i,c in self:
             mylog.debug("component[%i] forward count = %i" % (i,c.fwd_count))
             mylog.debug("component[%i] rev count = %i" % (i,c.rev_count))
 
@@ -146,45 +146,39 @@ class VectorFieldBase(BaseField):
     def __init__(self, sd):
         ncomp = sd.ndim
         BaseField.__init__(self, sd, ncomp)
-        #self.trans = self.components[0].trans
-        self.trans = {'x': 0, 'y': 1, 'z': 2,
-                      0:'x', 1:'y', 2:'z'} # for vector fields
+        
+        if self.ncomp == 2:
+            self.ctrans = {'x':0, 0:'x', 'y':1, 1:'y'}
+        else:
+            self.ctrans = {'x':0, 0:'x', 'y':1, 1:'y', 'z':2, 2:'z'}
 
-    def div_free(self, verbose=False):
+    def div_free(self):
         """
         Project off irrotational part of the vector field.
         
+        Notes
+        -----
         F = -grad(phi) + curl(A)
-        
-        ==> laplace(phi) = - div(F) 
+        ==> laplace(phi) = -div(F) 
+        ==> phi = inv_laplace(-div(F))
+        ==> F_proj = F - grad(inv_laplace(div(F)))
         
         """
         
-        mylog.debug("Projecting off irrotational part of vector field.")
+        if self.representation not in [FourierRepresentation,
+                                       FourierShearRepresentation]:
+            raise NotImplementedError("Solenoidal projection not implemented for this representation.")
         
-        if verbose:
-            # Compute pre-projection power
-            power0 = 0.
-            for i in xrange(self.ncomp):
-                power0 += 0.5 * na.sum(na.abs(self[i]['kspace']) ** 2)
-            mylog.debug("Pre-projection power : %f" % power0)
-    
-        KF = 0
-        for i in xrange(self.ncomp):
-            KF += self[i].k[self.trans[i]] * self[i]['kspace']
+        mylog.debug("Performing solenoidal projection.")
+        
+        divF = 0
+        for i,c in self:
+            divF += c.deriv(self.ctrans[i])
 
         k2 = self[i].k2(no_zero=True)
         
-        for i in xrange(self.ncomp):
-            self[i]['kspace'] -= self[i].k[self.trans[i]] * KF / k2
-        
-        if verbose:
-            # Compute post-projection power
-            power1 = 0.
-            for i in xrange(self.ncomp):
-                power1 += 0.5 * na.sum(na.abs(self[i]['kspace']) ** 2)
-            mylog.debug("Post-projection power: %f" % power1)
-            mylog.debug("Power projected off  : %f" % (power1 - power0))
+        for i,c in self:
+            c['kspace'] -= -1j * c.k[self.ctrans[i]] * divF / k2
     
 class ScalarFieldBase(BaseField):
     """Scalar class. One component."""
@@ -229,7 +223,7 @@ class ScalarFieldBase(BaseField):
         
         return self.components[0].__getattribute__(attr)
 
-    def zero(self, comp=0):
-        self.components[comp].data[:] = 0.
-            
-
+    def zero(self, space='kspace'):
+        """Zero specified component, setting space if needed."""
+        
+        self.components[0][space] = 0.
