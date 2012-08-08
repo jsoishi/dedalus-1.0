@@ -208,8 +208,11 @@ class Snapshot(AnalysisTask):
                   
         cmap = matplotlib.cm.Spectral_r
         cmap.set_bad('0.7')
-        pc = PatchCollection(patches, cmap=cmap, alpha=1., zorder=1, edgecolors='white') 
-                 
+        if space == 'kspace':
+            pc = PatchCollection(patches, cmap=cmap, zorder=1, edgecolors='white') 
+        else:
+            pc = PatchCollection(patches, cmap=cmap, zorder=1, lw=0)
+
         # Store for updating        
         self.patch_lists[axnum] = patches
         self.patch_collections[axnum] = pc
