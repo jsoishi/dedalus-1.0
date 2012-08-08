@@ -292,22 +292,19 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
     kx = data['u'][0].k['x']
     ky = data['u'][0].k['y']
 
+    aux = data.clone()
+    aux.add_field('ampl','ScalarField')
     sp = spec(kk, **kwargs)
     kk[kk==0] = 1.
     if data.ndim == 2:
-        ampl = sp/(2*na.pi*kk)
+        aux['ampl']['kspace'] = sp/(2.*na.pi*kk)
     elif data.ndim == 3:
-        ampl = sp/(4*na.pi*kk**2)
-    #norm = ampl.sum()
-    #norm = com_sys.comm.allreduce(norm, op=com_sys.MPI.SUM)
-    norm = volume_average(ampl,kdict=data['u'][0].k)
-    ampl /= norm
-    ampl = na.sqrt(ampl)
-    import cPickle
-    outfile = 'ampl.cpkl'
-    outf = open(outfile,'w')
-    cPickle.dump(ampl, outf)
-    outf.close()
+        aux['ampl']['kspace'] = sp/(4*na.pi*kk**2)
+
+    aux['ampl'].dealias()
+    norm = volume_average(aux['ampl']['kspace'],kdict=data['u'][0].k,reduce_all=True)
+    aux['ampl']['kspace'] *= tot_en/norm
+    aux['ampl']['kspace'] = na.sqrt(2.*aux['ampl']['kspace'])
 
     eps = na.finfo(data['u']['x']['kspace'].dtype).eps
 
@@ -323,7 +320,7 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
     phi    = data['u']['x']['kspace'].copy()
     phi    /= na.abs(phi + eps)
     phi = na.arctan2(phi.imag, phi.real)
-    alpha = ampl #* theta1
+    alpha = aux['ampl']['kspace'] * theta1
     if data.ndim == 2:
         data['u']['x']['kspace'] = alpha * ky/kk
         data['u']['y']['kspace'] = -alpha * kx/kk
@@ -331,13 +328,13 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
             # force hermitian symmetry and zero the nyquist mode.
             kshape = data['u']['x']['kspace'].shape[1]
             kylim = kshape/2 + 1
-            #data['u']['x']['kspace'][0,:] = alpha[0,:] * na.abs(ky[0,:])/kk[0,:]
-            #data['u']['x']['kspace'][0,kylim] = 0.
+            data['u']['x']['kspace'][0,:] = alpha[0,:] * na.abs(ky[0,:])/kk[0,:]
+            data['u']['x']['kspace'][0,kylim] = 0.
     elif data.ndim == 3:
         kz = data['u']['x'].k['z']
         k2 = na.sqrt(data['u']['x']**2 + data['u']['y']**2)
         alpha *= na.cos(phi)
-        beta = ampl * theta2 * na.sin(phi)
+        beta = aux['ampl']['kspace'] * theta2 * na.sin(phi)
 
         data['u']['x']['kspace'] = (alpha * kk * ky + beta * kx * kz)/(kk * k2)
         data['u']['y']['kspace'] = (beta * ky * kz - alpha * kk*kx)/(kk * k2)
