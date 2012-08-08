@@ -163,6 +163,7 @@ class RK2simple(TimeStepBase):
         
         # Create internal reference to derivative StateData from RHS
         self.field_dt = None
+       
 
     def do_advance(self, data, dt):
         """

@@ -394,7 +394,7 @@ def MIT_vortices(data):
     http://math.mit.edu/cse/codes/mit18336_spectral_ns2d.m
 
     """
-    x, y = data['u']['x'].xspace_grid()
+    y, x = data['u']['x'].xspace_grid()
     aux = data.clone()
     aux.add_field('w','ScalarField')
     aux.add_field('psi','ScalarField')
@@ -419,11 +419,15 @@ def shearing_wave(data, wampl, kinit):
     aux = data.clone()
     aux.add_field('w','ScalarField')
     aux.add_field('psi','ScalarField')
-    cos_k(aux['w']['kspace'],kinit,ampl=wampl)
-    aux['psi']['kspace'] = aux['w']['kspace']/aux['w'].k2(no_zero=True)
-
-    data['u']['x']['kspace'] = aux['psi'].deriv('y')
-    data['u']['y']['kspace'] = -aux['psi'].deriv('x')
+    
+    if kinit is not None:
+        aux['w']['kspace'][tuple(kinit)] = wampl / 2.
+        
+        #cos_k(aux['w']['kspace'],kinit,ampl=wampl)
+        aux['psi']['kspace'] = aux['w']['kspace']/aux['w'].k2(no_zero=True)
+    
+        data['u']['x']['kspace'] = aux['psi'].deriv('y')
+        data['u']['y']['kspace'] = -aux['psi'].deriv('x')
 
 def zeldovich(data, ampl, A, a_ini, a_cross):
     """velocity wave IC, for testing nonlinear collisionless cosmology

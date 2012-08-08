@@ -1,4 +1,5 @@
-"""Physics class. This defines fields, and provides a right hand side
+"""
+Physics classes. These defines fields, and provides a right hand side
 to time integrators.
 
 Authors: J. S. Oishi <jsoishi@gmail.com>
@@ -21,6 +22,7 @@ License:
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  
 """
 
 import numpy as na
@@ -28,7 +30,6 @@ from dedalus.utils.logger import mylog
 from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
 from dedalus.utils.api import a_friedmann
 from dedalus.funcs import insert_ipython
-from dedalus.utils.parallelism import com_sys
 
 def _reconstruct_object(*args, **kwargs):
     new_args = [args[1]['shape'], args[1]['_representation'], args[1]['length']]
@@ -38,20 +39,44 @@ def _reconstruct_object(*args, **kwargs):
 
 class Physics(object):
     """
-    This is a base class for a physics object. It needs to provide
-    a right hand side for a time integration scheme.
+    Base class for a physics object. Defines fields and provides
+    a right hand side for the time integration scheme.
+    
     """
     
     def __init__(self, shape, representation, length=None, visc_order=1):
+        """
+        Base class for a physics object. Defines fields and provides
+        a right hand side for the time integration scheme.
+        
+        Parameters
+        ----------
+        shape : tuple of ints
+            The shape of the data in xspace: (z, y, x) or (y, x)
+        representation : class
+            A Dedalus representation class
+        length : tuple of floats, optional
+            The length of the data in xspace: (z, y, x) or (y, x), 
+            defaults to 2 pi in all directions.
+        visc_order : int, optional
+            Hyperviscosity order, defaults to 1.
+            
+        """
+    
+        # Store inputs
         self.shape = shape
-        self.ndim = len(self.shape)
+        self._representation = representation
         if length:
             self.length = length
         else:
-            self.length = (2 * na.pi,) * self.ndim
+            self.length = (2 * na.pi,) * len(self.shape)
         self.visc_order = visc_order
+        
+        # Dimensionality
+        self.ndim = len(self.shape)
         self.dims = xrange(self.ndim)
-        self._representation = representation
+        
+        # Additional setup
         self._field_classes = create_field_classes(
                 self._representation, self.shape, self.length)
         self.parameters = {}
@@ -71,10 +96,11 @@ class Physics(object):
                 savedict[k] = v
         return (_reconstruct_object, (self.__class__, savedict))
 
-    def create_fields(self, t, field_list=None):        
+    def create_fields(self, time, field_list=None):        
         if field_list == None:
             field_list = self.fields
-        return StateData(t, self.shape, self.length, self._field_classes, 
+            
+        return StateData(time, self.shape, self.length, self._field_classes, 
                          field_list=field_list, params=self.parameters)
 
     def _setup_parameters(self, params):
@@ -103,9 +129,12 @@ class Physics(object):
         """
         Compute Jacobian: gradX[N * i + j] = dX_i/dx_j
         
-        Inputs:
-            X           Input Scalar/VectorField object
-            output      Output Vector/TensorField object
+        Parameters
+        ----------
+        X : Scalar/VectorField object
+            Input field
+        output : Vector/TensorField object
+            Field for storing output
 
         """
 
@@ -364,9 +393,7 @@ class Hydro(Physics):
         
         # Setup temporary data container
         sampledata = data['u']['x']
-
-        sampledata['kspace']
-        tmp = na.zeros_like(sampledata.data)
+        tmp = na.zeros_like(sampledata.kdata)
         k2 = sampledata.k2(no_zero=True)
         
         # Construct k * ugradu
@@ -386,10 +413,10 @@ class ShearHydro(Hydro):
         Compute right hand side of fluid equations, populating self._RHS with
         the time derivatives of the fields.
 
-        u_t + nu k^2 u = -ugradu - i k p / rho0 + rotation + shear
+        u_t + nu K^2 u = -ugradu - i K p / rho0 + rotation + shear
         
-        rotation =  [2 Omega u_y,  0                 ,  0]
-        shear =     [0          ,  -(2 + S) Omega u_x,  0]
+        rotation = -2 Omega u_x e_y
+        shear = (2 + S) Omega u_y e_x
 
         """
         
@@ -399,23 +426,23 @@ class ShearHydro(Hydro):
         
         # Compute terms
         Hydro.RHS(self, data)
-        self._RHS['u']['x']['kspace'] += 2. * Omega * data['u']['y']['kspace']
-        self._RHS['u']['y']['kspace'] += -(2 + S) * Omega * data['u']['x']['kspace']
+        self._RHS['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
+        self._RHS['u']['x']['kspace'] += (2. + S) * Omega * data['u']['y']['kspace']
         
         return self._RHS
 
     def pressure(self, data):
         """
-        Compute pressure term for ufields: i k p / rho0
+        Compute pressure term for ufields: i K p / rho0
         
-        p / rho0 = i (k * ugradu + rotation + shear)/ k^2
-        ==> pressure term = - k (k * ugradu + rotation + shear) / k^2
+        p / rho0 = i (K * ugradu + rotation + shear)/ K^2
+        ==> pressure term = - K (K * ugradu + rotation + shear) / K^2
         
-        rotation = -2 Omega u_y K_x
-        shear = (1 + S) 2 Omega u_x K_y
+        rotation = 2 Omega u_x K_y
+        shear = -(1 + S) 2 Omega u_y K_x
         
         """
-        
+
         # Place references
         ugradu = self.aux_fields['ugradu']
         pressure = self.aux_fields['pressure']
@@ -424,16 +451,16 @@ class ShearHydro(Hydro):
         
         # Setup temporary data container
         sampledata = data['u']['x']
-        tmp = na.zeros_like(sampledata.data)
+        tmp = na.zeros_like(sampledata.kdata)
         k2 = sampledata.k2(no_zero=True)
         
-        # Construct k * ugradu
+        # Construct K * ugradu
         for i in self.dims:
             tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace'] 
 
         # Add rotation + shear
-        tmp += (2. * (1 + S) * Omega * data['u']['x'].k['y'] * data['u']['x']['kspace'] - 
-                2. * Omega * data['u']['y'].k['x'] * data['u']['y']['kspace'])
+        tmp += (2. * Omega * data['u']['x']['kspace'] * data['u']['x'].k['y'] -
+                (1. + S) * 2. * Omega * data['u']['y']['kspace'] * data['u']['x'].k['x'])
 
         # Construct full term
         for i in self.dims:            
@@ -623,12 +650,12 @@ class ShearMHD(MHD):
         
         u_t + nu k^2 u = -ugradu + BgradB / (4 pi rho0) - i k Ptot / rho0 + rotation + shear
 
-        rotation =  [2 Omega u_y,  0                 ,  0]
-        shear =     [0          ,  -(2 + S) Omega u_x,  0]
+        rotation = -2 Omega u_x e_y
+        shear =  (2 + S) Omega u_y e_x
         
         B_t + eta k^2 B = Bgradu - ugradB + shear
         
-        shear = [0,  S Omega B_x,  0]
+        shear = -S Omega B_y e_x
         
         """
         
@@ -638,9 +665,9 @@ class ShearMHD(MHD):
         
         # Compute terms
         MHD.RHS(self, data)
-        self._RHS['u']['x']['kspace'] += 2. * Omega * data['u']['y']['kspace']
-        self._RHS['u']['y']['kspace'] += -(2 + S) * Omega * data['u']['x']['kspace']
-        self._RHS['B']['y']['kspace'] += S * Omega * data['B']['x']['kspace']
+        self._RHS['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
+        self._RHS['u']['x']['kspace'] += (2 + S) * Omega * data['u']['y']['kspace']
+        self._RHS['B']['x']['kspace'] += -S * Omega * data['B']['y']['kspace']
         
         return self._RHS
         
@@ -651,8 +678,8 @@ class ShearMHD(MHD):
         Ptot / rho0 = i (k * ugradu - k * BgradB / (4 pi rho0) + rotation + shear) / k^2  
         ==> pressure term = - k (k * ugradu - k * BgradB / (4 pi rho0) + rotation + shear) / k^2
         
-        rotation = -2 Omega u_y K_x
-        shear = (1 + S) 2 Omega u_x K_y
+        rotation = 2 Omega u_x K_y
+        shear = -(1 + S) 2 Omega u_y K_x
         
         """
 
@@ -676,8 +703,8 @@ class ShearMHD(MHD):
             tmp -= data['u'][i].k[self._trans[i]] * BgradB[i]['kspace'] / pr4
             
         # Add rotation + shear
-        tmp += (2. * (1 + S) * Omega * data['u']['x'].k['y'] * data['u']['x']['kspace'] - 
-                2. * Omega * data['u']['y'].k['x'] * data['u']['y']['kspace'])
+        tmp += (-2. * (1 + S) * Omega * data['u']['y'].k['x'] * data['u']['y']['kspace'] + 
+                2. * Omega * data['u']['x'].k['y'] * data['u']['x']['kspace'])
                 
         # Construct full term
         for i in self.dims:            

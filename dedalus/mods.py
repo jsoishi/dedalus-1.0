@@ -31,7 +31,8 @@ from dedalus.utils.logger import mylog
 
 from dedalus.analysis.api import \
     AnalysisSet, \
-    VolumeAverageSet
+    VolumeAverageSet, \
+    Snapshot
 
 from dedalus.data_objects.api import \
     FourierRepresentation, \

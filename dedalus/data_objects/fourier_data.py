@@ -27,7 +27,7 @@ import numpy as na
 import numpy.lib.stride_tricks as st
 import numpy.fft as fpack
 from dedalus.config import decfg
-from dedalus.utils.parallelism import com_sys, swap_indices
+from dedalus.utils.parallelism import com_sys, swap_indices, get_plane
 from dedalus.utils.logger import mylog
 from dedalus.utils.fftw import fftw
 from dedalus.utils.timer import Timer
@@ -50,8 +50,8 @@ class Representation(object):
 
 class FourierRepresentation(Representation):
     """
-    Container for data that can be Fourier transformed. Includes a
-    wrapped and specifiable method for performing the FFT. 
+    Representation of a field component that can be Fourier transformed 
+    in all directions (i.e. periodic across the domain).
     
     """
     
@@ -60,21 +60,7 @@ class FourierRepresentation(Representation):
     def __init__(self, sd, shape, length):
         """
         Representation of a field component that can be Fourier transformed 
-        (i.e. periodic across the domain).
-        
-        When dealing with data, keep in mind that for parallelism, the
-        data is transposed between k and x spaces: currently, we use
-        FFTW's internal MPI parallelism. This may be updated later,
-        but for now, the transposition means that the first two
-        indexed dimensions are swapped when in k-space:
-
-        In 3D:
-            x-space: z, y, x
-            k-space: y, z, x
-    
-        In 2D:
-            x-space: y, x
-            k-space: x, y
+        in all directions (i.e. periodic across the domain).
         
         Parameters
         ----------
@@ -84,6 +70,21 @@ class FourierRepresentation(Representation):
         length : tuple of floats
             The length of the data in xspace: (z, y, x) or (y, x)
             
+        Notes
+        -----
+        When dealing with data, keep in mind that for parallelism the data 
+        is transposed between k and x spaces following FFTW's internal MPI 
+        parallelism, in which the first two indexed dimensions are swapped 
+        when in k-space:
+
+        In 3D:
+            x-space: z, y, x
+            k-space: y, z, x
+    
+        In 2D:
+            x-space: y, x
+            k-space: x, y
+            
         """
         
         # Store inputs
@@ -92,15 +93,17 @@ class FourierRepresentation(Representation):
         self.length = na.asfarray(length)
         self.ndim = len(shape)
         
-        # Flexible datatypes not currently supported
-        self.dtype = 'complex128'
-        self.__eps = na.finfo(self.dtype).eps
-        
         # Make sure all dimensions make sense
         if self.ndim not in (2, 3):
             raise ValueError("Must use either 2 or 3 dimensions.")
-        if self.ndim != len(self.length):
+        if len(shape) != len(length):
             raise ValueError("Shape and Length must have same dimensions.")
+        
+        # Flexible datatypes not currently supported
+        self.dtype = {'kspace': 'complex128', 
+                      'xspace': 'float64'}
+        self._eps = {'kspace': na.finfo(self.dtype['kspace']).eps,
+                      'xspace': na.finfo(self.dtype['xspace']).eps}
         
         # Retrieve FFT method and dealiasing method from config
         method = decfg.get('FFT', 'method')
@@ -108,26 +111,61 @@ class FourierRepresentation(Representation):
         
         # Translation tables
         if self.ndim == 2:
-            self.xtrans = {'x':1, 1:'x', 'y':0, 0:'y'}
             self.ktrans = {'x':0, 0:'x', 'y':1, 1:'y'}
+            self.xtrans = {'x':1, 1:'x', 'y':0, 0:'y'}
         else:
-            self.xtrans = {'x':2, 2:'x', 'y':1, 1:'y', 'z':0, 0:'z'}
             self.ktrans = {'x':2, 2:'x', 'y':0, 0:'y', 'z':1, 1:'z'}
-            
+            self.xtrans = {'x':2, 2:'x', 'y':1, 1:'y', 'z':0, 0:'z'}
+        
         # Complete setup
-        self._allocate_memory(method)
+        self.set_fft(method)
+        self.set_dealiasing(dealiasing)
         self._setup_k()
         self._curr_space = 'kspace'
         self.data = self.kdata
-        self.set_fft(method)
-        self.set_dealiasing(dealiasing)
 
-        # for testing
+        # Set transform counters
         self.fwd_count = 0
         self.rev_count = 0
+    
+    def __getitem__(self, space):
+        """Return data in specified space, transforming as necessary."""
+        
+        self.require_space(space)
+        return self.data
+
+    def __setitem__(self, space, data):
+        """
+        Set data while ensuring the pointer for the field's data member doesn't 
+        change for FFTW. Currently done by slicing the entire data array. 
+        
+        """
+        
+        if space == 'xspace':
+            self.data = self.xdata
+        elif space == 'kspace':
+            self.data = self.kdata
+        else:
+            raise KeyError("space must be either xspace or kspace.")
+
+        # Scalar assignment
+        if type(data) == float or type(data) == complex:
+            self.data[:] = data
+        # Mis-matched size assignment
+        elif data.size < self.data.size:
+            mylog.warning("Size of assignment and data don't agree. This may be disallowed in future versions.")
+            sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
+            self.data[sli] = data
+        # Regular assignment by slicing
+        else:
+            sli = [slice(i) for i in self.data.shape]
+            self.data[:] = data[sli]
+
+        self._curr_space = space
 
     @timer
     def _allocate_memory(self, method):
+        """Allocate memory for data and derivative."""
     
         # Compute global kspace shape for R2C FFT with transpose
         self.global_shape['kspace'] = self.global_shape['xspace'].copy()
@@ -136,7 +174,7 @@ class FourierRepresentation(Representation):
         
         # Assign data arrays and compute local shapes and offsets
         if method == 'fftw':
-            self.kdata, self.xdata, local_n0, local_n0_start, local_n1, local_n1_start = fftw.create_data(self.global_shape['xspace'], com_sys)
+            self.kdata, self._mdata, self.xdata, local_n0, local_n0_start, local_n1, local_n1_start = fftw.create_data(self.global_shape['xspace'], com_sys)
             self.local_shape = {'kspace': self.global_shape['kspace'].copy(),
                                 'xspace': self.global_shape['xspace'].copy()}
             self.local_shape['kspace'][0] = local_n1
@@ -144,57 +182,21 @@ class FourierRepresentation(Representation):
             self.offset = {'xspace': local_n0_start,
                            'kspace': local_n1_start}
         elif method == 'numpy':
-            self.kdata = na.zeros(self.global_shape['kspace'], dtype=self.dtype)
-            self.xdata = na.zeros(self.global_shape['xspace'])
+            self.kdata = na.zeros(self.global_shape['kspace'], dtype=self.dtype['kspace'])
+            self.xdata = na.zeros(self.global_shape['xspace'], dtype=self.dtype['xspace'])
             self.local_shape = {'kspace': self.global_shape['kspace'].copy(),
                                 'xspace': self.global_shape['xspace'].copy()}
             self.offset = {'xspace': 0,
                            'kspace': 0}
+
+        # Allocate an array to hold derivatives
+        self.deriv_data = na.zeros_like(self.kdata)
         
-        else:
-            raise NotImplementedError("Specified FFT method not implemented.")
-
-        # allocate a temp array to hold derivatives
-        self.der = na.zeros_like(self.kdata)
-
-    def __getitem__(self,space):
-        """Returns data in specified space, transforming as necessary."""
+        # Incorporate ability to add extra views, etc.
+        self._additional_allocation(method)
         
-        if space == self._curr_space:
-            pass
-        elif space == 'xspace':
-            self.backward()
-        elif space == 'kspace':
-            self.forward()
-        else:
-            raise KeyError("space must be either xspace or kspace.")
-        
-        return self.data
-
-    def __setitem__(self, space, data):
-        """
-        This needs to ensure the pointer for the field's data member doesn't 
-        change for FFTW. Currently, we do that by slicing the entire data array. 
-        
-        """
-        if space == 'xspace':
-            self.data = self.xdata
-        elif space == 'kspace':
-            self.data = self.kdata
-        else:
-            raise KeyError("space must be either xspace or kspace.")
-
-        if type(data) == float or type(data) == complex:
-            self.data[:] = data
-        elif data.size < self.data.size:
-            mylog.warning("Size of assignment and data don't agree. This may be disallowed in future versions.")
-            sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
-            self.data[sli] = data
-        else:
-            sli = [slice(i) for i in self.data.shape]
-            self.data[:] = data[sli]
-
-        self._curr_space = space
+    def _additional_allocation(self, method):
+        pass
 
     def _setup_k(self):
         """Create local wavenumber arrays."""
@@ -204,33 +206,40 @@ class FourierRepresentation(Representation):
         self.kny = swap_indices(self.kny)
         
         # Setup global wavenumber arrays
-        self.k = []
-  
+        rcomp = self.ktrans['x']
+        self.k = {}
+
         for i,ksize in enumerate(self.global_shape['kspace']):
-            kshape = i * (1,) + (ksize,) + (self.ndim - i - 1) * (1,)
             xsize = swap_indices(self.global_shape['xspace'])[i]
-            if ksize == xsize:
-                ki = fpack.fftfreq(ksize) * 2. * self.kny[i]
-                if xsize % 2 == 0:
-                    ki[ksize / 2] *= -1.
-            else:
+            if i == rcomp:
                 ki = fpack.fftfreq(xsize)[:ksize] * 2. * self.kny[i]
                 if xsize % 2 == 0:
                     ki[-1] *= -1.
+            else:
+                ki = fpack.fftfreq(ksize) * 2. * self.kny[i]
+                if xsize % 2 == 0:
+                    ki[ksize / 2] *= -1.
+            kshape = i * (1,) + (ksize,) + (self.ndim - i - 1) * (1,)
             ki.resize(kshape)
-            self.k.append(ki)
-        
-        names = ['z','y','x'][3-self.ndim:]
-        names = swap_indices(names)
-        self.k = dict(zip(names, self.k))
+            self.k[self.ktrans[i]] = ki
 
         # Restrict to local
-        if self.ndim == 2:
-            self.k['x'] = self.k['x'][self.offset['kspace']:self.offset['kspace'] + self.local_shape['kspace'][0]]
-        else:
-            self.k['y'] = self.k['y'][self.offset['kspace']:self.offset['kspace'] + self.local_shape['kspace'][0]]
+        scomp = self.ktrans[0]
+        self.k[scomp] = self.k[scomp][self.offset['kspace']:self.offset['kspace'] + self.local_shape['kspace'][0]]
 
-    def find_mode(self, mode):
+    def require_space(self, space):
+        """Transform to required space if not there already."""
+        
+        if self._curr_space == space:
+            pass
+        elif space == 'xspace':
+            self.backward()
+        elif space == 'kspace':
+            self.forward()
+        else:
+            raise ValueError("space must be either xspace or kspace.")
+
+    def find_mode(self, mode, exact=False):
         """
         Test if object has a given mode, return index for closest mode if so.
 
@@ -239,6 +248,8 @@ class FourierRepresentation(Representation):
         mode : tuple of ints or floats
             Tuple describing physical wavevector for which to search.  Recall 
             kspace ordering (ky, kz, kx) for 3D, (kx, ky) for 2D.
+        exact : bool
+            Only return index if mode matches exactly (i.e. no binning).
 
         Returns
         -------
@@ -247,31 +258,40 @@ class FourierRepresentation(Representation):
             in (k - dk/2 <= mode < k + dk/2) in all dimensions. None otherwise.
 
         """
-        
+    
         # Get k-mode spacing
         dk = 2 * na.pi / swap_indices(self.length)
         
-        # Intersect applicable mode sets by dimension
-        index = [None] * self.ndim
+        # Intersect applicable mode sets by dimension  
+        test = na.ones(self.local_shape['kspace'], dtype=bool)
         for name, kn in self.k.iteritems():
             i = self.ktrans[name]
-            ilist = na.where((mode[i] >= kn - dk[i] / 2.) & 
-                             (mode[i] <  kn + dk[i] / 2.))
-            if ilist[i].size == 0:
-                return None
+            if exact:
+                itest = (kn == mode[i])
             else:
-                index[i] = ilist[i][0]
-                
-        return index
+                itest = ((kn <= mode[i] + dk[i] / 2.) & 
+                         (kn >  mode[i] - dk[i] / 2.))
+            test *= itest
+        
+        index = zip(*test.nonzero())
+        
+        if len(index) == 0:
+            return None
+        elif len(index) == 1:
+            return index[0]
+        else:
+            raise ValueError("Multiple modes tested true. This shouldn't happen.")
 
     def set_fft(self, method):
         """Assign fft method."""
         
         mylog.debug("Setting FFT method to %s." % method)
         
+        # Allocate memory
+        self._allocate_memory(method)
+        
         if method == 'fftw':
-            self.fplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'], direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
-            self.rplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'], direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
+            self.create_fftw_plans()
             self.fft = self.fwd_fftw
             self.ifft = self.rev_fftw
             
@@ -284,22 +304,26 @@ class FourierRepresentation(Representation):
         else:
             raise NotImplementedError("Specified FFT method not implemented.")
             
-    #@timer
+    def create_fftw_plans(self):
+        self.fplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'],
+                forward=True, flags=['FFTW_MEASURE'])
+        self.rplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'], 
+                forward=False, flags=['FFTW_MEASURE'])
+            
     def fwd_fftw(self):
         self.fplan()
         self.kdata /= self.global_shape['xspace'].prod()
         
-    #@timer
     def rev_fftw(self):
         self.rplan()
 
     def fwd_np(self):
         tr = [1, 0, 2][:self.ndim]
-        self.kdata = na.transpose(fpack.rfftn(self.xdata / self.global_shape['xspace'].prod()), tr)
+        self.kdata[:] = na.transpose(fpack.rfftn(self.xdata / self.global_shape['xspace'].prod()), tr)
 
     def rev_np(self):
         tr = [1, 0, 2][:self.ndim]
-        self.xdata = fpack.irfftn(na.transpose(self.kdata, tr)) * self.global_shape['xspace'].prod()
+        self.xdata[:] = fpack.irfftn(na.transpose(self.kdata, tr)) * self.global_shape['xspace'].prod()
 
     def forward(self):
         """FFT method to go from xspace to kspace."""
@@ -358,15 +382,13 @@ class FourierRepresentation(Representation):
                      (na.abs(self.k['y']) >= 2 / 3. * self.kny[0]) |
                      (na.abs(self.k['z']) >= 2 / 3. * self.kny[1]))
 
-        if self._curr_space == 'xspace': 
-            self.forward()
+        self.require_space('kspace')
         self.data[dmask] = 0.
         
     def dealias_23_cython(self):
         """Orszag 2/3 dealiasing rule implemented in cython."""
         
-        if self._curr_space == 'xspace': 
-            self.forward()
+        self.require_space('kspace')
         
         if self.ndim == 2:
             self._cython_dealias_function(self.data, self.k['x'], self.k['y'], self.kny)
@@ -379,17 +401,16 @@ class FourierRepresentation(Representation):
         # Zeroing mask   
         dmask = (na.sqrt(self.k2()) >= 2 / 3. * na.min(self.kny))
 
-        if self._curr_space == 'xspace': 
-            self.forward()
+        self.require_space('kspace')
         self.data[dmask] = 0.
         
     def deriv(self, dim):
         """Calculate derivative along specified dimension."""
         
-        if self._curr_space == 'xspace': 
-            self.forward()
-        na.multiply(self.data, 1j*self.k[dim], self.der)
-        return self.der
+        self.require_space('kspace')
+        na.multiply(self.data, 1j * self.k[dim], self.deriv_data)
+        
+        return self.deriv_data
 
     def k2(self, no_zero=False):
         """
@@ -410,7 +431,7 @@ class FourierRepresentation(Representation):
         """Zero out the Nyquist space in each dimension."""
         
         # Zeroing mask   
-        if self.ndim ==2:
+        if self.ndim == 2:
             dmask = ((na.abs(self.k['x']) == self.kny[0]) | 
                      (na.abs(self.k['y']) == self.kny[1]))
         else:
@@ -418,16 +439,62 @@ class FourierRepresentation(Representation):
                      (na.abs(self.k['y']) == self.kny[0]) |
                      (na.abs(self.k['z']) == self.kny[1]))
 
-        if self._curr_space == 'xspace': 
-            self.forward()
+        self.require_space('kspace')
         self.data[dmask] = 0.
+        
+    def enforce_hermitian(self):
+        """
+        Enforce Hermitian symmetry, zeroing out Nyquist spaces.  Data with 
+        (kx == 0) & (ky < 0) or (kx, ky == 0) & (kz < 0) will be overwritten 
+        with the complex conjugate of its Hermitian pair.
+        
+        """
+        
+        # Zero Nyquist spaces
+        self.require_space('kspace')
+        self.zero_nyquist()
+        
+        if self.ndim == 2:
+            # Enforce along kx=0 pencil, which is local to one process
+            zindex = self.find_mode((0, 0), exact=True)
+            if zindex:
+                self.data[0, 0] = self.data[0, 0].real
+                nyindex = self.local_shape['kspace'][1] / 2
+                grab = self.data[0, 1:nyindex + 1]
+                self.data[0, -nyindex:] = grab[::-1].conj()
+        else:
+            # Gather kx=0 plane from across processes
+            proc_data = self.kdata[:, :, 0]
+            gathered_data = com_sys.comm.gather(proc_data, root=0)
+                    
+            if com_sys.myproc == 0:
+                plane_data = na.concatenate(gathered_data)
+                nyy, nyz = na.array(plane_data.shape) / 2
+                
+                # Enforce along ky=0 pencil
+                grab = plane_data[0, 1:nyz + 1]
+                plane_data[0, -nyz:] = grab[::-1].conj()
+                
+                # Enforce along kz=0 pencil
+                grab = plane_data[1:nyy + 1, 0]
+                plane_data[-nyy:, 0] = grab[::-1].conj()
+                
+                # Enforce on ky < 0 side of plane
+                grab = plane_data[1:nyy + 1, 1:]
+                plane_data[-nyy:, 1:] = grab[::-1, ::-1].conj()
+            else:
+                plane_data = None
+                
+            plane_data = com_sys.comm.bcast(plane_data, root=0)
+            lstart = self.offset['kspace']
+            lstop = self.local_shape['kspace'][0]
+            self.kdata[:, :, 0] = plane_data[lstart:lstop, :]
 
     def zero_under_eps(self):
         """Zero out any modes with coefficients smaller than machine epsilon."""
         
-        if self._curr_space == 'xspace': 
-            self.forward()
-        self.data[na.abs(self.data) < self.__eps] = 0.
+        self.require_space('kspace')
+        self.data[na.abs(self.data) < self._eps['kspace']] = 0.
 
     def save(self, dataset):
         """
@@ -446,216 +513,212 @@ class FourierRepresentation(Representation):
             dataset[:] = self.data
         dataset.attrs['space'] = self._curr_space
 
-    def xspace_grid(self):
-        """returns the xspace grid for the local processor
+    def xspace_grid(self, open=False):
+        """Return the xspace grid for the local processor."""
+        
+        if open:
+            refgrid = na.ogrid
+        else:
+            refgrid = na.mgrid
+        
+        # Create integer array based on local shape and offset
+        grid = refgrid[[slice(i) for i in na.asfarray(self.local_shape['xspace'])]]
+        grid[0] += self.offset['xspace']
+        
+        # Multiply integer array by grid spacing
+        dx = self.length / self.global_shape['xspace']
+        for i in xrange(self.ndim):
+            grid[i] *= dx[i]
 
-        """
-        gsh = self.global_shape['xspace']
-        lsh = self.local_shape['xspace']
-        offset = self.offset['xspace']
-
-        x, y = na.meshgrid(na.r_[0:lsh[1]]*2*na.pi/gsh[1],na.r_[offset:lsh[0]+offset]*2*na.pi/gsh[0])
-        return x, y
-
+        return grid
 
 class FourierShearRepresentation(FourierRepresentation):
     """
-
+    Fourier representation in a shearing-box domain.
+        
     """
-    def __init__(self, sd, shape, length, left_edge=[0,0,-na.pi],**kwargs):    
+    
+    timer = Timer()
+    
+    def __init__(self, sd, shape, length):    
         """
-        Shearing box implementation.
-
+        Fourier representation in a shearing-box domain.
+        
         Parameters
         ----------
-        S : float
-            the *dimensional* shear rate in 1/t units
+        sd : StateData object
+        shape : tuple of ints
+            The shape of the data in xspace: (z, y, x) or (y, x)
+        length : tuple of floats
+            The length of the data in xspace: (z, y, x) or (y, x)
+            
+        Notes
+        -----
+        When dealing with data, keep in mind that for parallelism the data 
+        is transposed between k and x spaces following FFTW's internal MPI 
+        parallelism, in which the first two indexed dimensions are swapped 
+        when in k-space:
 
+        In 3D:
+            x-space: z, y, x
+            k-space: y, z, x
+    
+        In 2D:
+            x-space: y, x
+            k-space: x, y
+            
         """
         
-        FourierRepresentation.__init__(self, sd, shape, length, **kwargs)
-        self.shear_rate = self.sd.parameters['S'] * self.sd.parameters['Omega']
-        self.kx = self.k['x'].copy()
-        self.left_edge = left_edge
+        # Fourier initialization
+        FourierRepresentation.__init__(self, sd, shape, length)
+        
+        # Store initial copy of ky, allocate a fleshed-out ky
+        self._ky = self.k['y'].copy()
+        self.k['y'] = self.k['y'] * na.ones_like(self.k['x'])
+        
+        # Calculate phase rate for use in x-orientation transpose
+        ksize = self.global_shape['kspace'][self.ktrans['x']]
+        xsize = self.global_shape['xspace'][self.xtrans['x']]
+        xkx = fpack.fftfreq(xsize)[:ksize] * 2. * self.kny[self.ktrans['x']]
+        if xsize % 2 == 0:
+            xkx[-1] *= -1.
+        xkx.resize((self.ndim - 1) * (1,) + (ksize,))
+        y = self.xspace_grid(open=True)[self.xtrans['y']]
+        self._phase_rate = -self.sd.parameters['S'] * self.sd.parameters['Omega'] * xkx * y
+        
+        # Calculate wave rate for use in wavenumber update
+        self._wave_rate = -self.sd.parameters['S'] * self.sd.parameters['Omega'] * self.k['x']
+        
+        # Update wavenumbers in case component is initialized at non-zero time
+        self._update_k()
+        
+    def _additional_allocation(self, method):
+        """Allocate memory for intermediate transformation arrays."""
 
-    def set_fft(self, method):
-        if method == 'fftw':
-            self.fplan_yz = fftw.PlanPlane(self.data, 
-                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
-            self.rplan_yz = fftw.PlanPlane(self.data, 
-                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
-            self.fplan_x = fftw.PlanPencil(self.data, 
-                                           direction='FFTW_FORWARD', flags=['FFTW_MEASURE'])
-            self.rplan_x = fftw.PlanPencil(self.data, 
-                                           direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])
-
-            self.fft = self.fwd_fftw
-            self.ifft = self.rev_fftw
         if method == 'numpy':
-            self.fft = self.fwd_np
-            self.ifft = self.rev_np
+            mshape = self.local_shape['xspace'].copy()
+            mshape[-1] = mshape[-1] / 2 + 1
+            self._mdata = na.zeros(mshape, dtype=self.dtype['kspace'])
+    
+    def _update_k(self):
+        """Evolve wavenumbers due to shear."""
 
-    def rev_np(self):
-        """IFFT method to go from kspace to xspace."""
-        
-        deltay = self.shear_rate * self.sd.time 
-        x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
-        
-        # Do x fft
-        self.data = fpack.ifft(self.data, axis=-1) * na.sqrt(self.shape[-1])
-        
-        # Phase shift
-        self.data *= na.exp(-1j * self.k['y'] * x * deltay)
-        
-        # Do y fft
-        self.data = fpack.ifft(self.data, axis=-2) * na.sqrt(self.shape[-2])
-        
-        # Do z fft
-        if self.ndim == 3:
-            self.data = fpack.ifft(self.data, axis=0) * na.sqrt(self.shape[0])
-        
-    def fwd_np(self):
-        """FFT method to go from xspace to kspace."""
-        
-        deltay = self.shear_rate * self.sd.time
-        x = (na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False) +
-             na.zeros(self.shape))
+        # Wavenumber shift
+        #self.k['y'] = self._ky - self._wave_rate * self.sd.time
+        na.subtract(self._ky, self._wave_rate * self.sd.time , self.k['y'])
+    
+        # Wrap wavenumbers past Nyquist value
+        kny_y = self.kny[3 - self.ndim]
+        while self.k['y'].min() <= -kny_y:
+            self.k['y'][self.k['y'] <= -kny_y] += 2 * kny_y
+        while self.k['y'].max() > kny_y:
+            self.k['y'][self.k['y'] > kny_y] -= 2 * kny_y
+            
+        # Dealias
+        self.dealias()
 
-        # Do z fft
-        if self.ndim == 3:
-            self.data = fpack.fft(self.data / na.sqrt(self.shape[0]), axis=0)
-
-        # Do y fft
-        self.data = fpack.fft(self.data / na.sqrt(self.shape[-2]), axis=-2)
-
-        # Phase shift
-        self.data *= na.exp(1j * self.k['y'] * x * deltay)
-        
-        # Do x fft
-        self.data = fpack.fft(self.data / na.sqrt(self.shape[-1]), axis=-1)
-
+    def create_fftw_plans(self):
+        gmshape = self.global_shape['xspace'].copy()
+        gmshape[-1] = gmshape[-1] / 2 + 1
+    
+        self._fplan_x = fftw.rPencilPlan(self.xdata, self._mdata, forward=True, 
+                flags=['FFTW_MEASURE'])
+        self._rplan_x = fftw.rPencilPlan(self.xdata, self._mdata, forward=False, 
+                flags=['FFTW_MEASURE'])
+        if self.ndim == 2:
+            self._fplan_tr = fftw.TransposePlan(self._mdata, self.kdata, com_sys,
+                    gmshape, forward=True, flags=['FFTW_MEASURE'])
+            self._rplan_tr = fftw.TransposePlan(self._mdata, self.kdata, com_sys,
+                    gmshape, forward=False, flags=['FFTW_MEASURE'])
+            self._fplan_y = fftw.PencilPlan(self.kdata, self.kdata, forward=True, 
+                    flags=['FFTW_MEASURE'])
+            self._rplan_y = fftw.PencilPlan(self.kdata, self.kdata, forward=False, 
+                    flags=['FFTW_MEASURE'])
+        else:
+            self._fplan_yz = fftw.PlanePlan(self._mdata, self.kdata, com_sys, 
+                    gmshape, forward=True, flags=['FFTW_MEASURE'])
+            self._rplan_yz = fftw.PlanePlan(self._mdata, self.kdata, com_sys, 
+                    gmshape, forward=False, flags=['FFTW_MEASURE'])
+                          
     def fwd_fftw(self):
-        deltay = self.shear_rate * self.sd.time
-        x = (na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False) +
-             na.zeros(self.shape))
-
-        # do y-z fft
-        self.fplan_yz()
-
-        # Phase shift
-        self.data *= na.exp(1j * self.k['y'] * x * deltay)
-        
+    
         # Do x fft
-        self.fplan_x()
-        self.data /= (self.data.size * com_sys.nproc)
+        self._fplan_x()
+        
+        # Phase shift
+        self._mdata *= na.exp(1j * self._phase_rate * self.sd.time)
+           
+        # Do y and z ffts (with MPI transpose)
+        if self.ndim == 2:
+            self._fplan_tr()
+            self._fplan_y()
+        else:
+            self._fplan_yz()
+
+        # Normalize
+        self.kdata /= self.global_shape['xspace'].prod()
 
     def rev_fftw(self):
-        deltay = self.shear_rate * self.sd.time 
-        x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
         
+        # Do y and z iffts (with MPI transpose)
+        if self.ndim == 2:
+            self._rplan_y()
+            self._rplan_tr()
+        else:
+            self._rplan_yz()
+        
+        # Phase shift
+        self._mdata *= na.exp(-1j * self._phase_rate * self.sd.time)
+        
+        # Do x ifft
+        self._rplan_x()
+        
+    def fwd_np(self):
+
         # Do x fft
-        self.rplan_x()
+        self._mdata[:] = fpack.rfft(self.xdata, axis=-1)
+        
+        # Phase shift
+        self._mdata *= na.exp(1j * self._phase_rate * self.sd.time)
+        
+        # Transpose
+        tr = [1, 0, 2][:self.ndim]
+        self.kdata[:] = na.transpose(self._mdata, tr)
+        
+        # Do y and z ffts
+        if self.ndim == 2:
+            self.kdata[:] = fpack.fft(self.kdata, axis=1)
+        else:
+            self.kdata[:] = fpack.fftn(self.kdata, axes=(0,1))
+
+        # Correct numpy normalization
+        self.kdata /= self.global_shape['xspace'].prod()
+
+    def rev_np(self):
+    
+        # Do y and z iffts
+        if self.ndim == 2:
+            self.kdata[:] = fpack.ifft(self.kdata, axis=1)
+        else:
+            self.kdata[:] = fpack.ifftn(self.kdata, axes=(0,1))
+            
+        # Transpose
+        tr = [1, 0, 2][:self.ndim]
+        self._mdata[:] = na.transpose(self.kdata, tr)        
 
         # Phase shift
-        self.data *= na.exp(-1j * self.k['y'] * x * deltay)
+        self._mdata *= na.exp(-1j * self._phase_rate * self.sd.time)
         
-        # Do y-z fft
-        self.rplan_yz()
-        self.data.imag = 0.
-
-    def _update_k(self):
-        """Evolve modes due to shear."""
-
-        self.k['x'] = self.kx - self.shear_rate * self.sd.time * self.k['y']
-        while self.k['x'].min() < -self.kny[-1]:
-            self.k['x'][self.k['x'] < -self.kny[-1]] += 2 * self.kny[-1]
-        while self.k['x'].max() >= self.kny[-1]:
-            self.k['x'][self.k['x'] >= self.kny[-1]] -= 2 * self.kny[-1]
-            
-# class ParallelFourierShearRepresentation(ParallelFourierRepresentation, FourierShearRepresentation):
-#     def __init__(self, sd, shape, length, dtype='complex128', method='fftw',
-#                  dealiasing='2/3 cython'):
-#         ParallelFourierRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
-#         FourierShearRepresentation.__init__(self, sd, shape, length, dtype=dtype, method=method, dealiasing=dealiasing)
-#         self.nproc = com_sys.nproc
-#         self.myproc = com_sys.myproc
-#         self.offset = na.array([0, 0, self.myproc * shape[2]])
-
-#     def fwd_np(self):
-#         """FFT method to go from xspace to kspace."""
+        # Do x ifft
+        self.xdata[:] = fpack.irfft(self._mdata, axis=-1)
         
-#         deltay = self.shear_rate * self.sd.time
-#         x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False)
-
-#         # Do y-z fft
-#         self.data = fpack.fftn(self.data, axes=(0,1))
-
-#         # communicate
-#         recvbuf = self.communicate('forward')
-
-#         # Phase shift
-#         recvbuf *= na.exp(1j * self.k['y'] * x * deltay)
-        
-#         # Do x fft
-#         self.data = fpack.fft(recvbuf, axis=2)
-#         self.data /= (self.data.size * com_sys.nproc)
-
-#     def rev_np(self):
-#         """IFFT method to go from kspace to xspace."""
-#         deltay = self.shear_rate * self.sd.time 
-#         x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
-
-#         # Do x fft
-#         self.data = fpack.ifft(self.data, axis=2)
-        
-#         # Phase shift
-#         self.data *= na.exp(-1j * self.k['y'] * x * deltay)
-
-#         # communicate
-#         recvbuf = self.communicate('backward')
-        
-#         # Do y-z fft
-#         self.data = fpack.ifftn(recvbuf, axes=(0,1))
-#         self.data *= (self.data.size * com_sys.nproc)
-
-#     def fwd_fftw(self):
-#         deltay = self.shear_rate * self.sd.time
-#         x = na.linspace(self.left_edge[-1], self.left_edge[-1] + self._length['kspace'][-1], self._shape['kspace'][-1], endpoint=False)
-
-#         # do y-z fft
-#         self.fplan_yz()
-#         a = self.communicate('forward')
-#         self.data.shape = self._shape['kspace']
-#         self.data[:] = a[:]
-
-#         # Phase shift
-#         self.data *= na.exp(1j * self.k['y'] * x * deltay)
-        
-#         # Do x fft
-#         self.fplan_x()
-#         self.data /= (self.data.size * com_sys.nproc)
-
-#     def rev_fftw(self):
-#         deltay = self.shear_rate * self.sd.time
-#         x = na.linspace(self.left_edge[-1], self.left_edge[-1]+self.length[-1], self.shape[-1], endpoint=False)
-
-#         # Do x fft
-#         self.rplan_x()
-
-#         # Phase shift
-#         self.data *= na.exp(-1j * self.k['y'] * x * deltay)
-        
-#         # Communicate
-#         a = self.communicate('backward')
-#         self.data.shape = self._shape['xspace']
-#         self.data[:] = a[:]
-
-#         # Do y-z fft
-#         self.rplan_yz()
-#         self.data.imag = 0.
+        # Correct numpy normalization
+        self.kdata *= self.global_shape['xspace'].prod()
 
 class SphericalHarmonicRepresentation(FourierRepresentation):
-    """Dedalus should eventually support spherical and cylindrical geometries.
+    """
+    Dedalus should eventually support spherical and cylindrical geometries.
 
     """
+    
     pass
