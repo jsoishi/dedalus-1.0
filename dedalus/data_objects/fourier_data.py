@@ -485,7 +485,7 @@ class FourierRepresentation(Representation):
             else:
                 plane_data = None
                 
-            plane_data = com_sys.comm.scatter(plane_data, root=0)
+            plane_data = com_sys.comm.bcast(plane_data, root=0)
             lstart = self.offset['kspace']
             lstop = self.local_shape['kspace'][0]
             self.kdata[:, :, 0] = plane_data[lstart:lstop, :]
