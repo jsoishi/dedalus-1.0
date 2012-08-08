@@ -173,19 +173,15 @@ def strided_copy(input):
     
     return st.as_strided(input, shape=input.shape, strides=input.strides)
 
-def get_plane(data, field, comp=0, space='xspace', axis='z', index='middle',
+def get_plane(comp, space='xspace', axis='z', index='middle',
               return_position_arrays=True):
     """
     Return 2D slice of data, assembling across processes if needed.
     
     Parameters
     ----------
-    data : StateData object
-        Input data
-    field : str
-        Name of field to assemble
-    comp : int, optional
-        Index of field component to assemble, defaults to 0.
+    comp : Representation object
+        Field component to assemble from.
     space : str, optional
         'xspace' (default) or 'kspace'
     axis : str, optional
@@ -220,14 +216,12 @@ def get_plane(data, field, comp=0, space='xspace', axis='z', index='middle',
         
     Examples
     --------
-    >>> get_plane(data, 'u', 'x', 'kspace', 'x', 0) 
+    >>> get_plane(data['u']['x'], 'kspace', 'x', 0) 
     (global_ux[:, :, 0], 'ky', global_ky, 'kz', global_kz)
         
     """
     
-    # Grab specified component and check space
-    cname = comp
-    comp = data[field][cname]
+    # Check space
     comp.require_space(space)
     
     # Retrieve translation table for requested space
