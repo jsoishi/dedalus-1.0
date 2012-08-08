@@ -25,7 +25,7 @@ License:
 import numpy as na
 from dedalus.utils.parallelism import com_sys
 
-def enforce_hermitian(data, verbose=False):
+def enforce_hermitian(array, verbose=False):
     """
     Make array Hermitian-symmetric about origin (ifftn(data) will be real).  
     Note: this symmetry should propogate from real initial conditions.

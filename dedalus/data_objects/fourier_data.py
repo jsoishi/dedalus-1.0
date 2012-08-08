@@ -27,7 +27,7 @@ import numpy as na
 import numpy.lib.stride_tricks as st
 import numpy.fft as fpack
 from dedalus.config import decfg
-from dedalus.utils.parallelism import com_sys, swap_indices
+from dedalus.utils.parallelism import com_sys, swap_indices, get_plane
 from dedalus.utils.logger import mylog
 from dedalus.utils.fftw import fftw
 from dedalus.utils.timer import Timer
@@ -239,7 +239,7 @@ class FourierRepresentation(Representation):
         else:
             raise ValueError("space must be either xspace or kspace.")
 
-    def find_mode(self, mode):
+    def find_mode(self, mode, exact=False):
         """
         Test if object has a given mode, return index for closest mode if so.
 
@@ -248,6 +248,8 @@ class FourierRepresentation(Representation):
         mode : tuple of ints or floats
             Tuple describing physical wavevector for which to search.  Recall 
             kspace ordering (ky, kz, kx) for 3D, (kx, ky) for 2D.
+        exact : bool
+            Only return index if mode matches exactly (i.e. no binning).
 
         Returns
         -------
@@ -264,8 +266,11 @@ class FourierRepresentation(Representation):
         test = na.ones(self.local_shape['kspace'], dtype=bool)
         for name, kn in self.k.iteritems():
             i = self.ktrans[name]
-            itest = ((kn <= mode[i] + dk[i] / 2.) & 
-                     (kn >  mode[i] - dk[i] / 2.))
+            if exact:
+                itest = (kn == mode[i])
+            else:
+                itest = ((kn <= mode[i] + dk[i] / 2.) & 
+                         (kn >  mode[i] - dk[i] / 2.))
             test *= itest
         
         index = zip(*test.nonzero())
@@ -275,7 +280,7 @@ class FourierRepresentation(Representation):
         elif len(index) == 1:
             return index[0]
         else:
-            raise ValueError("Multiple modes tested true.  This shouldn't happen.")
+            raise ValueError("Multiple modes tested true. This shouldn't happen.")
 
     def set_fft(self, method):
         """Assign fft method."""
@@ -436,6 +441,54 @@ class FourierRepresentation(Representation):
 
         self.require_space('kspace')
         self.data[dmask] = 0.
+        
+    def enforce_hermitian(self):
+        """
+        Enforce Hermitian symmetry, zeroing out Nyquist spaces.  Data with 
+        (kx == 0) & (ky < 0) or (kx, ky == 0) & (kz < 0) will be overwritten 
+        with the complex conjugate of its Hermitian pair.
+        
+        """
+        
+        # Zero Nyquist spaces
+        self.require_space('kspace')
+        self.zero_nyquist()
+        
+        if self.ndim == 2:
+            # Enforce along kx=0 pencil, which is local to one process
+            zindex = self.find_mode((0, 0), exact=True)
+            if zindex:
+                self.data[0, 0] = self.data[0, 0].real
+                nyindex = self.local_shape['kspace'][1] / 2
+                grab = self.data[0, 1:nyindex + 1]
+                self.data[0, -nyindex:] = grab[::-1].conj()
+        else:
+            # Gather kx=0 plane from across processes
+            proc_data = self.kdata[:, :, 0]
+            gathered_data = com_sys.comm.gather(proc_data, root=0)
+                    
+            if com_sys.myproc == 0:
+                plane_data = na.concatenate(gathered_data)
+                nyy, nyz = na.array(plane_data.shape) / 2
+                
+                # Enforce along ky=0 pencil
+                grab = plane_data[0, 1:nyz + 1]
+                plane_data[0, -nyz:] = grab[::-1].conj()
+                
+                # Enforce along kz=0 pencil
+                grab = plane_data[1:nyy + 1, 0]
+                plane_data[-nyy:, 0] = grab[::-1].conj()
+                
+                # Enforce on ky < 0 side of plane
+                grab = plane_data[1:nyy + 1, 1:]
+                plane_data[-nyy:, 1:] = grab[::-1, ::-1].conj()
+            else:
+                plane_data = None
+                
+            plane_data = com_sys.comm.scatter(plane_data, root=0)
+            lstart = self.offset['kspace']
+            lstop = self.local_shape['kspace'][0]
+            self.kdata[:, :, 0] = plane_data[lstart:lstop, :]
 
     def zero_under_eps(self):
         """Zero out any modes with coefficients smaller than machine epsilon."""

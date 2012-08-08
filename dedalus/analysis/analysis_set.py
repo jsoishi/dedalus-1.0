@@ -141,12 +141,11 @@ class Snapshot(AnalysisTask):
                 
                 # Retrieve correct slice
                 if axnum == 0:
-                    plane_data, outindex, namex, x, namey, y = get_plane(data, 
-                        fname, cindex, space=space, axis=axis, index=index)
+                    plane_data, outindex, namex, x, namey, y = get_plane(comp, 
+                            space=space, axis=axis, index=index)
                 else:
-                    plane_data, outindex = get_plane(data, fname, cindex,
-                            space=space, axis=axis, index=index,
-                            return_position_arrays=False)
+                    plane_data, outindex = get_plane(comp, space=space, axis=axis, 
+                            index=index, return_position_arrays=False)
 
                 if com_sys.myproc == 0:
                     # kspace: take logarithm of magnitude, flooring at eps
