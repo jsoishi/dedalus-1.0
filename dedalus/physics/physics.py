@@ -1193,7 +1193,7 @@ class BaryonCDMCosmology(Physics):
         
 if __name__ == "__main__":
     import pylab as P
-    from fourier_data import FourierData
+    from representations import FourierData
     from init_cond import taylor_green
     a = Hydro((100,100),FourierData)
     data = a.create_fields(0.)
