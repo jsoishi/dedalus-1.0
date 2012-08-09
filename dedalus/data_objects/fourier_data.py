@@ -454,7 +454,7 @@ class FourierRepresentation(Representation):
         lsh = self.local_shape['xspace']
         offset = self.offset['xspace']
 
-        x, y = na.meshgrid(na.r_[0:lsh[1]]*2*na.pi/gsh[1],na.r_[offset:lsh[0]+offset]*2*na.pi/gsh[0])
+        x, y = na.meshgrid(na.r_[0:lsh[1]]*self.length[-1]/gsh[-1],na.r_[offset:lsh[0]+offset]*self.length[0]/gsh[0])
         return x, y
 
 
