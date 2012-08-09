@@ -47,7 +47,7 @@ from dedalus.init_cond.api import \
     turb_new, \
     mcwilliams_spec, \
     MIT_vortices, \
-    shearing_wave, \
+    vorticity_wave, \
     collisionless_cosmo_fields, \
     cosmo_fields, \
     cosmo_spectra, \

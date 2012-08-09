@@ -28,7 +28,7 @@ from .init_cond import \
     turb, \
     turb_new, \
     MIT_vortices, \
-    shearing_wave, \
+    vorticity_wave, \
     collisionless_cosmo_fields, \
     cosmo_fields, \
     cosmo_spectra, \
