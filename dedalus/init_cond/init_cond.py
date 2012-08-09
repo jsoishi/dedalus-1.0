@@ -407,25 +407,33 @@ def MIT_vortices(data):
     data['u']['x']['kspace'] = aux['psi'].deriv('y')
     data['u']['y']['kspace'] = -aux['psi'].deriv('x')
 
-def shearing_wave(data, wampl, kinit):
-    """Lithwick (2007) 2D shearing wave. 
-
-    inputs
-    ------
-    data -- data object
-    wampl -- z vorticity amplitude
-    kinit -- initial wave vector in index space
+def vorticity_wave(data, mode, w_amp):
     """
+    Initialize vorticity wave 
+
+    Parameters
+    ----------
+    data : StateData object
+        Dataset
+    mode : tuple of floats
+        Wavevector
+    w_amp : complex
+        Complex z-vorticity amplitude for specified mode
+
+    """
+    
     aux = data.clone()
     aux.add_field('w','ScalarField')
     aux.add_field('psi','ScalarField')
     
-    if kinit is not None:
-        aux['w']['kspace'][tuple(kinit)] = wampl / 2.
-        
-        #cos_k(aux['w']['kspace'],kinit,ampl=wampl)
-        aux['psi']['kspace'] = aux['w']['kspace']/aux['w'].k2(no_zero=True)
-    
+    index0 = data['u']['x'].find_mode(mode)
+    if index0:
+        aux['w']['kspace'][index0] = w_amp / 2.
+    index1 = data['u']['x'].find_mode(-1 * na.array(mode))
+    if index1:
+        aux['w']['kspace'][index1] = na.conj(w_amp.conj) / 2.
+    if index0 or index1
+        aux['psi']['kspace'] = aux['w']['kspace'] / aux['w'].k2(no_zero=True)
         data['u']['x']['kspace'] = aux['psi'].deriv('y')
         data['u']['y']['kspace'] = -aux['psi'].deriv('x')
 
