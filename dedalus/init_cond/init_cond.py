@@ -28,7 +28,6 @@ from dedalus.utils.parallelism import com_sys, pickle
 from dedalus.utils.logger import mylog
 from dedalus.funcs import insert_ipython
 import numpy as na
-from dedalus.data_objects import hermitianize
 from dedalus.utils.misc_numeric import find_zero, integrate_quad, interp_linear
 from dedalus.analysis.volume_average import volume_average
 def taylor_green(data):

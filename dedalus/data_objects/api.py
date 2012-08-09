@@ -30,9 +30,6 @@ from .state_data import \
 from .representations import \
     FourierRepresentation, \
     FourierShearRepresentation
-
-from .hermitianize import \
-    enforce_hermitian
     
 from .aux_equation import \
     AuxEquation
