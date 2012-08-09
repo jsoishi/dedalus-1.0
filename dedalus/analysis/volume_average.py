@@ -144,7 +144,7 @@ def mode_track(data, k=(1, 0, 0)):
     return 0.
 
 @VolumeAverageSet.register_task
-def enstrophy(data):
+def enstrophy(data, space='kspace'):
     """compute enstrophy 
 
     HARDCODED FOR 2D CARTESIAN ONLY!
@@ -153,10 +153,9 @@ def enstrophy(data):
     #aux = data.__class__(['vortz'],data.time)
     aux = data.clone()
     aux.add_field('vortz', 'ScalarField')
-    aux['vortz']['kspace'] = data['u']['y'].deriv('x') - data['u']['x'].deriv('y')
-    
-    enstrophy = (aux['vortz']['xspace']**2).real
-    return enstrophy.mean()
+    aux['vortz']['kspace'] = abs((data['u']['y'].deriv('x') - data['u']['x'].deriv('y'))**2)
+
+    return volume_average(aux['vortz'],space='kspace')
 
 @VolumeAverageSet.register_task
 def vort_cenk(data):
