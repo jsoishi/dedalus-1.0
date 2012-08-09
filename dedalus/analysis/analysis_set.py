@@ -32,14 +32,9 @@ import matplotlib.pyplot as P
 from mpl_toolkits.axes_grid1 import AxesGrid
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
-
-
 import numpy as na
-import numpy.lib.stride_tricks as st
 import os
-from functools import wraps
-from dedalus.config import decfg
-from dedalus.utils.parallelism import com_sys, get_plane, strided_copy
+from dedalus.utils.parallelism import com_sys, get_plane
 from dedalus.utils.logger import mylog
 
 class AnalysisSet(object):
@@ -132,7 +127,7 @@ class Snapshot(AnalysisTask):
                 os.mkdir('frames')
     
     def run(self, data, it, space='xspace', axis='z', index='middle', 
-            aspect='auto', units=True, **kwargs):
+            aspect='auto', units=True):
 
         # Plot field components
         for row, (fname, field) in enumerate(data):
@@ -298,6 +293,160 @@ class Snapshot(AnalysisTask):
             self.grid[axnum].set_xlabel(namex)
         if cindex == 0:
             self.grid[axnum].set_ylabel(namey)                    
+
+class TrackMode(AnalysisTask):
+    """
+    Record complex amplitude of specified modes.
+    
+    Keywords
+    --------
+    fieldlist : None or list of strings
+        List containing names of fields to track: ['u', ...]. If None, all fields
+        in data will be tracked.
+    modelist : list of tuples of floats
+        List containing physical wavevectors to track: [(0., 0., -3.), ...]
+    indexlist : None or list of tuples of ints
+        List containing local kspace indices to track : [(1, 0, 0), ...]
+        None should be passed to all processors without the desired mode.
+    
+    Notes
+    -----        
+    Keep in mind that for parallelism the data layouts in k-space when specifying
+    modes and indices:
+
+    In 3D: y, z, x
+    In 2D: x, y
+    
+    """
+    
+    def setup(self, data, it, fieldlist=None, modelist=[], indexlist=[]):
+    
+        if fieldlist is None:
+            fieldlist = data.fields.keys()
+                              
+        # Construct string defining columns
+        if com_sys.myproc == 0:
+            columnnames = 'time'
+            for mode in modelist:
+                columnnames += '\t' + str(list(mode))
+        for index in indexlist:
+            if index is None:
+                column = ''
+            else:
+                gindex = (index[0] + data['u']['x'].offset['kspace'],) + index[1:]
+                column = str(gindex)
+            column = com_sys.comm.reduce(column, root=0)
+            if com_sys.myproc == 0:
+                columnnames += '\t' + column
+
+        if com_sys.myproc == 0:
+            # Create file for each field component
+            for fname in fieldlist:
+                field = data[fname]
+                for cindex, comp in field:
+                    name = fname + field.ctrans[cindex]
+                    outfile = open('%s_mode_amplitudes.dat' %name, 'w')
+                    outfile.write("# Dedalus Mode Amplitudes\n")
+                    outfile.write(columnnames)
+                    outfile.write('\n')
+                    outfile.close()
+
+    def run(self, data, it, fieldlist=None, modelist=[], indexlist=[]):
+            
+        if fieldlist is None:
+            fieldlist = data.fields.keys()
+            
+        for fname in fieldlist:
+            field = data[fname]
+            for cindex, comp in field:
+
+                # Retrieve file
+                if com_sys.myproc == 0:
+                    amplitudes = []
+                    name = fname + field.ctrans[cindex]
+                    outfile = open('%s_mode_amplitudes.dat' %name, 'a')
+                
+                # Gather mode amplitudes
+                for mode in modelist:
+                    index = comp.find_mode(mode)
+                    if index:
+                        amp = comp['kspace'][index]
+                    else:
+                        amp = 0.
+                    amp = com_sys.comm.reduce(amp, root=0)
+                    if com_sys.myproc == 0:
+                        amplitudes.append(amp)
+
+                # Gather index amplitudes
+                for index in indexlist:
+                    if index is None:
+                        amp = 0.
+                    else:
+                        amp = comp['kspace'][index]
+                    amp = com_sys.comm.reduce(amp, root=0)
+                    if com_sys.myproc == 0:
+                        amplitudes.append(amp)
+                
+                # Write
+                if com_sys.myproc == 0:
+                    tstring = '%s\t' %data.time
+                    ampstring = '\t'.join([repr(amp) for amp in amplitudes])
+                    outfile.write(tstring + ampstring)
+                    outfile.write('\n')
+                    outfile.close()
+                    
+                    
+                    
+                    
+                    
+                    
+#                     
+#                     
+#         if it == 0:
+#             # Construct container on first pass
+#             data._save_modes = {}
+#     
+#             for f in flist:
+#                 for i in xrange(data[f].ncomp):
+#                     for k in klist:
+#                         data._save_modes[(f,i,k)] = [data[f][i]['kspace'][k[::-1]]]
+#             data._save_modes['time'] = [data.time]
+#             return
+#             
+#         # Save components and time
+#         for f in flist:
+#             for i in xrange(data[f].ncomp):
+#                 for k in klist:
+#                     data._save_modes[(f,i,k)].append(data[f][i]['kspace'][k[::-1]])
+#         data._save_modes['time'].append(data.time)
+#     
+#         # Plot field components
+#         time = na.array(data._save_modes['time'])
+#             
+#         for j,f in enumerate(flist):
+#             for i in xrange(data[f].ncomp):
+#                 for k in klist:
+#                     plot_array = na.array(data._save_modes[(f,i,k)])
+#                     power = 0.5 * na.abs(plot_array) ** 2
+#                     
+#                     if log:
+#                         axs[j, i].semilogy(time, power, '.-', label=str(k))
+#                     else:
+#                         axs[j, i].plot(time, power, '.-', label=str(k))   
+#         
+#                 # Pad and label axes
+#                 axs[j, i].axis(padrange(axs[j, i].axis(), 0.05))
+#                 axs[j, i].legend()
+#                 axs[j, i].set_title(f + str(i))
+#                                 
+#     
+#         axs[-1, 0].set_ylabel('power')
+#         axs[-1, 0].set_xlabel('time')
+#     
+#         outfile = "frames/mode_track.png"
+#         fig.savefig(outfile)
+#         fig.clf()
+#         
 
 
 
@@ -482,120 +631,3 @@ class Snapshot(AnalysisTask):
 #     outfile = "frames/cmpspec_%s_%s_%04i.png" %(f1, f2, it)
 #     P.savefig(outfile)
 #     P.clf()
-#     
-# @AnalysisSet.register_task
-# def mode_track(data, it, flist=[], klist=[], log=True, write=True):
-#     """
-#     Plot amplification of specified modes.
-#     
-#     Inputs:
-#         data        Data object
-#         it          Iteration number
-#         flist       List of fields to track: ['u', ...]
-#         klist       List of wavevectors given as tuples: [(1,0,0), (1,1,1), ...]
-#         log         (default True) plot a log-log plot
-#         write       (default False) do not plot; instead write to mode tracking files.
-#     """
-#     if write:
-#         for f in flist:
-#             for i in xrange(data[f].ncomp):
-#                 if com_sys.myproc == 0:
-#                     outfile = open('mode_amplitudes_%s_%i.dat' % (f, i), 'a')
-#                     amplitudes = []
-#                 for k in klist:
-#                     if data[f][i].find_mode(k):
-#                         kampl = data[f][i]['kspace'][k]
-#                     else:
-#                         kampl = 0.
-#                     try:
-#                         tot_kampl = com_sys.comm.reduce(kampl,root=0)
-#                     except AttributeError:
-#                         pass
-# 
-#                     if com_sys.myproc == 0:
-#                         amplitudes.append(abs(tot_kampl))
-#                     
-#                 if com_sys.myproc == 0:
-#                     if it == 0:
-#                         outfile.write("# Dedalus Mode Amplitudes\n")
-#                         outfile.write("# Column 0: time\n")
-#                         for nk,k in enumerate(klist):
-#                             outfile.write("# Column %i: %s\n" % (nk, na.array(k)))
-#                     outstring = '\t'.join([str(i) for i in amplitudes])
-#                     outfile.write("%s\t%s\n" % (data.time,outstring))
-#                     outfile.close()
-#                 
-#         return
-#     if it == 0:
-#         # Construct container on first pass
-#         data._save_modes = {}
-# 
-#         for f in flist:
-#             for i in xrange(data[f].ncomp):
-#                 for k in klist:
-#                     data._save_modes[(f,i,k)] = [data[f][i]['kspace'][k[::-1]]]
-#         data._save_modes['time'] = [data.time]
-#         return
-#         
-#     # Save components and time
-#     for f in flist:
-#         for i in xrange(data[f].ncomp):
-#             for k in klist:
-#                 data._save_modes[(f,i,k)].append(data[f][i]['kspace'][k[::-1]])
-#     data._save_modes['time'].append(data.time)
-#     
-#     # Determine image grid size
-#     nrow = len(flist)
-#     ncol = na.max([data[f].ncomp for f in flist])
-#     fig, axs = P.subplots(nrow, ncol, num=3, figsize=(8 * ncol, 6 * nrow)) 
-# 
-#     # Plot field components
-#     time = na.array(data._save_modes['time'])
-#         
-#     for j,f in enumerate(flist):
-#         for i in xrange(data[f].ncomp):
-#             for k in klist:
-#                 plot_array = na.array(data._save_modes[(f,i,k)])
-#                 power = 0.5 * na.abs(plot_array) ** 2
-#                 
-#                 if log:
-#                     axs[j, i].semilogy(time, power, '.-', label=str(k))
-#                 else:
-#                     axs[j, i].plot(time, power, '.-', label=str(k))   
-#     
-#             # Pad and label axes
-#             axs[j, i].axis(padrange(axs[j, i].axis(), 0.05))
-#             axs[j, i].legend()
-#             axs[j, i].set_title(f + str(i))
-#                             
-# 
-#     axs[-1, 0].set_ylabel('power')
-#     axs[-1, 0].set_xlabel('time')
-# 
-#     if not os.path.exists('frames'):
-#         os.mkdir('frames')
-#     outfile = "frames/mode_track.png"
-#     fig.savefig(outfile)
-#     fig.clf()
-#     
-
-    
-def padrange(range, pad=0.1):
-    """Pad a list of the form [x0, x1, y0, y1] by specified fraction."""
-    
-    if pad == 0.:
-        return range
-    
-    xmin, xmax, ymin, ymax = range
-    dx = xmax - xmin
-    dy = ymax - ymin
-    if dx == 0: dx = 1.
-    if dy == 0: dy = 1.
-    outrange = [xmin - pad * dx,
-                xmax + pad * dx,
-                ymin - pad * dy,
-                ymax + pad * dy]
-                
-    return outrange
-    
-     
