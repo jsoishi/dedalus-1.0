@@ -27,7 +27,7 @@ License:
 import weakref
 import numpy as na
 from dedalus.utils.logger import mylog
-from dedalus.data_objects.fourier_data import \
+from dedalus.data_objects.representations import \
     FourierRepresentation, \
     FourierShearRepresentation
 

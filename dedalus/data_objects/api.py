@@ -21,13 +21,13 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from .field_object import \
+from .fields import \
     create_field_classes
 
 from .state_data import \
     StateData
 
-from .fourier_data import \
+from .representations import \
     FourierRepresentation, \
     FourierShearRepresentation
 
