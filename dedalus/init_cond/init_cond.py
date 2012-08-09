@@ -431,7 +431,7 @@ def vorticity_wave(data, mode, w_amp):
     index1 = data['u']['x'].find_mode(-1 * na.array(mode))
     if index1:
         aux['w']['kspace'][index1] = na.conj(w_amp.conj) / 2.
-    if index0 or index1
+    if index0 or index1:
         aux['psi']['kspace'] = aux['w']['kspace'] / aux['w'].k2(no_zero=True)
         data['u']['x']['kspace'] = aux['psi'].deriv('y')
         data['u']['y']['kspace'] = -aux['psi'].deriv('x')

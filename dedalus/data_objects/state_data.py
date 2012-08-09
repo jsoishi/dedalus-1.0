@@ -30,7 +30,7 @@ import numpy as na
 from dedalus.funcs import get_mercurial_changeset_id
 from dedalus.utils.api import Timer
 from dedalus.utils.logger import mylog
-from field_object import create_field_classes
+from fields import create_field_classes
 
 def _reconstruct_data(*args, **kwargs):
     arg1 = args[1]
