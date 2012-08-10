@@ -522,6 +522,8 @@ class MHD(Hydro):
                        ('B', 'VectorField')]
         self._aux_fields = [('Ptotal', 'VectorField'),
                             ('mathtmp', 'ScalarField'),
+                            ('ucopy','VectorField'),
+                            ('Bcopy','VectorField'),
                             ('ugradu', 'VectorField'),
                             ('BgradB', 'VectorField'),
                             ('ugradB', 'VectorField'),
@@ -559,12 +561,14 @@ class MHD(Hydro):
         ugradB = self.aux_fields['ugradB']
         Bgradu = self.aux_fields['Bgradu']
         Ptotal = self.aux_fields['Ptotal']
+        ucopy = self.aux_fields['ucopy']
+        Bcopy = self.aux_fields['Bcopy']
         pr4 = 4 * na.pi * self.parameters['rho0']
         k2 = data['u']['x'].k2()
         
         # Compute terms
-        self.XlistgradY([u, B], u, mathtmp, [ugradu, Bgradu])
-        self.XlistgradY([u, B], B, mathtmp, [ugradB, BgradB])
+        self.XlistgradY([u, B], u, mathtmp, [ucopy, Bcopy], [ugradu, Bgradu])
+        self.XlistgradY([u, B], B, mathtmp, [ucopy, Bcopy], [ugradB, BgradB])
         self.total_pressure(data)
         
         # Construct time derivatives
