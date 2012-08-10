@@ -20,15 +20,16 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 from dedalus.mods import *
 
-shape = (450,450)
+shape = (450, 450)
 RHS = Hydro(shape, FourierRepresentation, visc_order=2)
-RHS.parameters['nu'] = 3.5e-9 
+RHS.parameters['nu'] = 3.5e-9
 data = RHS.create_fields(0.)
 
-turb_new(data, mcwilliams_spec,k0=30., E0=1.)
-ti = RK2simplevisc(RHS,CFL=0.4)
+turb_new(data, mcwilliams_spec, k0=30., E0=1.)
+ti = RK2simplevisc(RHS, CFL=0.4)
 ti.stop_time(1.) # set stoptime
 ti.stop_walltime(36000.) # stop after 10 hours
 
@@ -43,13 +44,16 @@ vs.add("enstrophy","%10.5e", options={'space': 'xspace'})
 vs.add("vort_cenk","%10.5e")
 
 an = AnalysisSet(data, ti)
-an.add(Snapshot(100))
+#an.add(Snapshot(10, space='kspace'))
+#an.add(Snapshot(5, space='kspace', units=False))
+an.add(Snapshot(10, space='xspace'))
+#an.add(Snapshot(5, space='xspace', units=False))
 # an.add("en_spec",100, {'loglog': True})
 # an.add("en_spec",10)
 # an.add("volume_average",10,{'va_obj': vs})
 
 #main loop
-dt = 2.5e-3
+dt = 1e-3
 an.run()
 while ti.ok:
     ti.advance(data, dt)
