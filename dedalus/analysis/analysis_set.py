@@ -171,7 +171,7 @@ class Snapshot(AnalysisTask):
                         if self._moves:
                             self.update_patches(axnum, x, y, plane_data, units, space)
                         else:
-                            self.update_image(axnum, plane_data)
+                            self.update_image(axnum, plane_data, namex, namey, space, units)
                               
         if com_sys.myproc == 0:
             # Add time to figure title
@@ -248,7 +248,11 @@ class Snapshot(AnalysisTask):
            
         # Update values and colorbar     
         pc.set_array(na.ma.ravel(plane_data))
-        pc.set_clim(plane_data.min(), plane_data.max())
+        if space == 'kspace':
+            pc.set_clim(plane_data.min(), plane_data.max())
+        else:
+            lim = np.max(np.abs([plane_data.min(), plane_data.max()]))
+            pc.set_clim(-lim, lim)
         
     def add_image(self, axnum, x, y, plane_data, units, space, comp, namex, namey):
 
@@ -257,18 +261,14 @@ class Snapshot(AnalysisTask):
             if space == 'kspace':
                 dx = x[0, 1] - x[0, 0]
                 dy = y[1, 0] - y[0, 0]
+                extent = [x.min() - dx / 2., x.max() + dx / 2., 
+                          y.min() - dy / 2.,y.max() + dy / 2.]
                           
-                # Extend to Nyquist mode even if not present
-                nyx = comp.kny[comp.ktrans[namex[1]]]
-                nyy = comp.kny[comp.ktrans[namey[1]]]
-                if namex == 'kx':
-                    xsq = na.array([0, nyx, nyx, 0, 0])
-                    ysq = na.array([nyy, nyy, -nyy, -nyy, nyy])
-                else:
-                    xsq = na.array([-nyx, nyx, nyx, -nyx, -nyx])
-                    ysq = na.array([nyy, nyy, -nyy, -nyy, nyy])
-                extent = [xsq[0] - dx / 2., xsq[1] + dx / 2., 
-                          ysq[2] - dy / 2., ysq[0] + dy / 2.]
+                # Roll array
+                if namey != 'kx':
+                    plane_data = na.roll(plane_data, -(plane_data.shape[0] / 2 + 1), axis=0)
+                if namex != 'kx':
+                    plane_data = na.roll(plane_data, -(plane_data.shape[1] / 2 + 1), axis=1)
             else:
                 xlen = comp.length[comp.xtrans[namex]]
                 ylen = comp.length[comp.xtrans[namey]]
@@ -285,14 +285,25 @@ class Snapshot(AnalysisTask):
         # Store for updating        
         self.images[axnum] = im
         
-    def update_image(self, axnum, plane_data):
+    def update_image(self, axnum, plane_data, namex, namey, space, units):
     
         # Retrieve image
         im = self.images[axnum]
-           
+        
+        if units and space == 'kspace':
+            # Roll array
+            if namey != 'kx':
+                plane_data = na.roll(plane_data, -(plane_data.shape[0] / 2 + 1), axis=0)
+            if namex != 'kx':
+                plane_data = na.roll(plane_data, -(plane_data.shape[1] / 2 + 1), axis=1)
+       
         # Update values and colorbar     
         im.set_array(plane_data)
-        im.set_clim(plane_data.min(), plane_data.max())
+        if space == 'kspace':
+            im.set_clim(plane_data.min(), plane_data.max())
+        else:
+            lim = na.max(na.abs([plane_data.min(), plane_data.max()]))
+            im.set_clim(-lim, lim)
         
     def add_lines(self, axnum, x, y, plane_data, units, space, comp, namex, namey):
         
