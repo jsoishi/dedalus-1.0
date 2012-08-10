@@ -88,16 +88,24 @@ class Snapshot(AnalysisTask):
     index : int or string, optional
         Index for slicing as an integer, or 'top', 'middle' (default), or 'bottom'.
         Ignored for 2D data.
-    aspect : str
-        'auto' stretches image to match axis
-        'equal' stretches axis to match image
     units : boolean
         True for physical-space layout and units.
         False for array-based layout and indexing.
 
     """
     
-    def setup(self, data, it, **kwargs):
+    def setup(self, data, it, space='xspace', units=True, **kwargs):
+    
+        # Determine if moving patches are required
+        if units and space == 'kspace' and hasattr(data['u']['x'], '_ky'):
+            self._moves = True
+            if com_sys.myproc == 0:
+                self.patch_lists = {}
+                self.patch_collections = {}
+        else:
+            self._moves = False
+            if com_sys.myproc == 0:
+                self.images = {}
     
         # Determine grid size
         self.nrows = len(data.fields.keys())
@@ -108,8 +116,6 @@ class Snapshot(AnalysisTask):
 
             # Create figure and axes grid
             self.firstplot = True
-            self.patch_lists = {}
-            self.patch_collections = {}
             self.fig = P.figure(self._n, figsize=(8 * self.ncols, 8 * self.nrows))
             self.fig.clear()
             self.grid = AxesGrid(self.fig, 111,
@@ -126,8 +132,7 @@ class Snapshot(AnalysisTask):
             if not os.path.exists('frames'):
                 os.mkdir('frames')
     
-    def run(self, data, it, space='xspace', axis='z', index='middle', 
-            aspect='auto', units=True):
+    def run(self, data, it, space='xspace', axis='z', index='middle', units=True):
 
         # Plot field components
         for row, (fname, field) in enumerate(data):
@@ -153,13 +158,20 @@ class Snapshot(AnalysisTask):
     
                     # Plot
                     if self.firstplot:
-                        self.add_patches(axnum, x, y, plane_data, units, space)
+                        if self._moves:
+                            self.add_patches(axnum, x, y, plane_data, units, space)
+                        else:
+                            self.add_image(axnum, x, y, plane_data, units, space, 
+                                    comp, namex, namey)
                         self.add_lines(axnum, x, y, plane_data, units, space, 
                                 comp, namex, namey)
                         self.add_labels(axnum, fname, field.ctrans[cindex],
                                 namex, namey, row, cindex, units)
                     else:
-                        self.update_patches(axnum, x, y, plane_data, units, space)
+                        if self._moves:
+                            self.update_patches(axnum, x, y, plane_data, units, space)
+                        else:
+                            self.update_image(axnum, plane_data)
                               
         if com_sys.myproc == 0:
             # Add time to figure title
@@ -238,13 +250,56 @@ class Snapshot(AnalysisTask):
         pc.set_array(na.ma.ravel(plane_data))
         pc.set_clim(plane_data.min(), plane_data.max())
         
+    def add_image(self, axnum, x, y, plane_data, units, space, comp, namex, namey):
+
+        # Construct image
+        if units:
+            if space == 'kspace':
+                dx = x[0, 1] - x[0, 0]
+                dy = y[1, 0] - y[0, 0]
+                          
+                # Extend to Nyquist mode even if not present
+                nyx = comp.kny[comp.ktrans[namex[1]]]
+                nyy = comp.kny[comp.ktrans[namey[1]]]
+                if namex == 'kx':
+                    xsq = na.array([0, nyx, nyx, 0, 0])
+                    ysq = na.array([nyy, nyy, -nyy, -nyy, nyy])
+                else:
+                    xsq = na.array([-nyx, nyx, nyx, -nyx, -nyx])
+                    ysq = na.array([nyy, nyy, -nyy, -nyy, nyy])
+                extent = [xsq[0] - dx / 2., xsq[1] + dx / 2., 
+                          ysq[2] - dy / 2., ysq[0] + dy / 2.]
+            else:
+                xlen = comp.length[comp.xtrans[namex]]
+                ylen = comp.length[comp.xtrans[namey]]
+                extent = [0, xlen, 0, ylen]
+        else:
+            extent = None
+        
+        cmap = matplotlib.cm.Spectral_r
+        cmap.set_bad('0.7')
+        im = self.grid[axnum].imshow(plane_data, cmap=cmap, zorder=1, aspect='auto', 
+                interpolation='nearest', origin='lower', extent=extent)
+        self.grid.cbar_axes[axnum].colorbar(im)
+
+        # Store for updating        
+        self.images[axnum] = im
+        
+    def update_image(self, axnum, plane_data):
+    
+        # Retrieve image
+        im = self.images[axnum]
+           
+        # Update values and colorbar     
+        im.set_array(plane_data)
+        im.set_clim(plane_data.min(), plane_data.max())
+        
     def add_lines(self, axnum, x, y, plane_data, units, space, comp, namex, namey):
         
-        if units:
-            dx = x[0, 1] - x[0, 0]
-            dy = y[1, 0] - y[0, 0]
-            
+        if units:            
             if space == 'kspace':
+                dx = x[0, 1] - x[0, 0]
+                dy = y[1, 0] - y[0, 0]
             
                 # Zero lines
                 self.grid[axnum].axhline(0, c='k', zorder=2, lw=2)

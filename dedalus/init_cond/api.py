@@ -29,11 +29,7 @@ from .init_cond import \
     turb_new, \
     MIT_vortices, \
     vorticity_wave, \
-    collisionless_cosmo_fields, \
-    cosmo_fields, \
-    cosmo_spectra, \
     alfven, \
-    zeldovich, \
     kida_vortex
 
 from .turb_spectra import \
