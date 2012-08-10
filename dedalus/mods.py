@@ -48,11 +48,7 @@ from dedalus.init_cond.api import \
     mcwilliams_spec, \
     MIT_vortices, \
     vorticity_wave, \
-    collisionless_cosmo_fields, \
-    cosmo_fields, \
-    cosmo_spectra, \
     alfven, \
-    zeldovich, \
     kida_vortex
 
 from dedalus.physics.api import \

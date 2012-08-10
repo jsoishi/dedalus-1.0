@@ -43,10 +43,10 @@ vs.add("enstrophy","%10.5e", options={'space': 'xspace'})
 vs.add("vort_cenk","%10.5e")
 
 an = AnalysisSet(data, ti)
-an.add("field_snap", 100)
-an.add("en_spec",100, {'loglog': True})
-an.add("en_spec",10)
-an.add("volume_average",10,{'va_obj': vs})
+an.add(Snapshot(100))
+# an.add("en_spec",100, {'loglog': True})
+# an.add("en_spec",10)
+# an.add("volume_average",10,{'va_obj': vs})
 
 #main loop
 dt = 2.5e-3
