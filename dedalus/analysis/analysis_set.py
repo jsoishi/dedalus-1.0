@@ -251,7 +251,7 @@ class Snapshot(AnalysisTask):
         if space == 'kspace':
             pc.set_clim(plane_data.min(), plane_data.max())
         else:
-            lim = np.max(np.abs([plane_data.min(), plane_data.max()]))
+            lim = na.max(na.abs([plane_data.min(), plane_data.max()]))
             pc.set_clim(-lim, lim)
         
     def add_image(self, axnum, x, y, plane_data, units, space, comp, namex, namey):
