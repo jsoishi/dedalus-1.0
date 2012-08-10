@@ -483,7 +483,7 @@ class BoussinesqHydro(Hydro):
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'nu': 0., 'rho0': 1., 'kappa': 0., 'g': 1.,
-                  'alpha_t': 1., 'T0': 0., 'beta': 1.}
+                  'alpha_t': 1., 'beta': 1.}
         self._setup_parameters(params)
         self._finalized = False
 
@@ -502,7 +502,6 @@ class BoussinesqHydro(Hydro):
         # Place references
         g = self.parameters['g']
         alpha_t = self.parameters['alpha_t']
-        T0 = self.parameters['T0']
         beta = self.parameters['beta']
 
         u = data['u']
@@ -513,7 +512,7 @@ class BoussinesqHydro(Hydro):
         # Compute terms
 
         # add buoyancy term
-        self._RHS['u']['z']['kspace'] += g * alpha_t * (T['kspace'] - T0)
+        self._RHS['u']['z']['kspace'] += g * alpha_t * T['kspace']
 
         # temperature equation
         self.XlistgradY([u], T, mathtmp, [Tcopy], [ugradT])
@@ -550,6 +549,8 @@ class MHD(Hydro):
                        ('B', 'VectorField')]
         self._aux_fields = [('Ptotal', 'VectorField'),
                             ('mathtmp', 'ScalarField'),
+                            ('ucopy','VectorField'),
+                            ('Bcopy','VectorField'),
                             ('ugradu', 'VectorField'),
                             ('BgradB', 'VectorField'),
                             ('ugradB', 'VectorField'),
@@ -587,12 +588,14 @@ class MHD(Hydro):
         ugradB = self.aux_fields['ugradB']
         Bgradu = self.aux_fields['Bgradu']
         Ptotal = self.aux_fields['Ptotal']
+        ucopy = self.aux_fields['ucopy']
+        Bcopy = self.aux_fields['Bcopy']
         pr4 = 4 * na.pi * self.parameters['rho0']
         k2 = data['u']['x'].k2()
         
         # Compute terms
-        self.XlistgradY([u, B], u, mathtmp, [ugradu, Bgradu])
-        self.XlistgradY([u, B], B, mathtmp, [ugradB, BgradB])
+        self.XlistgradY([u, B], u, mathtmp, [ucopy, Bcopy], [ugradu, Bgradu])
+        self.XlistgradY([u, B], B, mathtmp, [ucopy, Bcopy], [ugradB, BgradB])
         self.total_pressure(data)
         
         # Construct time derivatives
