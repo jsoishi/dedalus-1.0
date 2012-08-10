@@ -24,7 +24,8 @@ License:
 from .analysis_set import \
     AnalysisSet, \
     Snapshot, \
-    TrackMode
+    TrackMode, \
+    VolumeAverage
 
 from .volume_average import \
     VolumeAverageSet

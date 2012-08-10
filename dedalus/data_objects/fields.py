@@ -186,6 +186,8 @@ class ScalarFieldBase(BaseField):
     def __init__(self, sd):
         ncomp = 1
         BaseField.__init__(self, sd, ncomp)
+        
+        self.ctrans = {'': 0, 0:''}
 
     def __getitem__(self, item):
         """

@@ -74,7 +74,7 @@ class AnalysisTask(object):
         
 class Snapshot(AnalysisTask):
     """
-    Take image snapshot of data in array configuration.
+    Save image of specified plane in data.
     
     Keywords
     --------
@@ -362,7 +362,7 @@ class Snapshot(AnalysisTask):
 
 class TrackMode(AnalysisTask):
     """
-    Record complex amplitude of specified modes.
+    Record complex amplitude of specified modes to text file.
     
     Keywords
     --------
@@ -411,11 +411,11 @@ class TrackMode(AnalysisTask):
                 field = data[fname]
                 for cindex, comp in field:
                     name = fname + field.ctrans[cindex]
-                    outfile = open('%s_mode_amplitudes.dat' %name, 'w')
-                    outfile.write("# Dedalus Mode Amplitudes\n")
-                    outfile.write(columnnames)
-                    outfile.write('\n')
-                    outfile.close()
+                    file = open('%s_mode_amplitudes.dat' %name, 'w')
+                    file.write("# Dedalus Mode Amplitudes\n")
+                    file.write(columnnames)
+                    file.write('\n')
+                    file.close()
 
     def run(self, data, it, fieldlist=None, modelist=[], indexlist=[]):
             
@@ -425,12 +425,8 @@ class TrackMode(AnalysisTask):
         for fname in fieldlist:
             field = data[fname]
             for cindex, comp in field:
-
-                # Retrieve file
                 if com_sys.myproc == 0:
                     amplitudes = []
-                    name = fname + field.ctrans[cindex]
-                    outfile = open('%s_mode_amplitudes.dat' %name, 'a')
                 
                 # Gather mode amplitudes
                 for mode in modelist:
@@ -457,74 +453,201 @@ class TrackMode(AnalysisTask):
                 if com_sys.myproc == 0:
                     tstring = '%s\t' %data.time
                     ampstring = '\t'.join([repr(amp) for amp in amplitudes])
-                    outfile.write(tstring + ampstring)
-                    outfile.write('\n')
-                    outfile.close()
                     
+                    name = fname + field.ctrans[cindex]
+                    file = open('%s_mode_amplitudes.dat' %name, 'a')
+                    file.write(tstring + ampstring)
+                    file.write('\n')
+                    file.close()
                     
-                    
-                    
-                    
-                    
-#                     
-#                     
-#         if it == 0:
-#             # Construct container on first pass
-#             data._save_modes = {}
-#     
-#             for f in flist:
-#                 for i in xrange(data[f].ncomp):
-#                     for k in klist:
-#                         data._save_modes[(f,i,k)] = [data[f][i]['kspace'][k[::-1]]]
-#             data._save_modes['time'] = [data.time]
-#             return
-#             
-#         # Save components and time
-#         for f in flist:
-#             for i in xrange(data[f].ncomp):
-#                 for k in klist:
-#                     data._save_modes[(f,i,k)].append(data[f][i]['kspace'][k[::-1]])
-#         data._save_modes['time'].append(data.time)
-#     
-#         # Plot field components
-#         time = na.array(data._save_modes['time'])
-#             
-#         for j,f in enumerate(flist):
-#             for i in xrange(data[f].ncomp):
-#                 for k in klist:
-#                     plot_array = na.array(data._save_modes[(f,i,k)])
-#                     power = 0.5 * na.abs(plot_array) ** 2
-#                     
-#                     if log:
-#                         axs[j, i].semilogy(time, power, '.-', label=str(k))
-#                     else:
-#                         axs[j, i].plot(time, power, '.-', label=str(k))   
-#         
-#                 # Pad and label axes
-#                 axs[j, i].axis(padrange(axs[j, i].axis(), 0.05))
-#                 axs[j, i].legend()
-#                 axs[j, i].set_title(f + str(i))
-#                                 
-#     
-#         axs[-1, 0].set_ylabel('power')
-#         axs[-1, 0].set_xlabel('time')
-#     
-#         outfile = "frames/mode_track.png"
-#         fig.savefig(outfile)
-#         fig.clf()
-#         
+class PowerSpectrum(AnalysisTask):
+    """
+    Save power spectrum plot of specified field.
 
+    Keywords
+    --------
+    fieldlist : None or list of strings
+        List containing names of fields to track: ['u', ...]. If None, all fields
+        in data will be tracked.
+    normalization    
+        Power in each mode is multiplied by normalization
+    averaging        
+        None     : no averaging (default)
+        'all'    : divide power in each bin by number of modes 
+                included in that bin
+        'nonzero': like 'all', but count only nonzero modes
+        
+    """
+    
+    def setup(self, data, it, fieldlist=None, **kwargs):
+    
+        if fieldlist is None:
+            fieldlist = data.fields.keys()
 
+        if com_sys.myproc == 0:
+            self.first = True
+            if plot:
+                # Create figure and axes grid
+                ncols = len(fieldlist)
+                self.fig, self.axes = P.subplots(1, ncols, num=self._n, 
+                        figsize=(8 * ncols, 8))
+                                         
+                # Directory setup
+                if not os.path.exists('frames'):
+                    os.mkdir('frames')
+                    
+            if write:
+                # Create file for each field
+                for fname in fieldlist:
+                    file = open('%s_power_spectra.dat' %fname, 'w')
+                    file.write("# Dedalus Mode Amplitudes\n")
+                    file.write('\n')
+                    file.close()
+    
+    def run(data, it, fieldlist=None, loglog=False):
+    
+        if fieldlist is None:
+            fieldlist = data.fields.keys()
 
+        N = len(flist)
+        for i, fname in enumerate(fieldlist):
+            field = data[fname]
+            
+            # Compute spectrum
+            k, spectrum = self.compute_spectrum(field)
+    
+            if com_sys.myproc == 0:
+                if plot:
+                    # Skip if all modes are zero
+                    if spectrum[1:].nonzero()[0].size == 0:
+                        continue
+                   
+                    # Plot
+                    if self.first:
+                        if self._moves:
+                            self.add_patches(axnum, x, y, plane_data, units, space)
+                        else:
+                            self.add_image(axnum, x, y, plane_data, units, space, 
+                                    comp, namex, namey)
+                        self.add_lines(axnum, x, y, plane_data, units, space, 
+                                comp, namex, namey)
+                        self.add_labels(axnum, fname, field.ctrans[cindex],
+                                namex, namey, row, cindex, units)
+                    else:
+                        if self._moves:
+                            self.update_patches(axnum, x, y, plane_data, units, space)
+                        else:
+                            self.update_image(axnum, plane_data, namex, namey, space, units)
+                            
+                                         
+                                
+                    # Plot
+                    ax = fig.add_subplot(1, N, i+1)
+                    if loglog:
+                        ax.loglog(k[1:], spectrum[1:], 'o-')
+                    else:
+                        ax.semilogy(k[1:], spectrum[1:], 'o-')
+        
+                    print "%s E total power = %10.5e" %(f, spectrum.sum())
+                    print "%s E0 power = %10.5e" %(f, spectrum[0])
+                    ax.set_xlabel(r"$k$")
+                    ax.set_ylabel(r"$E(k)$")
+                    ax.set_title('%s Power, time = %5.2f' %(f, data.time))
+                    
+                    
+                                     
+                if write:
+                    file = open('%s_power_spectra.dat' %fname, 'w')
+                    file.write("# Dedalus Mode Amplitudes\n")
+                    file.write(columnnames)
+                    file.write('\n')
+                    
+                    file.close()
+                    txtout = open("power.dat",'a')
+                    txtout.write(' '.join([str(i) for i in spectrum.tolist()])+'\n')
+                    txtout.close()
+               
+        if com_sys.myproc == 0:
+            if plot:
+                # Add time to figure title
+                tstr = 't = %6.3f' % data.time
+                if self.first:
+                    self.timestr = self.fig.suptitle(tstr, size=24, color='k')
+                    self.first = False
+                else:
+                    self.timestr.set_text(tstr)
+                
+                # Save in frames folder
+                outfile = "frames/power_spectra_n%07i.png" %it
+                self.fig.savefig(outfile)
+            if self.first:
+                self.first = False
+
+    def compute_spectrum(field, normalization=1.0, averaging=None):
+
+        f = field
+        power = na.zeros(f[0]['kspace'].shape)
+        for i in xrange(f.ncomp):
+            power += na.abs(f[i]['kspace']) ** 2
+        power *= normalization
+    
+        # Construct bins by wavevector magnitude (evenly spaced)
+        kmag = na.sqrt(f[0].k2())
+    
+        if com_sys.comm:
+            # note: not the same k-values as serial version
+            k = na.linspace(0, int(na.max(f[0].kny)), na.max(data.shape)/2 + 1, endpoint=False)
+        else:
+            k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
+        dk = k[1] - k[0]
+        print "dk = %10.5e" % dk
+        kbottom = k #- k[1] / 2.
+        ktop = k + k[1]#/ 2.
+        print "sizeof(kbottom) = %i" % kbottom.size
+        print "sizeof(ktop) = %i" % ktop.size
+        spec = na.zeros_like(k)
+        nonzero = (power > 0)
+    
+        comm = com_sys.comm
+        MPI = com_sys.MPI
+        if comm:
+            myspec = na.zeros_like(k)
+            myproc = com_sys.myproc
+            nk = na.zeros_like(spec)
+            mynk = na.zeros_like(spec)
+            for i in xrange(k.size):
+                kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
+                myspec[i] = (power[kshell]).sum()
+                if averaging == 'all':
+                    mynk[i] = kshell.sum()
+                elif averaging == 'nonzero':
+                    mynk[i] = (kshell & nonzero).sum()
+            spec = comm.reduce(myspec, op=MPI.SUM, root=0)
+            nk = comm.reduce(mynk, op=MPI.SUM, root=0)
+            if myproc != 0: return None, None
+            if averaging is None:
+                return k, spec
+            else:
+                nk[(nk==0)] = 1.
+                return k, spec/nk
+        else:
+            for i in xrange(k.size):
+                kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
+                spec[i] = (power[kshell]).sum()
+                if averaging == 'nonzero':
+                    spec[i] /= (kshell & nonzero).sum()
+                elif averaging == 'all':
+                    spec[i] /= kshell.sum()
+            return k, spec
 
 
  
-# 
-# @AnalysisSet.register_task
-# def volume_average(data, it, va_obj=None):
-#     va_obj.run()
-#        
-# 
+
+class VolumeAverage(AnalysisTask):
+    def run(self, data, it, va_obj=None):
+        va_obj.run()
+       
+
 # @AnalysisSet.register_task
 # def print_energy(data, it):
 #     """compute energy in real space
@@ -539,116 +662,6 @@ class TrackMode(AnalysisTask):
 #     print "k energy: %10.5e" % (0.5* e2.sum())
 #     print "x energy: %10.5e" % (0.5*energy.sum()/energy.size)
 # 
-# def compute_en_spec(data, field, normalization=1.0, averaging=None):
-#     """Compute power spectrum (helper function for analysis tasks).
-# 
-#     Inputs:
-#         fc               (field name, component) tuple 
-#         normalization    Power in each mode is multiplied by normalization
-#         averaging        None     : no averaging (default)
-#                          'all'    : divide power in each bin by number of modes 
-#                                     included in that bin
-#                          'nonzero': like 'all', but count only nonzero modes
-# 
-#     Returns:
-#         k                centers of k-bins
-#         spec             Power spectrum of f
-#     """
-#     f = data[field]
-#     power = na.zeros(f[0]['kspace'].shape)
-#     for i in xrange(f.ncomp):
-#         power += na.abs(f[i]['kspace']) ** 2
-#     power *= normalization
-# 
-#     # Construct bins by wavevector magnitude (evenly spaced)
-#     kmag = na.sqrt(f[0].k2())
-# 
-#     if com_sys.comm:
-#         # note: not the same k-values as serial version
-#         k = na.linspace(0, int(na.max(f[0].kny)), na.max(data.shape)/2 + 1, endpoint=False)
-#     else:
-#         k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
-#     dk = k[1] - k[0]
-#     print "dk = %10.5e" % dk
-#     kbottom = k #- k[1] / 2.
-#     ktop = k + k[1]#/ 2.
-#     print "sizeof(kbottom) = %i" % kbottom.size
-#     print "sizeof(ktop) = %i" % ktop.size
-#     spec = na.zeros_like(k)
-#     nonzero = (power > 0)
-# 
-#     comm = com_sys.comm
-#     MPI = com_sys.MPI
-#     if comm:
-#         myspec = na.zeros_like(k)
-#         myproc = com_sys.myproc
-#         nk = na.zeros_like(spec)
-#         mynk = na.zeros_like(spec)
-#         for i in xrange(k.size):
-#             kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
-#             myspec[i] = (power[kshell]).sum()
-#             if averaging == 'all':
-#                 mynk[i] = kshell.sum()
-#             elif averaging == 'nonzero':
-#                 mynk[i] = (kshell & nonzero).sum()
-#         spec = comm.reduce(myspec, op=MPI.SUM, root=0)
-#         nk = comm.reduce(mynk, op=MPI.SUM, root=0)
-#         if myproc != 0: return None, None
-#         if averaging is None:
-#             return k, spec
-#         else:
-#             nk[(nk==0)] = 1.
-#             return k, spec/nk
-#     else:
-#         for i in xrange(k.size):
-#             kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
-#             spec[i] = (power[kshell]).sum()
-#             if averaging == 'nonzero':
-#                 spec[i] /= (kshell & nonzero).sum()
-#             elif averaging == 'all':
-#                 spec[i] /= kshell.sum()
-#         return k, spec
-# 
-# @AnalysisSet.register_task
-# def en_spec(data, it, flist=['u'], loglog=False):
-#     """Record power spectrum of specified fields."""
-#     N = len(flist)
-#     if com_sys.myproc == 0:
-#         fig = P.figure(2, figsize=(8 * N, 8))
-#     
-#     for i,f in enumerate(flist):
-#         k, spectrum = compute_en_spec(data, f)
-# 
-#         if com_sys.myproc == 0:
-#             # Plotting, skip if all modes are zero
-#             if spectrum[1:].nonzero()[0].size == 0:
-#                 return
-# 
-#             ax = fig.add_subplot(1, N, i+1)
-#             if loglog:
-#                 ax.loglog(k[1:], spectrum[1:], 'o-')
-#             else:
-#                 ax.semilogy(k[1:], spectrum[1:], 'o-')
-# 
-#             print "%s E total power = %10.5e" %(f, spectrum.sum())
-#             print "%s E0 power = %10.5e" %(f, spectrum[0])
-#             ax.set_xlabel(r"$k$")
-#             ax.set_ylabel(r"$E(k)$")
-#             ax.set_title('%s Power, time = %5.2f' %(f, data.time))
-# 
-#     if com_sys.myproc == 0:
-#         # Add timestamp
-#         #tstr = 't = %5.2f' % data.time
-#         #P.text(-0.3,1.,tstr, transform=P.gca().transAxes,size=24,color='black')
-#        
-#         if not os.path.exists('frames'):
-#             os.mkdir('frames')
-#         outfile = "frames/enspec_%04i.png" %it
-#         P.savefig(outfile)
-#         P.clf()
-#         txtout = open("power.dat",'a')
-#         txtout.write(' '.join([str(i) for i in spectrum.tolist()])+'\n')
-#         txtout.close()
 # 
 # @AnalysisSet.register_task
 # def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', output_columns=True):
