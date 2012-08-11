@@ -2,7 +2,7 @@
 Swinging vorticity wave test from
 
     Lithwick, Y. Nonlinear Evolution of Hydrodynamical Shear Flows in Two 
-        Dimensions. The Astrophysical Journal 670, 789–804 (2007).    
+        Dimensions. The Astrophysical Journal 670, 789-804 (2007).    
         http://labs.adsabs.harvard.edu/ui/abs/2007ApJ...670..789L
             
 Author: K. J. Burns <keaton.burns@gmail.com>
