@@ -486,7 +486,10 @@ class BoussinesqHydro(Hydro):
                   'alpha_t': 1., 'beta': 1.}
         self._setup_parameters(params)
         self._finalized = False
+        self.ThermalDrive = None
 
+    def set_thermal_drive(self, func):
+        self.ThermalDrive = func
 
     def RHS(self, data):
         """
@@ -518,6 +521,8 @@ class BoussinesqHydro(Hydro):
         self.XlistgradY([u], T, mathtmp, [Tcopy], [ugradT])
         self._RHS['T']['kspace'] = -ugradT['kspace'] - beta * u['z']['kspace']
         
+        if self.ThermalDrive:
+            self._RHS['T']['kspace'] += self.ThermalDrive(data)
         self._RHS['T']['kspace'][0,0,0] = 0. # must ensure (0,0,0) T mode does not grow.
         self._RHS['T'].integrating_factor = self.parameters['kappa'] * T.k2() ** self.visc_order
 
