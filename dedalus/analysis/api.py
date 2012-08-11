@@ -25,7 +25,8 @@ from .analysis_set import \
     AnalysisSet, \
     Snapshot, \
     TrackMode, \
-    VolumeAverage
+    VolumeAverage, \
+    PowerSpectrum
 
 from .volume_average import \
     VolumeAverageSet
