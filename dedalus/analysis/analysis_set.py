@@ -407,6 +407,7 @@ def mode_track(data, it, flist=[], klist=[], log=True, write=True):
                     outfile = open('mode_amplitudes_%s_%i.dat' % (f, i), 'a')
                     amplitudes = []
                 for k in klist:
+                    data[f][i]['kspace'] # dummy call to ensure we're *all* in the same space.
                     if data[f][i].find_mode(k):
                         kampl = data[f][i]['kspace'][k]
                     else:
