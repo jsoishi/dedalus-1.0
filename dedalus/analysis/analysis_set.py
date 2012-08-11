@@ -26,16 +26,15 @@ License:
   
 """
 
+import os
+import numpy as na
 import matplotlib
 matplotlib.use('AGG')
 import matplotlib.pyplot as P
-from mpl_toolkits.axes_grid1 import AxesGrid
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
-import numpy as na
-import os
+from mpl_toolkits.axes_grid1 import AxesGrid
 from dedalus.utils.parallelism import com_sys, get_plane
-from dedalus.utils.logger import mylog
 
 class AnalysisSet(object):
     def __init__(self, data, ti):
@@ -462,35 +461,41 @@ class TrackMode(AnalysisTask):
                     
 class PowerSpectrum(AnalysisTask):
     """
-    Save power spectrum plot of specified field.
+    Save and plot power spectrum of specified field.
 
     Keywords
     --------
     fieldlist : None or list of strings
         List containing names of fields to track: ['u', ...]. If None, all fields
         in data will be tracked.
-    normalization    
+    norm : int    
         Power in each mode is multiplied by normalization
-    averaging        
-        None     : no averaging (default)
-        'all'    : divide power in each bin by number of modes 
-                included in that bin
-        'nonzero': like 'all', but count only nonzero modes
+    loglog : bool
+        Plot log-log plot if True, semilogy otherwise.
+    plot : bool
+        Save plot of power spectra.
+    write : bool
+        Write power spectra to text file.
+    nyquistlines : bool
+        Plot lines at individual and composite Nyquist wavenumbers
+    dealiasinglines : bool
+        Plot lines at 2/3 of the individual and composite Nyquist wavenumbers
         
     """
     
-    def setup(self, data, it, fieldlist=None, **kwargs):
+    def setup(self, data, it, fieldlist=None, plot=True, write=True, **kwargs):
     
         if fieldlist is None:
             fieldlist = data.fields.keys()
 
         if com_sys.myproc == 0:
             self.first = True
+            self.lines = {}
             if plot:
                 # Create figure and axes grid
                 ncols = len(fieldlist)
                 self.fig, self.axes = P.subplots(1, ncols, num=self._n, 
-                        figsize=(8 * ncols, 8))
+                        figsize=(6 * ncols, 6))
                                          
                 # Directory setup
                 if not os.path.exists('frames'):
@@ -500,79 +505,77 @@ class PowerSpectrum(AnalysisTask):
                 # Create file for each field
                 for fname in fieldlist:
                     file = open('%s_power_spectra.dat' %fname, 'w')
-                    file.write("# Dedalus Mode Amplitudes\n")
-                    file.write('\n')
+                    file.write("# Dedalus Power Spectrum\n")
                     file.close()
     
-    def run(data, it, fieldlist=None, loglog=False):
-    
+    def run(self, data, it, fieldlist=None, norm=1.0, loglog=True, plot=True, 
+                write=True, nyquistlines=False, dealiasinglines=True):
+
         if fieldlist is None:
             fieldlist = data.fields.keys()
 
-        N = len(flist)
         for i, fname in enumerate(fieldlist):
             field = data[fname]
             
             # Compute spectrum
-            k, spectrum = self.compute_spectrum(field)
+            k, spectrum = self.compute_spectrum(field, norm=norm)
     
             if com_sys.myproc == 0:
                 if plot:
                     # Skip if all modes are zero
                     if spectrum[1:].nonzero()[0].size == 0:
-                        continue
-                   
-                    # Plot
-                    if self.first:
-                        if self._moves:
-                            self.add_patches(axnum, x, y, plane_data, units, space)
-                        else:
-                            self.add_image(axnum, x, y, plane_data, units, space, 
-                                    comp, namex, namey)
-                        self.add_lines(axnum, x, y, plane_data, units, space, 
-                                comp, namex, namey)
-                        self.add_labels(axnum, fname, field.ctrans[cindex],
-                                namex, namey, row, cindex, units)
-                    else:
-                        if self._moves:
-                            self.update_patches(axnum, x, y, plane_data, units, space)
-                        else:
-                            self.update_image(axnum, plane_data, namex, namey, space, units)
-                            
-                                         
+                        continue                 
                                 
                     # Plot
-                    ax = fig.add_subplot(1, N, i+1)
-                    if loglog:
-                        ax.loglog(k[1:], spectrum[1:], 'o-')
+                    if len(fieldlist) == 1:
+                        ax = self.axes
                     else:
-                        ax.semilogy(k[1:], spectrum[1:], 'o-')
-        
-                    print "%s E total power = %10.5e" %(f, spectrum.sum())
-                    print "%s E0 power = %10.5e" %(f, spectrum[0])
-                    ax.set_xlabel(r"$k$")
-                    ax.set_ylabel(r"$E(k)$")
-                    ax.set_title('%s Power, time = %5.2f' %(f, data.time))
+                        ax = self.axes[i]
+                        
+                    if self.first:
+                        if loglog:
+                            linelist = ax.loglog(k[1:], spectrum[1:], 'b.-', mew=0, ms=5)
+                        else:
+                            linelist = ax.semilogy(k[1:], spectrum[1:], 'b.-', mew=0, ms=5)
+                        self.lines[i] = linelist[0]
+                        ax.set_title(fname, size=16, color='k')
+                        ax.set_xlabel('k')
+                        ax.set_ylabel('E(k)')
+                        for kny in field[0].kny:
+                            if nyquistlines:
+                                ax.axvline(kny, ls='dashed', color='k')
+                            if dealiasinglines:
+                                ax.axvline(kny * 2. / 3., ls='dotted', color='k')
+                        if nyquistlines:
+                            ax.axvline(na.sqrt(na.sum(field[0].kny ** 2)), ls='dashed', color='r') 
+                        if dealiasinglines:
+                            ax.axvline(na.sqrt(na.sum((2./3. * field[0].kny) ** 2)), ls='dotted', color='r')
                     
-                    
+                    else:
+                        line = self.lines[i]
+                        line.set_ydata(spectrum[1:])
+                        ax.relim()
+                        ax.autoscale_view()
                                      
                 if write:
-                    file = open('%s_power_spectra.dat' %fname, 'w')
-                    file.write("# Dedalus Mode Amplitudes\n")
-                    file.write(columnnames)
+                    file = open('%s_power_spectra.dat' %fname, 'a')
+                    if self.first:
+                        columnnames = 'time\t'
+                        columnnames += '\t'.join([repr(ki) for ki in k])
+                        file.write(columnnames)
+                        file.write('\n')
+                    tstring = '%s\t' %data.time
+                    ampstring = '\t'.join([repr(amp) for amp in spectrum])
+                    file.write(tstring + ampstring)
                     file.write('\n')
-                    
                     file.close()
-                    txtout = open("power.dat",'a')
-                    txtout.write(' '.join([str(i) for i in spectrum.tolist()])+'\n')
-                    txtout.close()
                
         if com_sys.myproc == 0:
             if plot:
                 # Add time to figure title
                 tstr = 't = %6.3f' % data.time
                 if self.first:
-                    self.timestr = self.fig.suptitle(tstr, size=24, color='k')
+                    self.timestr = self.fig.suptitle(tstr, size=20, color='k')
                     self.first = False
                 else:
                     self.timestr.set_text(tstr)
@@ -580,89 +583,59 @@ class PowerSpectrum(AnalysisTask):
                 # Save in frames folder
                 outfile = "frames/power_spectra_n%07i.png" %it
                 self.fig.savefig(outfile)
+                
             if self.first:
                 self.first = False
 
-    def compute_spectrum(field, normalization=1.0, averaging=None):
+    def compute_spectrum(self, field, norm=1.0):
 
-        f = field
-        power = na.zeros(f[0]['kspace'].shape)
-        for i in xrange(f.ncomp):
-            power += na.abs(f[i]['kspace']) ** 2
-        power *= normalization
+        # Compute 1D power samples
+        kmag = na.sqrt(field[0].k2())
+        power = na.zeros(field[0].local_shape['kspace'])
+        for cindex, comp in field:
+            power += na.abs(comp['kspace']) ** 2
+        power *= norm
+        if field.ndim == 2:
+            power1d = power * 2. * na.pi * kmag
+        else:
+            power1d = power * 4. * na.pi * kmag ** 2
     
         # Construct bins by wavevector magnitude (evenly spaced)
-        kmag = na.sqrt(f[0].k2())
-    
-        if com_sys.comm:
-            # note: not the same k-values as serial version
-            k = na.linspace(0, int(na.max(f[0].kny)), na.max(data.shape)/2 + 1, endpoint=False)
-        else:
-            k = na.linspace(0, na.max(kmag), na.max(data.shape) / 2.)
-        dk = k[1] - k[0]
-        print "dk = %10.5e" % dk
-        kbottom = k #- k[1] / 2.
-        ktop = k + k[1]#/ 2.
-        print "sizeof(kbottom) = %i" % kbottom.size
-        print "sizeof(ktop) = %i" % ktop.size
-        spec = na.zeros_like(k)
-        nonzero = (power > 0)
-    
-        comm = com_sys.comm
-        MPI = com_sys.MPI
-        if comm:
-            myspec = na.zeros_like(k)
-            myproc = com_sys.myproc
-            nk = na.zeros_like(spec)
-            mynk = na.zeros_like(spec)
-            for i in xrange(k.size):
-                kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
-                myspec[i] = (power[kshell]).sum()
-                if averaging == 'all':
-                    mynk[i] = kshell.sum()
-                elif averaging == 'nonzero':
-                    mynk[i] = (kshell & nonzero).sum()
-            spec = comm.reduce(myspec, op=MPI.SUM, root=0)
-            nk = comm.reduce(mynk, op=MPI.SUM, root=0)
-            if myproc != 0: return None, None
-            if averaging is None:
-                return k, spec
-            else:
-                nk[(nk==0)] = 1.
-                return k, spec/nk
-        else:
-            for i in xrange(k.size):
-                kshell = (kmag >= kbottom[i]) & (kmag < ktop[i])
-                spec[i] = (power[kshell]).sum()
-                if averaging == 'nonzero':
-                    spec[i] /= (kshell & nonzero).sum()
-                elif averaging == 'all':
-                    spec[i] /= kshell.sum()
-            return k, spec
-
-
- 
+        kmax = na.sqrt(na.sum(field[0].kny ** 2))
+        n = int(na.product(field[0].global_shape['xspace'] / 2.) ** (1. / field.ndim))
+        k = na.linspace(0, kmax, n, endpoint=False)
+        kbottom = k
+        ktop = k + k[1]
+        
+        # Bin power samples
+        spectrum = na.zeros_like(k)
+        n = na.zeros_like(k)
+        for i in xrange(k.size):
+            mask = (kmag >= kbottom[i]) & (kmag < ktop[i])
+            nonzero = (power1d != 0)
+            spectrum[i] = na.sum(power1d[mask])
+            n[i] = na.sum(mask * nonzero)
+        
+        # Collect from all processes
+        if com_sys.nproc != 1:
+            spectrum = com_sys.comm.reduce(spectrum, op=com_sys.MPI.SUM, root=0)
+            n = com_sys.comm.reduce(n, op=com_sys.MPI.SUM, root=0)
+            
+            if com_sys.myproc != 0:
+                return (None, None)
+        
+        # Return bin centers and 1D power sample averages
+        n[n == 0] = 1
+        return k + k[1] / 2. , spectrum / n
 
 class VolumeAverage(AnalysisTask):
+    """Run volume average tasks."""
+    
     def run(self, data, it, va_obj=None):
         va_obj.run()
        
 
-# @AnalysisSet.register_task
-# def print_energy(data, it):
-#     """compute energy in real space
-# 
-#     """
-# 
-#     energy = na.zeros(data['ux']['xspace'].shape)
-#     e2 = na.zeros_like(energy)
-#     for f in data.fields:
-#         energy += (data[f]['xspace']*data[f]['xspace'].conj()).real
-#         e2 += (data[f]['kspace']*data[f]['kspace'].conj()).real
-#     print "k energy: %10.5e" % (0.5* e2.sum())
-#     print "x energy: %10.5e" % (0.5*energy.sum()/energy.size)
-# 
-# 
+
 # @AnalysisSet.register_task
 # def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', output_columns=True):
 #     """Compare power spectrum of two fields. Defaults for baryon

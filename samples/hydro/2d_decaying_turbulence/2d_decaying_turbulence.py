@@ -44,11 +44,11 @@ vs.add("enstrophy","%10.5e", options={'space': 'xspace'})
 vs.add("vort_cenk","%10.5e")
 
 an = AnalysisSet(data, ti)
-#an.add(Snapshot(10, space='kspace'))
+an.add(Snapshot(10, space='kspace'))
 #an.add(Snapshot(5, space='kspace', units=False))
 an.add(Snapshot(10, space='xspace'))
 #an.add(Snapshot(5, space='xspace', units=False))
-# an.add("en_spec",100, {'loglog': True})
+an.add(PowerSpectrum(10))
 # an.add("en_spec",10)
 # an.add("volume_average",10,{'va_obj': vs})
 

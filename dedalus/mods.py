@@ -34,7 +34,8 @@ from dedalus.analysis.api import \
     VolumeAverageSet, \
     Snapshot, \
     TrackMode, \
-    VolumeAverage
+    VolumeAverage, \
+    PowerSpectrum
 
 from dedalus.data_objects.api import \
     FourierRepresentation, \
