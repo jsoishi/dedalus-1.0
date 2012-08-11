@@ -127,6 +127,13 @@ def uz2(data, space='kspace'):
     return volume_average(data['u']['z']['kspace']*data['u']['z']['kspace'].conj(), kdict=data['u']['z'].k)
 
 @VolumeAverageSet.register_task
+def temp2(data, space='kspace'):
+    """mean square temperature
+
+    """
+    return volume_average(data['T']['kspace']*data['T']['kspace'].conj(), kdict=data['T'].k, space=space)
+
+@VolumeAverageSet.register_task
 def emag(data, space='kspace'):
     aux = data.clone()
     aux.add_field('emag', 'ScalarField')
