@@ -45,16 +45,14 @@ vs.add("vort_cenk","%10.5e")
 
 an = AnalysisSet(data, ti)
 an.add(Snapshot(10, space='kspace'))
-#an.add(Snapshot(5, space='kspace', units=False))
 an.add(Snapshot(10, space='xspace'))
-#an.add(Snapshot(5, space='xspace', units=False))
 an.add(PowerSpectrum(10))
-# an.add("en_spec",10)
-# an.add("volume_average",10,{'va_obj': vs})
+an.add("volume_average",10,{'va_obj': vs})
 
-#main loop
-dt = 1e-3
+# Main loop
 an.run()
+
+dt = 1e-3
 while ti.ok:
     ti.advance(data, dt)
     an.run()
