@@ -35,6 +35,7 @@ from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
 from mpl_toolkits.axes_grid1 import AxesGrid
 from dedalus.utils.parallelism import com_sys, get_plane
+from dedalus.config import decfg
 
 class AnalysisSet(object):
     def __init__(self, data, ti):
@@ -45,16 +46,16 @@ class AnalysisSet(object):
     def add(self, task):
         self.tasks.append(task)
         task._n = len(self.tasks)
-        task.setup(self.data, self.ti.iter, **task.options)
+        task.setup(self.data, self.ti.iter)
 
     def run(self):
         for task in self.tasks:
             if self.ti.iter % task.cadence == 0:
-                task.run(self.data, self.ti.iter, **task.options)
+                task.run(self.data, self.ti.iter)
                 
     def cleanup(self):
         for task in self.tasks:
-            task.cleanup(self.data, self.ti.iter, **task.options)
+            task.cleanup(self.data, self.ti.iter)
               
 class AnalysisTask(object):
     def __init__(self, cadence, **kwargs):
@@ -62,13 +63,13 @@ class AnalysisTask(object):
         self.cadence = cadence
         self.options = kwargs
         
-    def setup(self, data, iter, **kwargs):
+    def setup(self, data, iter):
         pass
         
-    def run(self, data, iter, **kwargs):
+    def run(self, data, iter):
         pass
         
-    def cleanup(self, data, iter, **kwargs):
+    def cleanup(self, data, iter):
         pass
         
 class Snapshot(AnalysisTask):
@@ -93,10 +94,26 @@ class Snapshot(AnalysisTask):
 
     """
     
-    def setup(self, data, it, space='xspace', units=True, **kwargs):
-    
+    def setup(self, data, it, space=None, axis=None, index=None, units=True):
+        if space:
+            self.space = space
+        else:
+            self.space = decfg.get('analysis', 'slice_space')
+
+        if axis:
+            self.axis = axis
+        else:
+            self.axis = decfg.get('analysis', 'slice_axis')
+
+        if index:
+            self.index = index
+        else:
+            self.index = decfg.get('analysis','slice_index')
+
+        self.units = units
+
         # Determine if moving patches are required
-        if units and space == 'kspace' and hasattr(data['u']['x'], '_ky'):
+        if self.units and self.space == 'kspace' and hasattr(data['u']['x'], '_ky'):
             self._moves = True
             if com_sys.myproc == 0:
                 self.patch_lists = {}
@@ -131,7 +148,7 @@ class Snapshot(AnalysisTask):
             if not os.path.exists('frames'):
                 os.mkdir('frames')
     
-    def run(self, data, it, space='xspace', axis='z', index='middle', units=True):
+    def run(self, data, it):
 
         # Plot field components
         for row, (fname, field) in enumerate(data):
@@ -141,14 +158,14 @@ class Snapshot(AnalysisTask):
                 # Retrieve correct slice
                 if axnum == 0:
                     plane_data, outindex, namex, x, namey, y = get_plane(comp, 
-                            space=space, axis=axis, index=index)
+                            space=self.space, axis=self.axis, index=self.index)
                 else:
-                    plane_data, outindex = get_plane(comp, space=space, axis=axis, 
-                            index=index, return_position_arrays=False)
+                    plane_data, outindex = get_plane(comp, space=self.space, axis=self.axis, 
+                            index=self.index, return_position_arrays=False)
 
                 if com_sys.myproc == 0:
                     # kspace: take logarithm of magnitude, flooring at eps
-                    if space == 'kspace':
+                    if self.space == 'kspace':
                         kmag = na.abs(plane_data)
                         zero_mask = (kmag == 0)
                         kmag[kmag < comp._eps['kspace']] = comp._eps['kspace']
@@ -158,19 +175,19 @@ class Snapshot(AnalysisTask):
                     # Plot
                     if self.firstplot:
                         if self._moves:
-                            self.add_patches(axnum, x, y, plane_data, units, space)
+                            self.add_patches(axnum, x, y, plane_data)
                         else:
-                            self.add_image(axnum, x, y, plane_data, units, space, 
+                            self.add_image(axnum, x, y, plane_data, 
                                     comp, namex, namey)
-                        self.add_lines(axnum, x, y, plane_data, units, space, 
+                        self.add_lines(axnum, x, y, plane_data, 
                                 comp, namex, namey)
                         self.add_labels(axnum, fname, field.ctrans[cindex],
-                                namex, namey, row, cindex, units)
+                                namex, namey, row, cindex)
                     else:
                         if self._moves:
-                            self.update_patches(axnum, x, y, plane_data, units, space)
+                            self.update_patches(axnum, x, y, plane_data)
                         else:
-                            self.update_image(axnum, plane_data, namex, namey, space, units)
+                            self.update_image(axnum, plane_data, namex, namey)
                               
         if com_sys.myproc == 0:
             # Add time to figure title
@@ -182,27 +199,27 @@ class Snapshot(AnalysisTask):
                 self.timestr.set_text(tstr)
             
             # Save in frames folder
-            spacestr = space[0]
-            if not units:
+            spacestr = self.space[0]
+            if not self.units:
                 spacestr += '_ind'
             if data.ndim == 2:
                 slicestr = ''
             else:
-                slicestr = '%s_%i_' %(axis, outindex)
+                slicestr = '%s_%i_' %(self.axis, outindex)
             outfile = "frames/%s_snap_%sn%07i.png" %(spacestr, slicestr, it)
             self.fig.savefig(outfile)
                                   
-    def add_patches(self, axnum, x, y, plane_data, units, space):
+    def add_patches(self, axnum, x, y, plane_data):
 
         # Construct patches
         shape = plane_data.shape
         patches = []
         for i in xrange(shape[0]):
             for j in xrange(shape[1]):
-                if units:
+                if self.units:
                     dx = x[0, 1] - x[0, 0]
                     dy = y[1, 0] - y[0, 0]
-                    if space == 'kspace':
+                    if self.space == 'kspace':
                         xy = (x[i, j] - dx / 2., y[i, j] - dy / 2.)
                     else:
                         xy = (x[i, j], y[i, j])
@@ -228,7 +245,7 @@ class Snapshot(AnalysisTask):
         self.grid[axnum].add_collection(pc)
         self.grid.cbar_axes[axnum].colorbar(pc)
         
-    def update_patches(self, axnum, x, y, plane_data, units, space):
+    def update_patches(self, axnum, x, y, plane_data):
     
         # Retrieve patches
         shape = plane_data.shape
@@ -236,7 +253,7 @@ class Snapshot(AnalysisTask):
         pc = self.patch_collections[axnum]
         
         # Update positions
-        if units and space == 'kspace':
+        if self.units and self.space == 'kspace':
             for i in xrange(shape[0]):
                 for j in xrange(shape[1]):
                     dx = x[0, 1] - x[0, 0]
@@ -247,17 +264,17 @@ class Snapshot(AnalysisTask):
            
         # Update values and colorbar     
         pc.set_array(na.ma.ravel(plane_data))
-        if space == 'kspace':
+        if self.space == 'kspace':
             pc.set_clim(plane_data.min(), plane_data.max())
         else:
             lim = na.max(na.abs([plane_data.min(), plane_data.max()]))
             pc.set_clim(-lim, lim)
         
-    def add_image(self, axnum, x, y, plane_data, units, space, comp, namex, namey):
+    def add_image(self, axnum, x, y, plane_data, comp, namex, namey):
 
         # Construct image
-        if units:
-            if space == 'kspace':
+        if self.units:
+            if self.space == 'kspace':
                 dx = x[0, 1] - x[0, 0]
                 dy = y[1, 0] - y[0, 0]
                 extent = [x.min() - dx / 2., x.max() + dx / 2., 
@@ -284,12 +301,12 @@ class Snapshot(AnalysisTask):
         # Store for updating        
         self.images[axnum] = im
         
-    def update_image(self, axnum, plane_data, namex, namey, space, units):
+    def update_image(self, axnum, plane_data, namex, namey):
     
         # Retrieve image
         im = self.images[axnum]
         
-        if units and space == 'kspace':
+        if self.units and self.space == 'kspace':
             # Roll array
             if namey != 'kx':
                 plane_data = na.roll(plane_data, -(plane_data.shape[0] / 2 + 1), axis=0)
@@ -298,16 +315,16 @@ class Snapshot(AnalysisTask):
        
         # Update values and colorbar     
         im.set_array(plane_data)
-        if space == 'kspace':
+        if self.space == 'kspace':
             im.set_clim(plane_data.min(), plane_data.max())
         else:
             lim = na.max(na.abs([plane_data.min(), plane_data.max()]))
             im.set_clim(-lim, lim)
         
-    def add_lines(self, axnum, x, y, plane_data, units, space, comp, namex, namey):
+    def add_lines(self, axnum, x, y, plane_data, comp, namex, namey):
         
-        if units:            
-            if space == 'kspace':
+        if self.units:            
+            if self.space == 'kspace':
                 dx = x[0, 1] - x[0, 0]
                 dy = y[1, 0] - y[0, 0]
             
@@ -332,7 +349,7 @@ class Snapshot(AnalysisTask):
                 plot_extent = [xsq[0] - dx / 2., xsq[1] + dx / 2., 
                                ysq[2] - dy / 2., ysq[0] + dy / 2.]
             
-            elif space == 'xspace':
+            elif self.space == 'xspace':
                 xlen = comp.length[comp.xtrans[namex]]
                 ylen = comp.length[comp.xtrans[namey]]
                 plot_extent = [0, xlen, 0, ylen]
@@ -344,14 +361,14 @@ class Snapshot(AnalysisTask):
         # Plot range
         self.grid[axnum].axis(plot_extent)
 
-    def add_labels(self, axnum, fname, cname, namex, namey, row, cindex, units):
+    def add_labels(self, axnum, fname, cname, namex, namey, row, cindex):
 
         # Title
         title = self.grid[axnum].set_title(fname + cname, size=20, color='k')
         title.set_y(1.08)
         
         # Axis labels
-        if not units:
+        if not self.units:
             namex += ' index'
             namey += ' index'
         if row == self.nrows - 1:
@@ -631,8 +648,11 @@ class PowerSpectrum(AnalysisTask):
 class VolumeAverage(AnalysisTask):
     """Run volume average tasks."""
     
-    def run(self, data, it, va_obj=None):
-        va_obj.run()
+    def __init__(self, iter, va_obj):
+        AnalysisTask.__init__(self, iter)
+        self.va_obj=va_obj
+    def run(self, data, it):
+        self.va_obj.run()
        
 
 
