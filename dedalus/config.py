@@ -40,6 +40,7 @@ decfg.add_section('analysis')
 decfg.set('analysis', 'slice_axis', '0')
 decfg.set('analysis', 'slice_index', 'middle')
 decfg.set('analysis', 'slice_name', 'snap')
+decfg.set('analysis', 'slice_space', 'xspace')
 
 # Read user config, local config
 decfg.read([os.path.expanduser('~/.dedalus/config'), 'dedalus.cfg'])
