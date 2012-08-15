@@ -37,10 +37,10 @@ decfg.add_section('utils')
 decfg.set('utils', 'loglevel', 'debug')
 
 decfg.add_section('analysis')
-decfg.set('analysis', 'slice_axis', '0')
-decfg.set('analysis', 'slice_index', 'middle')
-decfg.set('analysis', 'slice_name', 'snap')
-decfg.set('analysis', 'slice_space', 'xspace')
+decfg.set('analysis', 'snapshot_space', 'xspace')
+decfg.set('analysis', 'snapshot_axis', 'z')
+decfg.set('analysis', 'snapshot_index', 'middle')
+decfg.set('analysis', 'snapshot_units', 'True')
 
 # Read user config, local config
 decfg.read([os.path.expanduser('~/.dedalus/config'), 'dedalus.cfg'])
