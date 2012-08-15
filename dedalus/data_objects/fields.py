@@ -83,9 +83,6 @@ class BaseField(object):
         self.components = []
         for i in xrange(self.ncomp):
             self.components.append(self.representation(self.sd, self.shape, self.length))
-
-        # Option for integrating factor                                       
-        self.integrating_factor = None
         
         # Translation table to be specified in derived classes
         self.ctrans = {}
