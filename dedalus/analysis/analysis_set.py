@@ -53,13 +53,7 @@ class AnalysisSet(object):
     def run(self):
         for task in self.tasks:
             if self.ti.iter % task.cadence == 0:
-                start = time.time()
                 task.run(self.data, self.ti.iter)
-                stop = time.time()
-                print 'Task time: %f' %(stop - start)
-                print '-'*10
-        
-        
                 
     def cleanup(self):
         for task in self.tasks:
@@ -136,6 +130,7 @@ class Snapshot(AnalysisTask):
     def setup(self, data, it):
 
         # Determine if moving patches are required
+        self.firstrun = True
         if self.units and (self.space == 'kspace') and hasattr(data['u']['x'], '_ky'):
             self._moves = True
             if com_sys.myproc == 0:
@@ -149,7 +144,6 @@ class Snapshot(AnalysisTask):
         # Figure setup for proc 0
         if com_sys.myproc == 0:
         
-            self.firstrun = True
             self.image_axes = {}
             self.cbar_axes = {}
             
@@ -255,8 +249,8 @@ class Snapshot(AnalysisTask):
             stop = time.time()
             print '    save time: %f' %(stop - start)
             
-            if self.firstrun:
-                self.firstrun = False
+        if self.firstrun:
+            self.firstrun = False
                                   
     def add_patches(self, axtup, x, y, plane_data):
     
@@ -428,13 +422,13 @@ class Snapshot(AnalysisTask):
             
         if imax.lastrow:
             imax.set_xlabel(xstr)
-            plt.setp(imax.get_xticklabels(), fontsize=12)
+            plt.setp(imax.get_xticklabels(), fontsize=10)
         else:
             plt.setp(imax.get_xticklabels(), visible=False)
             
         if imax.firstcol:
             imax.set_ylabel(ystr)
-            plt.setp(imax.get_yticklabels(), fontsize=12)
+            plt.setp(imax.get_yticklabels(), fontsize=10)
         else:
             plt.setp(imax.get_yticklabels(), visible=False)            
 

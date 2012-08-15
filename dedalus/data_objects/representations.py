@@ -46,7 +46,7 @@ class Representation(object):
     """
 
     def __init__(self, sd, shape, length):
-        pass
+        self.integrating_factor = None
 
 class FourierRepresentation(Representation):
     """

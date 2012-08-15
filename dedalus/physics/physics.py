@@ -26,6 +26,8 @@ License:
 """
 
 import numpy as na
+from dedalus.data_objects.representations import FourierRepresentation,
+        FourierShearRepresentation
 from dedalus.utils.logger import mylog
 from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
 from dedalus.utils.api import a_friedmann
@@ -44,7 +46,9 @@ class Physics(object):
     
     """
     
-    def __init__(self, shape, representation, length=None, visc_order=1):
+    allowable_representations = []
+    
+    def __init__(self, shape, representation, length=None):
         """
         Base class for a physics object. Defines fields and provides
         a right hand side for the time integration scheme.
@@ -58,19 +62,20 @@ class Physics(object):
         length : tuple of floats, optional
             The length of the data in xspace: (z, y, x) or (y, x), 
             defaults to 2 pi in all directions.
-        visc_order : int, optional
-            Hyperviscosity order, defaults to 1.
             
         """
     
         # Store inputs
         self.shape = shape
-        self._representation = representation
+        if representation in allowable_representations:
+            self._representation = representation
+        else:
+            raise ValueError("Specified representation is incompatible with this physics class.")
         if length:
             self.length = length
         else:
             self.length = (2 * na.pi,) * len(self.shape)
-        self.visc_order = visc_order
+        self.visc_order = np.array(visc_order)
         
         # Dimensionality
         self.ndim = len(self.shape)
@@ -79,8 +84,9 @@ class Physics(object):
         # Additional setup
         self._field_classes = create_field_classes(
                 self._representation, self.shape, self.length)
-        self.parameters = {}
         self.aux_eqns = {}
+        
+        self._is_finalized = False
     
     def __getitem__(self, item):
          value = self.parameters.get(item, None)
@@ -95,6 +101,11 @@ class Physics(object):
             if k not in exclude:
                 savedict[k] = v
         return (_reconstruct_object, (self.__class__, savedict))
+        
+    def _finalize(self):
+        self._setup_aux_fields(0., self._aux_fields)
+        self._RHS = self.create_fields(0.)
+        self._is_finalized = True
 
     def create_fields(self, time, field_list=None):        
         if field_list == None:
@@ -102,10 +113,6 @@ class Physics(object):
             
         return StateData(time, self.shape, self.length, self._field_classes, 
                          field_list=field_list, params=self.parameters)
-
-    def _setup_parameters(self, params):
-        for k,v in params.iteritems():
-            self.parameters[k] = v
 
     def _setup_aux_fields(self, t, aux_field_list=None):
         self.aux_fields = self.create_fields(t, aux_field_list)
@@ -316,8 +323,29 @@ class Physics(object):
             output[0]['kspace'] = X[0].deriv(self._trans[1])
             output[1]['kspace'] = -X[0].deriv(self._trans[0])
         
-class Hydro(Physics):
-    """Incompressible hydrodynamics."""
+class IncompressibleHydro(Physics):
+    """
+    Incompressible hydrodynamics.
+    
+    Parameters *** Set in self.parameters dictionary after instantiation. ***
+    ----------
+    'viscous_order' : int or dict
+        Hyperviscosity order, specified for each direction through a dictionary,
+        or with an integer for all directions.  Defaults to 1.
+    'nu' : kinematic viscosity
+        Kinematic viscosity, specified for each direction through a dictionary, 
+        or with an integer for all directions.  Defaults to 0.
+    'rho0' : float
+        Background density. Defaults to 1.
+    
+    Example
+    -------
+    >>> physics = IncompressibleHydro((128, 128), FourierRepresentation)
+    >>> physics.parameters['viscous_order'] = {'x': 1, 'y': 2}
+    
+    """
+    
+    allowable_representations = [FourierRepresentation]
     
     def __init__(self, *args, **kwargs):
         Physics.__init__(self, *args, **kwargs)
@@ -330,14 +358,25 @@ class Hydro(Physics):
                             ('ugradu', 'VectorField')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
-        params = {'nu': 0., 'rho0': 1.}
-        self._setup_parameters(params)
-        self._finalized = False
-
-    def _finalize_init(self):
-        self._setup_aux_fields(0., self._aux_fields)
-        self._RHS = self.create_fields(0.)
-        self._finalized = True
+        self.parameters = {'viscous_order': 1,
+                           'nu': 0.,
+                           'rho0': 1.}
+                           
+    def _setup_integrating_factors(self):
+        
+        if type(self.parameters['nu']) == int:
+            nu = self.parameters['nu']
+            self.parameters['nu'] = {'x': nu, 'y': nu, 'z': nu}
+        if type(self.parameters['viscous_order'] == int:
+            vo = self.parameters['viscous_order']
+            self.parameters['viscous_order'] = {'x': vo, 'y': vo, 'z': vo}
+            
+        # Kinematic viscosity for u
+        du = self._RHS['u']
+        for cindex, comp in du:
+            nu = self.parameters['nu'][du.ctrans[cindex]]
+            vo = self.parameters['viscous_order'][du.ctrans[cindex]]
+            comp.integrating_factor = nu * comp.k2() ** vo
 
     def RHS(self, data):
         """
@@ -348,8 +387,10 @@ class Hydro(Physics):
 
         """
         
-        if not self._finalized:
-            self._finalize_init()
+        # Finalize and setup integrating factors
+        if not self._is_finalized:
+            self._finalize()
+            self._setup_integrating_factors()
             
         self._RHS.set_time(data.time)
         self.aux_fields.set_time(data.time)
@@ -372,10 +413,7 @@ class Hydro(Physics):
         # Construct time derivatives
         for i in self.dims:
             self._RHS['u'][i]['kspace'] = -ugradu[i]['kspace'] - pressure[i]['kspace']
-            
-        # Set integrating factors
-        self._RHS['u'].integrating_factor = self.parameters['nu'] * k2 ** self.visc_order
-            
+
         return self._RHS
 
     def pressure(self, data):
@@ -407,6 +445,8 @@ class Hydro(Physics):
 
 class ShearHydro(Hydro):
     """Incompressible hydrodynamics in a shearing box."""
+    
+    allowable_representations = [FourierShearRepresentation]
 
     def RHS(self, data):
         """
@@ -428,6 +468,9 @@ class ShearHydro(Hydro):
         Hydro.RHS(self, data)
         self._RHS['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
         self._RHS['u']['x']['kspace'] += (2. + S) * Omega * data['u']['y']['kspace']
+        
+        # Recalculate integrating factors
+        self._setup_integrating_factors()
         
         return self._RHS
 
@@ -560,11 +603,38 @@ class MHD(Hydro):
                             ('BgradB', 'VectorField'),
                             ('ugradB', 'VectorField'),
                             ('Bgradu', 'VectorField')]
-        
+
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
-        params = {'nu': 0., 'rho0': 1., 'eta': 0.}
-        self._setup_parameters(params)
-        self._finalized = False
+        self.parameters = {'viscous_order': 1,
+                           'rho0': 1.,
+                           'nu': 0.,
+                           'eta': 0.}
+                           
+    def _setup_integrating_factors(self):
+        
+        if type(self.parameters['viscous_order'] == int:
+            vo = self.parameters['viscous_order']
+            self.parameters['viscous_order'] = {'x': vo, 'y': vo, 'z': vo}
+        if type(self.parameters['nu']) == int:
+            nu = self.parameters['nu']
+            self.parameters['nu'] = {'x': nu, 'y': nu, 'z': nu}
+        if type(self.parameters['eta']) == int:
+            eta = self.parameters['eta']
+            self.parameters['eta'] = {'x': eta, 'y': eta, 'z': eta}
+            
+        # Kinematic viscosity for u
+        du = self._RHS['u']
+        for cindex, comp in du:
+            nu = self.parameters['nu'][du.ctrans[cindex]]
+            vo = self.parameters['viscous_order'][du.ctrans[cindex]]
+            comp.integrating_factor = nu * comp.k2() ** vo
+            
+        # Magnetic diffusivity for B
+        dB = self._RHS['B']
+        for cindex, comp in du:
+            eta = self.parameters['eta'][du.ctrans[cindex]]
+            vo = self.parameters['viscous_order'][du.ctrans[cindex]]
+            comp.integrating_factor = eta * comp.k2() ** vo
 
     def RHS(self, data):
         """
@@ -579,7 +649,7 @@ class MHD(Hydro):
         
         if not self._finalized:
             self._finalize_init()
-        
+            self._setup_integrating_factors()
         
         self._RHS.set_time(data.time)
         self.aux_fields.set_time(data.time)
@@ -610,10 +680,6 @@ class MHD(Hydro):
                                            Ptotal[i]['kspace'])
                                            
             self._RHS['B'][i]['kspace'] = Bgradu[i]['kspace'] - ugradB[i]['kspace']
-
-        # Set integrating factors
-        self._RHS['u'].integrating_factor = self.parameters['nu'] * k2 ** self.visc_order
-        self._RHS['B'].integrating_factor = self.parameters['eta'] * k2 ** self.visc_order
 
         self._RHS.time = data.time        
         return self._RHS
@@ -676,6 +742,9 @@ class ShearMHD(MHD):
         self._RHS['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
         self._RHS['u']['x']['kspace'] += (2 + S) * Omega * data['u']['y']['kspace']
         self._RHS['B']['x']['kspace'] += -S * Omega * data['B']['y']['kspace']
+        
+        # Recalculate integrating factors
+        self._setup_integrating_factors()
         
         return self._RHS
         
