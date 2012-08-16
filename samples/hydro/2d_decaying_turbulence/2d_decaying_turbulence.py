@@ -24,12 +24,13 @@ License:
 from dedalus.mods import *
 
 shape = (450, 450)
-RHS = Hydro(shape, FourierRepresentation, visc_order=2)
+RHS = Hydro(shape, FourierRepresentation)
+RHS.parameters['viscous_order'] = 2
 RHS.parameters['nu'] = 3.5e-9
 data = RHS.create_fields(0.)
 
 turb_new(data, mcwilliams_spec, k0=30., E0=1.)
-ti = RK2simplevisc(RHS, CFL=0.4)
+ti = RK2mid(RHS, CFL=0.4)
 ti.stop_time(1.) # set stoptime
 ti.stop_walltime(36000.) # stop after 10 hours
 

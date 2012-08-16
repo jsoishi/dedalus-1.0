@@ -52,7 +52,7 @@ if mode:
     data['T']['kspace'][tuple(mode)] = -1j*RHS.parameters['beta']/np.sqrt(kx**2/(kx**2 + kz**2)) * uz
     
 # Integration parameters
-ti = RK2simplevisc(RHS)
+ti = RK2mid(RHS)
 ti.stop_time(2.) # 2 wave periods
 #ti.stop_iter(1)
 ti.stop_walltime(86400.) # stop after 24 hours
