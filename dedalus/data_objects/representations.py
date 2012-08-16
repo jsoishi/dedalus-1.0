@@ -30,7 +30,7 @@ from dedalus.config import decfg
 from dedalus.utils.parallelism import com_sys, swap_indices, get_plane
 from dedalus.utils.logger import mylog
 from dedalus.utils.fftw import fftw
-from dedalus.utils.timer import Timer
+from dedalus.utils.timer import timer
 try:
     import pycuda.autoinit
     import pycuda.gpuarray as gpuarray
@@ -46,7 +46,7 @@ class Representation(object):
     """
 
     def __init__(self, sd, shape, length):
-        self.integrating_factor = None
+        pass
 
 class FourierRepresentation(Representation):
     """
@@ -55,7 +55,7 @@ class FourierRepresentation(Representation):
     
     """
     
-    timer = Timer()
+    timer = timer
     
     def __init__(self, sd, shape, length):
         """
@@ -200,6 +200,8 @@ class FourierRepresentation(Representation):
 
     def _setup_k(self):
         """Create local wavenumber arrays."""
+        
+        self._static_k = True
     
         # Get Nyquist wavenumbers
         self.kny = na.pi * self.global_shape['xspace'] / self.length
@@ -385,6 +387,7 @@ class FourierRepresentation(Representation):
         self.require_space('kspace')
         self.data[dmask] = 0.
         
+    @timer
     def dealias_23_cython(self):
         """Orszag 2/3 dealiasing rule implemented in cython."""
         
@@ -412,7 +415,7 @@ class FourierRepresentation(Representation):
         
         return self.deriv_data
 
-    def k2(self, no_zero=False):
+    def k2(self, no_zero=False, set_zero=1.):
         """
         Calculate wavenumber magnitudes squared.  If keyword 'no_zero' is True, 
         set the mean mode amplitude to 1 (useful for division).
@@ -423,7 +426,7 @@ class FourierRepresentation(Representation):
         for k in self.k.values():
             k2 += k ** 2
         if no_zero:
-            k2[k2 == 0] = 1.
+            k2[k2 == 0] = set_zero
             
         return k2
         
@@ -538,7 +541,7 @@ class FourierShearRepresentation(FourierRepresentation):
         
     """
     
-    timer = Timer()
+    timer = timer
     
     def __init__(self, sd, shape, length):    
         """
@@ -573,6 +576,7 @@ class FourierShearRepresentation(FourierRepresentation):
         FourierRepresentation.__init__(self, sd, shape, length)
         
         # Store initial copy of ky, allocate a fleshed-out ky
+        self._static_k = False
         self._ky = self.k['y'].copy()
         self.k['y'] = self.k['y'] * na.ones_like(self.k['x'])
         

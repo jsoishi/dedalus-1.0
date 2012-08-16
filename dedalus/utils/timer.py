@@ -62,6 +62,8 @@ class Timer(object):
                 print "%s: %10.5f sec" % (k,v)
             print
 
+timer = Timer()
+
 if __name__ == "__main__":
     timer = Timer()
 

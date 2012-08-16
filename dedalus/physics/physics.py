@@ -26,7 +26,7 @@ License:
 """
 
 import numpy as na
-from dedalus.data_objects.representations import FourierRepresentation,
+from dedalus.data_objects.representations import FourierRepresentation, \
         FourierShearRepresentation
 from dedalus.utils.logger import mylog
 from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
@@ -67,7 +67,7 @@ class Physics(object):
     
         # Store inputs
         self.shape = shape
-        if representation in allowable_representations:
+        if representation in self.__class__.allowable_representations:
             self._representation = representation
         else:
             raise ValueError("Specified representation is incompatible with this physics class.")
@@ -75,7 +75,6 @@ class Physics(object):
             self.length = length
         else:
             self.length = (2 * na.pi,) * len(self.shape)
-        self.visc_order = np.array(visc_order)
         
         # Dimensionality
         self.ndim = len(self.shape)
@@ -358,25 +357,28 @@ class IncompressibleHydro(Physics):
                             ('ugradu', 'VectorField')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
-        self.parameters = {'viscous_order': 1,
-                           'nu': 0.,
-                           'rho0': 1.}
+        self.parameters = {'rho0': 1.,
+                           'viscous_order': 1,
+                           'nu': 0.}
                            
     def _setup_integrating_factors(self):
         
-        if type(self.parameters['nu']) == int:
-            nu = self.parameters['nu']
-            self.parameters['nu'] = {'x': nu, 'y': nu, 'z': nu}
-        if type(self.parameters['viscous_order'] == int:
+        if na.isscalar(self.parameters['viscous_order']):
             vo = self.parameters['viscous_order']
             self.parameters['viscous_order'] = {'x': vo, 'y': vo, 'z': vo}
+        if na.isscalar(self.parameters['nu']):
+            nu = self.parameters['nu']
+            self.parameters['nu'] = {'x': nu, 'y': nu, 'z': nu}
             
         # Kinematic viscosity for u
         du = self._RHS['u']
         for cindex, comp in du:
             nu = self.parameters['nu'][du.ctrans[cindex]]
             vo = self.parameters['viscous_order'][du.ctrans[cindex]]
-            comp.integrating_factor = nu * comp.k2() ** vo
+            if nu != 0.:
+                comp.integrating_factor = nu * comp.k2() ** vo
+            else:
+                comp.integrating_factor = None
 
     def RHS(self, data):
         """
@@ -443,7 +445,7 @@ class IncompressibleHydro(Physics):
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             #pressure[i].zero_nyquist()
 
-class ShearHydro(Hydro):
+class ShearHydro(IncompressibleHydro):
     """Incompressible hydrodynamics in a shearing box."""
     
     allowable_representations = [FourierShearRepresentation]
@@ -510,7 +512,7 @@ class ShearHydro(Hydro):
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             #pressure[i].zero_nyquist()
 
-class BoussinesqHydro(Hydro):
+class BoussinesqHydro(IncompressibleHydro):
     def __init__(self, *args, **kwargs):
         Physics.__init__(self, *args, **kwargs)
         
@@ -586,7 +588,7 @@ class BoussinesqHydro(Hydro):
         for i in self.dims:
             pressure[i]['kspace'] += data['T'].k[self._trans[i]] * self.parameters['g'] * self.parameters['alpha_t'] * data['T'].k['z'] * data['T']['kspace']/k2
 
-class MHD(Hydro):
+class MHD(IncompressibleHydro):
     """Incompressible magnetohydrodynamics."""
     
     def __init__(self, *args, **kwargs):
@@ -605,20 +607,20 @@ class MHD(Hydro):
                             ('Bgradu', 'VectorField')]
 
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
-        self.parameters = {'viscous_order': 1,
-                           'rho0': 1.,
+        self.parameters = {'rho0': 1.,
+                           'viscous_order': 1,
                            'nu': 0.,
                            'eta': 0.}
                            
     def _setup_integrating_factors(self):
         
-        if type(self.parameters['viscous_order'] == int:
+        if na.isscalar(self.parameters['viscous_order']):
             vo = self.parameters['viscous_order']
             self.parameters['viscous_order'] = {'x': vo, 'y': vo, 'z': vo}
-        if type(self.parameters['nu']) == int:
+        if na.isscalar(self.parameters['nu']):
             nu = self.parameters['nu']
             self.parameters['nu'] = {'x': nu, 'y': nu, 'z': nu}
-        if type(self.parameters['eta']) == int:
+        if na.isscalar(self.parameters['eta']):
             eta = self.parameters['eta']
             self.parameters['eta'] = {'x': eta, 'y': eta, 'z': eta}
             
@@ -627,14 +629,20 @@ class MHD(Hydro):
         for cindex, comp in du:
             nu = self.parameters['nu'][du.ctrans[cindex]]
             vo = self.parameters['viscous_order'][du.ctrans[cindex]]
-            comp.integrating_factor = nu * comp.k2() ** vo
+            if nu != 0.:
+                comp.integrating_factor = nu * comp.k2() ** vo
+            else:
+                comp.integrating_factor = None
             
         # Magnetic diffusivity for B
         dB = self._RHS['B']
         for cindex, comp in du:
             eta = self.parameters['eta'][du.ctrans[cindex]]
             vo = self.parameters['viscous_order'][du.ctrans[cindex]]
-            comp.integrating_factor = eta * comp.k2() ** vo
+            if eta != 0.:
+                comp.integrating_factor = eta * comp.k2() ** vo
+            else:
+                comp.integrating_factor = None
 
     def RHS(self, data):
         """

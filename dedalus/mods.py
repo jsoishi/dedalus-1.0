@@ -54,7 +54,7 @@ from dedalus.init_cond.api import \
     kida_vortex
 
 from dedalus.physics.api import \
-    Hydro, \
+    IncompressibleHydro, \
     BoussinesqHydro, \
     ShearHydro, \
     MHD, \
@@ -67,10 +67,9 @@ from dedalus.physics.api import \
     CollisionlessCosmology
 
 from dedalus.time_stepping.api import \
-    RK2simple,\
-    RK2simplevisc, \
-    CrankNicholsonVisc, \
-    RK4simplevisc
+    RK2mid,\
+    RK4, \
+    CrankNicholsonVisc
 
 from dedalus.utils.api import \
     restart, \

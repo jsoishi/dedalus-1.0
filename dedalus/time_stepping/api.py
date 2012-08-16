@@ -22,7 +22,6 @@ License:
 """
 
 from time_step import \
-    RK2simple,\
-    RK2simplevisc, \
-    CrankNicholsonVisc, \
-    RK4simplevisc
+    RK2mid,\
+    RK4, \
+    CrankNicholsonVisc
