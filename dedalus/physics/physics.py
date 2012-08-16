@@ -445,7 +445,7 @@ class IncompressibleHydro(Physics):
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             #pressure[i].zero_nyquist()
 
-class ShearHydro(IncompressibleHydro):
+class ShearIncompressibleHydro(IncompressibleHydro):
     """Incompressible hydrodynamics in a shearing box."""
     
     allowable_representations = [FourierShearRepresentation]
@@ -588,7 +588,7 @@ class BoussinesqHydro(IncompressibleHydro):
         for i in self.dims:
             pressure[i]['kspace'] += data['T'].k[self._trans[i]] * self.parameters['g'] * self.parameters['alpha_t'] * data['T'].k['z'] * data['T']['kspace']/k2
 
-class MHD(IncompressibleHydro):
+class IncompressibleMHD(IncompressibleHydro):
     """Incompressible magnetohydrodynamics."""
     
     def __init__(self, *args, **kwargs):
@@ -722,7 +722,7 @@ class MHD(IncompressibleHydro):
             Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             #Ptotal[i].zero_nyquist()
     
-class ShearMHD(MHD):
+class ShearIncompressibleMHD(MHD):
     """Incompressible magnetohydrodynamics in a shearing box."""
 
     def RHS(self, data):

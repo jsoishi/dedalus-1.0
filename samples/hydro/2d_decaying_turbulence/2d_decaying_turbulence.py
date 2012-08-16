@@ -24,7 +24,7 @@ License:
 from dedalus.mods import *
 
 shape = (450, 450)
-RHS = Hydro(shape, FourierRepresentation)
+RHS = IncompressibleHydro(shape, FourierRepresentation)
 RHS.parameters['viscous_order'] = 2
 RHS.parameters['nu'] = 3.5e-9
 data = RHS.create_fields(0.)

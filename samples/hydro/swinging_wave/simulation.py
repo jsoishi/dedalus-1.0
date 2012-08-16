@@ -32,7 +32,7 @@ from dedalus.mods import *
 
 shape = (30, 10)
 length = (2 * np.pi, 100 * 2 * np.pi)
-RHS = ShearHydro(shape, FourierShearRepresentation, length=length)
+RHS = ShearIncompressibleHydro(shape, FourierShearRepresentation, length=length)
 RHS.parameters['Omega'] = 1.
 RHS.parameters['S'] = -1.5
 data = RHS.create_fields(0.)
