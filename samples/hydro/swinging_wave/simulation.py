@@ -42,7 +42,7 @@ k = (0.01, 4)
 w = 0.01
 vorticity_wave(data, k, w)
 
-ti = RK2simple(RHS,CFL=0.4)
+ti = RK2mid(RHS,CFL=0.4)
 ti.stop_iter(1e6)
 ti.stop_time(534)
 ti.set_nsnap(10000)
