@@ -230,7 +230,6 @@ class Snapshot(AnalysisTask):
 
                               
         if com_sys.myproc == 0:
-            start = time.time()
             # Change figure title
             tstr = r'$t = %6.3f$' % data.time
             self.timestring.set_text(tstr)            
@@ -245,9 +244,6 @@ class Snapshot(AnalysisTask):
                 slicestr = '%s_%i_' %(self.axis, outindex)
             outfile = "frames/%s_snap_%sn%07i.png" %(spacestr, slicestr, it)
             self.fig.savefig(outfile, dpi=100)
-            
-            stop = time.time()
-            print '    save time: %f' %(stop - start)
             
         if self.firstrun:
             self.firstrun = False
@@ -568,7 +564,7 @@ class PowerSpectrum(AnalysisTask):
                 # Create figure and axes grid
                 ncols = len(fieldlist)
                 self.fig, self.axes = plt.subplots(1, ncols, num=self._n, 
-                        figsize=(6 * ncols, 6))
+                        figsize=(6 * ncols, 6), squeeze=False)
                                          
                 # Directory setup
                 if not os.path.exists('frames'):

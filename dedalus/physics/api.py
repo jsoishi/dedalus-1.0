@@ -22,7 +22,7 @@ License:
 """
 
 from .physics import \
-    Hydro,\
+    IncompressibleHydro,\
     BoussinesqHydro,\
     ShearHydro, \
     MHD, \

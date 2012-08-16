@@ -29,7 +29,7 @@ import numpy as na
 from dedalus.utils.parallelism import com_sys
 from dedalus.utils.logger import mylog
 from dedalus.funcs import insert_ipython, get_mercurial_changeset_id
-from dedalus.utils.api import Timer
+from dedalus.utils.timer import timer
 
 try:
     from dedalus.__hg_version__ import hg_version
@@ -40,7 +40,7 @@ except:
     hg_version = "unknown"
 
 class TimeStepBase(object):
-    timer = Timer()
+    timer = timer
     def __init__(self, RHS, CFL=0.4, int_factor=None):
         """Base class for dedalus time stepping methods. Provides
         stopping controls, statistics, and (eventually) a snapshotting
@@ -64,6 +64,14 @@ class TimeStepBase(object):
         self._dtsnap = 1.
 
         self._start_time = time.time()
+        
+        # Import Cython step functions
+        if self.RHS.ndim == 2:
+            from forward_step_cy_2d import linear_step, intfac_step
+        else:
+            from forward_step_cy_3d import linear_step, intfac_step
+        self.linear_step = linear_step
+        self.intfac_step = intfac_step
 
     @property
     def ok(self):
@@ -150,79 +158,93 @@ class TimeStepBase(object):
         """
         self.snapshot(data)
         self.final_stats()
+            
+    @timer
+    def forward_step(self, start, deriv, output, dt):
+        """
+        Take a step in all fields using forward-Euler for components without
+        integrating factors.  Compiled in Cython for speed.
+        
+        Parameters
+        ----------
+        start : StateData object
+            Data at initial time
+        deriv : StateData object
+            Time derivatives
+        output : StateData object
+            Container for output
+        dt : float
+            Timestep
+            
+        """
+        
+        # Loop over field components in output
+        for fname, field in output:
+            for cindex, comp in field:
+                if deriv[fname][cindex].integrating_factor is None:
+                    self.linear_step(start[fname][cindex]['kspace'], 
+                                     deriv[fname][cindex]['kspace'], 
+                                     comp['kspace'],
+                                     dt)
+                else:
+                    self.intfac_step(start[fname][cindex]['kspace'], 
+                                     deriv[fname][cindex]['kspace'], 
+                                     comp['kspace'],
+                                     deriv[fname][cindex].integrating_factor,
+                                     dt)
+                                
+        # Update time
+        output.set_time(start.time + dt)
 
-
-class RK2simple(TimeStepBase):
-    """Basic second-order (midpoint) Runga-Kutta integrator."""
+class RK2mid(TimeStepBase):
+    """
+    Second-order explicit midpoint Runge-Kutta method.
+   
+    k1 = h * f(t_n, y_n)
+    k2 = h * f(t_n + h / 2, y_n + k1 / 2)
+    
+    y_(n+1) = y_n + k2 + O(h ** 3)   
+    
+      0  |  0    0    
+     1/2 | 1/2   0
+    ----------------
+         |  0    1
+   
+    """
         
     def __init__(self, *arg, **kwargs):        
         TimeStepBase.__init__(self, *arg, **kwargs)
         
-        # Create StateData for storing stage
-        self.tmp_fields = self.RHS.create_fields(0.)
-        
-        # Create internal reference to derivative StateData from RHS
-        self.field_dt = None
+        # Create StateData for constructing increments
+        self.temp_data = self.RHS.create_fields(0.)
        
-
     def do_advance(self, data, dt):
-        """
-        from NR:
-          k1 = h * RHS(x_n, y_n)
-          k2 = h * RHS(x_n + 1/2*h, y_n + 1/2*k1)
-          y_n+1 = y_n + k2 +O(h**3)
-          
-          Peyret 143 for high order
-        """
+
+        # Construct k1
+        deriv = self.RHS.RHS(data)
         
-        # First step
-        self.field_dt = self.RHS.RHS(data)
-        linear_step(data, self.field_dt, dt / 2., self.tmp_fields)
-
+        # Store initial integrating factors for the complete step
+        for fname, field in self.temp_data:
+            for cindex, comp in field:
+                if comp._static_k or (deriv[fname][cindex].integrating_factor is None):
+                    comp.integrating_factor = deriv[fname][cindex].integrating_factor
+                else:
+                    comp.integrating_factor = deriv[fname][cindex].integrating_factor.copy()
+        
+        # Construct k2
+        self.forward_step(data, deriv, self.temp_data, dt / 2.)
         for a in self.RHS.aux_eqns.values():
-            a_old = a.value # OK if we only have one aux eqn...
-            # need to update actual value so RHS can use it
-            a.value = a.value + dt / 2. * a.RHS(a.value)
-
-        # Second step
-        self.field_dt = self.RHS.RHS(self.tmp_fields)
-        linear_step(data, self.field_dt, dt, data)
-
-        for a in self.RHS.aux_eqns.values():
-            a.value = a_old + dt * a.RHS(a.value)
-                     
-        # Update integrator stats
-        self.time += dt
-        self.iter += 1
-        for k,f in data.fields.iteritems():
-            self.tmp_fields[k].zero_all() 
-            self.field_dt[k].zero_all()
-
-class RK2simplevisc(RK2simple):
-    """Midpoint RK2 with integrating factors."""
-    
-    def do_advance(self, data, dt):
-        """
-        from NR:
-          k1 = h * RHS(x_n, y_n)
-          k2 = h * RHS(x_n + 1/2*h, y_n + 1/2*k1)
-          y_n+1 = y_n + k2 +O(h**3)
-        """
-
-        # First step
-        self.field_dt = self.RHS.RHS(data)
-        integrating_factor_step(data, self.field_dt, dt / 2., self.tmp_fields)
-              
-        for a in self.RHS.aux_eqns.values():
-            # OK if we only have one aux eqn...
-            # need to update actual value so RHS can use it
             a_old = a.value 
-            a.value = a.value + dt / 2. * a.RHS(a.value)
+            a.value = a_old + dt / 2. * a.RHS(a.value)
+        deriv = self.RHS.RHS(self.temp_data)
+        
+        # Retrieve initial integrating factors for the complete step
+        for fname, field in self.temp_data:
+            for cindex, comp in field:
+                deriv[fname][cindex].integrating_factor = comp.integrating_factor
 
-        # Second step
-        self.field_dt = self.RHS.RHS(self.tmp_fields)
-        integrating_factor_step(data, self.field_dt, dt, data)
-
+        # Complete step
+        self.forward_step(data, deriv, data, dt)
         for a in self.RHS.aux_eqns.values():
             a.value = a_old + dt * a.RHS(a.value)
 
@@ -230,85 +252,87 @@ class RK2simplevisc(RK2simple):
         self.time += dt
         self.iter += 1
         
-class RK4simplevisc(RK2simple):
-    """Standard RK4 with integrating factors."""
+class RK4(TimeStepBase):
+    """
+    Fourth-order explicit classical Runge-Kutta method.
+   
+    k1 = h * f(t_n, y_n)
+    k2 = h * f(t_n + h / 2, y_n + k1 / 2)
+    k3 = h * f(t_n + h / 2, y_n + k2 / 2)
+    k4 = h * f(t_n + h, y_n + k3)
+      
+    y_(n+1) = y_n + (k1 + 2 * k2 + 2 * k3 + k4) / 6 + O(h ** 5)
+
+      0  |  0    0    0    0
+     1/2 | 1/2   0    0    0
+     1/2 |  0   1/2   0    0
+      1  |  0    0    1    0
+    --------------------------
+         | 1/6  1/3  1/3  1/6
+   
+    """
     
     def __init__(self, *arg, **kwargs):        
         TimeStepBase.__init__(self, *arg, **kwargs)
         
-        # Create StateData for storing stages
-        self.tmp_stage = self.RHS.create_fields(0.)
+        # Create StateData for constructing increments
+        self.temp_data = self.RHS.create_fields(0.)
         
-        # Create StateData for building final step
-        self.tmp_final = self.RHS.create_fields(0.)
-        
-        # Create internal reference to derivative StateData from RHS
-        self.field_dt = None
-
+        # Create StateData for combining increments
+        self.total_deriv = self.RHS.create_fields(0.)
     
     def do_advance(self, data, dt):
-        """
-        k1 = RHS(t_n, y_n)
-        k2 = RHS(t_n + h / 2, y_n + dt / 2 * k1)
-        k3 = RHS(t_n + h / 2, y_n + dt / 2 * k2)
-        k4 = RHS(t_n + h, y_n + dt * k3)
-          
-        y_n+1 = y_n + dt * (k1 + 2 * k2 + 2 * k3 + k4) / 6 + O(h ** 5)
-        t_n+1 = t_n + h
-        """
-        
-        # First stage
-        self.field_dt = self.RHS.RHS(data)
-        
-        for k,f in data.fields.iteritems():
-            for i in xrange(f.ncomp):
-                self.tmp_final[k][i]['kspace'] = self.field_dt[k][i]['kspace'] / 6.
-        integrating_factor_step(data, self.field_dt, dt / 2., self.tmp_stage)                
+
+        # Construct k1
         for a in self.RHS.aux_eqns.values():
-            # OK if we only have one aux eqn...
-            # need to update actual value so RHS can use it
-            a_old = a.value 
+            a_old = a.value
             a_final_dt = a.RHS(a.value) / 6.
-            a.value = a_old + dt / 2. * a.RHS(a.value)
+        deriv = self.RHS.RHS(data)
+        for fname, field in self.total_deriv:
+            for cindex, comp in field:
+                comp['kspace'] = deriv[fname][cindex]['kspace'] / 6.
                 
-        # Second stage
-        self.field_dt = self.RHS.RHS(self.tmp_stage)
+                # Retrieve initial integrating factors for the complete step
+                if comp._static_k or (deriv[fname][cindex].integrating_factor is None):
+                    comp.integrating_factor = deriv[fname][cindex].integrating_factor
+                else:
+                    comp.integrating_factor = deriv[fname][cindex].integrating_factor.copy()
+                    
+        # Construct k2
+        self.forward_step(data, deriv, self.temp_data, dt / 2.)              
+        for a in self.RHS.aux_eqns.values():
+            a.value = a_old + dt / 2. * a.RHS(a.value)
+            a_final_dt += a.RHS(a.value) / 3.
+            
+        deriv = self.RHS.RHS(self.temp_data)
+        for fname, field in self.total_deriv:
+            for cindex, comp in field:
+                comp['kspace'] += deriv[fname][cindex]['kspace'] / 3.
         
-        for k,f in data.fields.iteritems():
-            for i in xrange(f.ncomp):
-                self.tmp_final[k][i]['kspace'] += self.field_dt[k][i]['kspace'] / 3.
-        integrating_factor_step(data, self.field_dt, dt / 2., self.tmp_stage)                
+        # Construct k3
+        self.forward_step(data, deriv, self.temp_data, dt / 2.)            
         for a in self.RHS.aux_eqns.values():
-            a_final_dt += a.RHS(a.value) / 3.
             a.value = a_old + dt / 2. * a.RHS(a.value)
-                
-        # Third stage
-        self.field_dt = self.RHS.RHS(self.tmp_stage)
-                       
-        for k,f in data.fields.iteritems():
-            for i in xrange(f.ncomp):
-                self.tmp_final[k][i]['kspace'] += self.field_dt[k][i]['kspace'] / 3.
-
-        integrating_factor_step(data, self.field_dt, dt, self.tmp_stage)                
-        for a in self.RHS.aux_eqns.values():
             a_final_dt += a.RHS(a.value) / 3.
-            a.value = a_old + dt * a.RHS(a.value)
-                
-        # Fourth stage
-        self.field_dt = self.RHS.RHS(self.tmp_stage)
+        
+        deriv = self.RHS.RHS(self.temp_data)
+        for fname, field in self.total_deriv:
+            for cindex, comp in field:
+                comp['kspace'] += deriv[fname][cindex]['kspace'] / 3.
 
-        for k,f in data.fields.iteritems():
-            self.tmp_final[k].integrating_factor = self.field_dt[k].integrating_factor
-            for i in xrange(f.ncomp):
-                self.tmp_final[k][i]['kspace'] += self.field_dt[k][i]['kspace'] / 6.
-
-                
+        # Construct k4
+        self.forward_step(data, deriv, self.temp_data, dt)            
         for a in self.RHS.aux_eqns.values():
+            a.value = a_old + dt * a.RHS(a.value)
             a_final_dt += a.RHS(a.value) / 6.
         
-        # Final step
-        integrating_factor_step(data, self.tmp_final, dt, data)
-
+        deriv = self.RHS.RHS(self.temp_data)
+        for fname, field in self.total_deriv:
+            for cindex, comp in field:
+                comp['kspace'] += deriv[fname][cindex]['kspace'] / 6.
+                
+        # Complete step
+        self.forward_step(data, self.total_deriv, data, dt)
         for a in self.RHS.aux_eqns.values():
             a.value = a_old + dt * a_final_dt
 
@@ -337,50 +361,4 @@ class CrankNicholsonVisc(TimeStepBase):
         data.set_time(data.time + dt)
         self.time += dt
         self.iter += 1
-            
-def linear_step(start, deriv, dt, output):
-    """
-    Take a linear step in all fields.
-    
-    Inputs:
-        start       StateData object at initial time
-        deriv       StateData object containing derivatives
-        dt          Timestep
-        output      StateData object to take the output
-        
-    """
-    
-    output.set_time(start.time + dt)
-    
-    for k,f in start.fields.iteritems():
-        for i in xrange(f.ncomp):
-            output[k][i]['kspace'] = start[k][i]['kspace'] + dt * deriv[k][i]['kspace']            
-                
-def integrating_factor_step(start, deriv, dt, output):
-    """
-    Take a step using integrating factors in all fields.
-    
-    Inputs:
-        start       StateData object at initial time
-        deriv       StateData object containing derivatives
-        dt          Timestep
-        output      StateData object to take the output
-        
-    """
-    
-    output.set_time(start.time + dt)
-    
-    for k,f in start.fields.iteritems():
-        # Exponentiate the integrating factor
-        IF = deriv[k].integrating_factor
-
-        # Turn zeros into small numbers: to first order, reduces to linear step
-        if IF == None:
-            IF = 1e-10
-        else:
-            IF[IF == 0] = 1e-10
-        EIF = na.exp(IF * dt)
-        EIF1 = na.zeros_like(EIF)
-        na.subtract(EIF, 1, EIF1)
-        for i in xrange(f.ncomp):
-            output[k][i]['kspace'] = (start[k][i]['kspace'] + deriv[k][i]['kspace'] / IF * (EIF - 1.)) / EIF
+   
