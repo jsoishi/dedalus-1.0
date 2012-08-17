@@ -208,7 +208,7 @@ class ScalarFieldBase(BaseField):
         if item == 0:
             self.components[0] = data
         else:
-            self.components[0].__setitem__(item, data)
+            self.components[0][item] = data
 
     def __getattr__(self, attr):
         """

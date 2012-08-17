@@ -697,58 +697,10 @@ class PowerSpectrum(AnalysisTask):
 class VolumeAverage(AnalysisTask):
     """Run volume average tasks."""
     
-    def __init__(self, iter, va_obj):
-        AnalysisTask.__init__(self, iter)
-        self.va_obj=va_obj
+    def __init__(self, cadence, volume_average_object):
+        self.cadence = cadence
+        self.volume_average_object = volume_average_object
+        
     def run(self, data, it):
-        self.va_obj.run()
+        self.volume_average_object.run()
        
-
-
-# @AnalysisSet.register_task
-# def compare_power(data, it, f1='delta_b', f2='delta_c', comparison='ratio', output_columns=True):
-#     """Compare power spectrum of two fields. Defaults for baryon
-# 
-#     Inputs:
-#         data            Data object
-#         it              Iteration number
-#         f1, f2          Fields to compare
-#         comparison      'ratio'      : use P(f1)/P(f2) (default)
-#                         'difference' : use P(f1) - P(f2) 
-#         output_columns  if True, output data as columns in a file
-# 
-#     """
-#     k, spec_f1 = compute_en_spec(data, f1, averaging='nonzero')
-#     k, spec_f2 = compute_en_spec(data, f2, averaging='nonzero')
-# 
-#     if com_sys.myproc != 0:
-#         return
-# 
-#     if not os.path.exists('frames'):
-#         os.mkdir('frames')
-# 
-#     if output_columns:
-#         outfile = open('frames/spec_data_%s_%s_%04i.txt'%(f1,f2,it), 'w')
-#         for ak, s1, s2 in zip(k, spec_f1, spec_f2):
-#             outfile.write('%08f\t%08e\t%08e\n'%(ak, s1, s2))
-#         outfile.close()
-#         return
-# 
-#     fig = P.figure(figsize=(8,6))
-# 
-#     if comparison == 'ratio':
-#         spec_f2[spec_f2==0] = 1.
-#         spec_compare = spec_f1/spec_f2
-#         P.title('Comparison of %s and %s power, t = %5.2f' %(f1, f2, data.time))
-#         P.ylabel(r"P(%s)/P(%s)" %(f1, f2))
-#     elif comparison == 'difference':
-#         spec_compare = spec_f1 - spec_f2
-#         P.title('Comparison of %s and %s power, t = %5.2f' %(f1, f2, data.time))
-#         P.ylabel(r"$P(%s) - P(%s)$" %(f1, f2))
-#         
-#     P.xlabel(r"$k$")
-#     P.loglog(k[1:], spec_compare[1:], 'o-')
-#     
-#     outfile = "frames/cmpspec_%s_%s_%04i.png" %(f1, f2, it)
-#     P.savefig(outfile)
-#     P.clf()
