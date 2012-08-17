@@ -117,6 +117,7 @@ setup(
                              library_dirs=[fftw_get_lib()]),
                    Extension("dedalus.data_objects.dealias_cy_2d", ["dedalus/data_objects/dealias_cy_2d.pyx"]),
                    Extension("dedalus.data_objects.dealias_cy_3d", ["dedalus/data_objects/dealias_cy_3d.pyx"]),
-                   Extension("dedalus.time_stepping.forward_step_cy_2d", ["dedalus/time_stepping/forward_step_cy_2d.pyx"])]
+                   Extension("dedalus.time_stepping.forward_step_cy_2d", ["dedalus/time_stepping/forward_step_cy_2d.pyx"]),
+                   Extension("dedalus.time_stepping.forward_step_cy_3d", ["dedalus/time_stepping/forward_step_cy_3d.pyx"])]
     
     )
