@@ -530,7 +530,7 @@ class BoussinesqHydro(IncompressibleHydro):
     def _setup_integrating_factors(self):
     
         # Kinematic viscosity for u
-        IncompressibleHydro._setup_integrating_factors()
+        IncompressibleHydro._setup_integrating_factors(self)
 
         # Thermal diffusivity for T
         kappa = self.parameters['kappa']
@@ -622,7 +622,7 @@ class IncompressibleMHD(IncompressibleHydro):
     def _setup_integrating_factors(self):
     
         # Kinematic viscosity for u
-        IncompressibleHydro._setup_integrating_factors()
+        IncompressibleHydro._setup_integrating_factors(self)
 
         # Magnetic diffusivity for B
         for cindex, comp in self._RHS['B']:
