@@ -533,9 +533,9 @@ class BoussinesqHydro(IncompressibleHydro):
         IncompressibleHydro._setup_integrating_factors(self)
 
         # Thermal diffusivity for T
+        comp = self._RHS['T'][0]
         kappa = self.parameters['kappa']
         vo = self.parameters['viscosity_order']
-        comp = self._RHS['T'][0]
         if kappa == 0.:
             comp.integrating_factor = None
         else:

@@ -36,7 +36,7 @@ from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
 from dedalus.utils.parallelism import com_sys, get_plane
 from dedalus.config import decfg
-import time
+
 
 class AnalysisSet(object):
 
@@ -58,11 +58,12 @@ class AnalysisSet(object):
     def cleanup(self):
         for task in self.tasks:
             task.cleanup(self.data, self.ti.iter)
+       
               
 class AnalysisTask(object):
 
-    def __init__(self, cadence, **kwargs):
-        self.cadence = cadence
+    def __init__(self, cadence, *args, **kwargs):
+        pass
         
     def setup(self, data, iter):
         pass
@@ -72,6 +73,7 @@ class AnalysisTask(object):
         
     def cleanup(self, data, iter):
         pass
+        
         
 class Snapshot(AnalysisTask):
     def __init__(self, cadence, space=None, axis=None, index=None, units=None):
@@ -83,53 +85,47 @@ class Snapshot(AnalysisTask):
         cadence : int
             Iteration cadence for running task.
         space: str, optional
-            'xspace' or 'kspace'
+            'xspace' or 'kspace'. Default: config setting
         axis : str, optional
-            Axis normal to desired slice. Ignored for 2D data.
-            i.e. 'x' for a y-z plane
-                 'y' for a x-z plane
-                 'z' for a x-y plane
+            Axis normal to desired slice, i.e.
+                'x' for a y-z plane
+                'y' for a x-z plane
+                'z' for a x-y plane
+            Ignored for 2D data. Default: config setting
         index : int or string, optional
             Index for slicing as an integer, or 'top', 'middle', or 'bottom'.
-            Ignored for 2D data.
+            Ignored for 2D data. Default: config setting
         units : boolean, optional
             True for physical-space layout and units.
             False for array-based layout and indexing.
-            
-        Notes
-        -----
-        Any unspecified keywords will have their values taken from the config.
-    
+            Default: config setting
+
         """
     
         # Store inputs
         self.cadence = cadence
+        self.space = space
+        self.axis = axis
+        self.index = index
+        self.units = units
         
-        if space is None:
-            self.space = decfg.get('analysis', 'snapshot_space')
-        else:
-            self.space = space
-            
-        if axis is None:
+        # Get defaults from config
+        if self.space is None:
+            self.space = decfg.get('analysis', 'snapshot_space')        
+        if self.axis is None:
             self.axis = decfg.get('analysis', 'snapshot_axis')
-        else:
-            self.axis = axis
-
-        if index is None:
+        if self.index is None:
             self.index = decfg.get('analysis','snapshot_index')
-        else:
-            self.index = index
-        
-        if units is None:
+        if self.units is None:
             self.units = decfg.getboolean('analysis', 'snapshot_units')
-        else:
-            self.units = units
     
     def setup(self, data, it):
+    
+        self.firstrun = True
 
         # Determine if moving patches are required
-        self.firstrun = True
-        if self.units and (self.space == 'kspace') and hasattr(data['u']['x'], '_ky'):
+        if (self.units and (self.space == 'kspace') and 
+                not data['u']['x']._static_k):
             self._moves = True
             if com_sys.myproc == 0:
                 self.patch_lists = {}
@@ -162,14 +158,16 @@ class Snapshot(AnalysisTask):
             scale = 4.0
             
             # Create figure and axes
-            self.fig = plt.figure(self._n, figsize=(scale * w_total, scale * h_total))
+            self.fig = plt.figure(self._n, figsize=(scale * w_total, 
+                                                    scale * h_total))
             for row, (fname, field) in enumerate(data):
                 for cindex, comp in field:
                     left = (l_mar + w_im * cindex + l_pad) / w_total
                     bottom = 1 - (t_mar + h_im * (row + 1) - b_pad) / h_total
                     width = w_data / w_total
                     height = h_data / h_total
-                    self.image_axes[(row, cindex)] = self.fig.add_axes([left, bottom, width, height])
+                    self.image_axes[(row, cindex)] = self.fig.add_axes([left, 
+                            bottom, width, height])
                     self.image_axes[(row, cindex)].lastrow = (row == nrows - 1)
                     self.image_axes[(row, cindex)].firstcol = (cindex == 0)
                                         
@@ -177,11 +175,12 @@ class Snapshot(AnalysisTask):
                     bottom = 1 - (t_mar + h_im * row + t_pad + h_cbar) / h_total
                     width = w_cbar / w_total
                     height = h_cbar / h_total
-                    self.cbar_axes[(row, cindex)] = self.fig.add_axes([left, bottom, width, height])
+                    self.cbar_axes[(row, cindex)] = self.fig.add_axes([left, 
+                            bottom, width, height])
         
             # Title
             height = 1 - (0.6 * t_mar) / h_total
-            self.timestring = self.fig.suptitle(r'', y=height, fontsize=16)
+            self.timestring = self.fig.suptitle(r'', y=height, size=16)
         
             # Directory setup
             if not os.path.exists('frames'):
@@ -189,20 +188,24 @@ class Snapshot(AnalysisTask):
     
     def run(self, data, it):
 
-        # Plot field components
         for row, (fname, field) in enumerate(data):
             for cindex, comp in field:
                 
                 # Retrieve correct slice
-                if (row == 0) and (cindex == 0) and (self.firstrun or self._moves):
-                    packed_data = get_plane(comp, space=self.space, axis=self.axis, index=self.index)
-                    plane_data, outindex, self.namex, x, self.namey, y = packed_data
+                if ((row == 0) and (cindex == 0) and 
+                        (self.firstrun or self._moves)):
+                    packed_data = get_plane(comp, space=self.space, 
+                            axis=self.axis, index=self.index)
+                    plane_data, outindex, namex, x, namey, y = packed_data
+                    self.namex, self.namey = namex, namey
                 else:
-                    plane_data, outindex = get_plane(comp, space=self.space, axis=self.axis, 
-                            index=self.index, return_position_arrays=False)
+                    plane_data, outindex = get_plane(comp, space=self.space, 
+                            axis=self.axis, index=self.index, 
+                            return_position_arrays=False)
 
                 if com_sys.myproc == 0:
-                    # kspace: take logarithm of magnitude, flooring at eps
+                
+                    # In kspace, take logarithm of magnitude, flooring at eps
                     if self.space == 'kspace':
                         kmag = na.abs(plane_data)
                         zero_mask = (kmag == 0)
@@ -212,14 +215,13 @@ class Snapshot(AnalysisTask):
     
                     # Plot
                     axtup = (row, cindex)
-                    start = time.time()
                     if self.firstrun:
                         if self._moves:
                             self.add_patches(axtup, x, y, plane_data)
                         else:
                             self.add_image(axtup, x, y, plane_data)
                         self.add_lines(axtup, x, y, plane_data, comp)
-                        self.add_labels(axtup, fname, field.ctrans[cindex], row, cindex)
+                        self.add_labels(axtup, fname, field.ctrans[cindex])
                     else:
                         if self._moves:
                             self.update_patches(axtup, x, y, plane_data)
@@ -228,7 +230,8 @@ class Snapshot(AnalysisTask):
 
                               
         if com_sys.myproc == 0:
-            # Change figure title
+        
+            # Update time title
             tstr = r'$t = %6.3f$' % data.time
             self.timestring.set_text(tstr)            
             
@@ -307,11 +310,14 @@ class Snapshot(AnalysisTask):
             dx = x[0, 1] - x[0, 0]
             dy = y[1, 0] - y[0, 0] 
             if self.space == 'kspace':
+            
                 # Roll array
                 if self.namey != 'kx':
-                    plane_data = na.roll(plane_data, -(plane_data.shape[0] / 2 + 1), axis=0)
+                    plane_data = na.roll(plane_data, 
+                            -(plane_data.shape[0] / 2 + 1), axis=0)
                 if self.namex != 'kx':
-                    plane_data = na.roll(plane_data, -(plane_data.shape[1] / 2 + 1), axis=1)
+                    plane_data = na.roll(plane_data, 
+                            -(plane_data.shape[1] / 2 + 1), axis=1)
                     
                 extent = [x.min() - dx / 2., x.max() + dx / 2., 
                           y.min() - dy / 2., y.max() + dy / 2.]
@@ -339,9 +345,11 @@ class Snapshot(AnalysisTask):
         if self.units and (self.space == 'kspace'):
             # Roll array
             if self.namey != 'kx':
-                plane_data = na.roll(plane_data, -(plane_data.shape[0] / 2 + 1), axis=0)
+                plane_data = na.roll(plane_data, -(plane_data.shape[0] / 2 + 1), 
+                        axis=0)
             if self.namex != 'kx':
-                plane_data = na.roll(plane_data, -(plane_data.shape[1] / 2 + 1), axis=1)
+                plane_data = na.roll(plane_data, -(plane_data.shape[1] / 2 + 1), 
+                        axis=1)
        
         # Update values and colorbar     
         im.set_array(plane_data)
@@ -375,7 +383,7 @@ class Snapshot(AnalysisTask):
                     ysq = na.array([nyy, nyy, -nyy, -nyy, nyy])
                 xsh = na.array([-dx / 2., dx / 2., dx / 2., -dx / 2., -dx / 2.])
                 ysh = na.array([dy / 2., dy / 2., -dy / 2., -dy / 2., dy / 2.])
-                imax.plot(2./3. * xsq + xsh, 2./3. * ysq + ysh, 
+                imax.plot(2. / 3. * xsq + xsh, 2. / 3. * ysq + ysh, 
                         'k--', zorder=2, lw=2)
                 
                 plot_extent = [xsq[0] - dx / 2., xsq[1] + dx / 2., 
@@ -393,18 +401,18 @@ class Snapshot(AnalysisTask):
         # Plot range
         imax.axis(plot_extent)
 
-    def add_labels(self, axtup, fname, cname, row, cindex):
+    def add_labels(self, axtup, fname, cname):
     
         imax = self.image_axes[axtup]
         cbax = self.cbar_axes[axtup]
 
         # Title
-        title = imax.set_title(r'$%s_{%s}$' %(fname, cname), fontsize=14)
+        title = imax.set_title(r'$%s_{%s}$' %(fname, cname), size=14)
         title.set_y(1.1)
         
         # Colorbar
         cbax.xaxis.set_ticks_position('top')
-        plt.setp(cbax.get_xticklabels(), fontsize=10)
+        plt.setp(cbax.get_xticklabels(), size=10)
         
         # Axis labels
         if self.space == 'kspace':
@@ -419,16 +427,17 @@ class Snapshot(AnalysisTask):
             ystr += r'$\;\mathrm{index}$'
             
         if imax.lastrow:
-            imax.set_xlabel(xstr)
-            plt.setp(imax.get_xticklabels(), fontsize=10)
+            imax.set_xlabel(xstr, size=12)
+            plt.setp(imax.get_xticklabels(), size=10)
         else:
             plt.setp(imax.get_xticklabels(), visible=False)
             
         if imax.firstcol:
-            imax.set_ylabel(ystr)
-            plt.setp(imax.get_yticklabels(), fontsize=10)
+            imax.set_ylabel(ystr, size=12)
+            plt.setp(imax.get_yticklabels(), size=10)
         else:
             plt.setp(imax.get_yticklabels(), visible=False)            
+
 
 class TrackMode(AnalysisTask):
 
@@ -441,12 +450,15 @@ class TrackMode(AnalysisTask):
         cadence : int
             Iteration cadence for running task.
         fieldlist : None or list of strings
-            List containing names of fields to track: ['u', ...]. If None, all fields
-            in data will be tracked.
+            List containing names of fields to track, e.g. 
+                ['u', ...]
+            Default: track all fields
         modelist : list of tuples of floats
-            List containing physical wavevectors to track: [(0., 0., -3.), ...]
+            List containing physical wavevectors to track, e.g. 
+                [(0., 0., -3.), ...]
         indexlist : None or list of tuples of ints
-            List containing *local* kspace indices to track : [(1, 0, 0), ...]
+            List containing *local* kspace indices to track, e.g. 
+                [(1, 0, 0), ...]
             None should be passed to all processors without the desired mode.
         
         Notes
@@ -476,17 +488,19 @@ class TrackMode(AnalysisTask):
             columnnames = 'time'
             for mode in self.modelist:
                 columnnames += '\t' + str(list(mode))
+                
         for index in self.indexlist:
             if index is None:
                 column = ''
             else:
-                gindex = (index[0] + data['u']['x'].offset['kspace'],) + index[1:]
-                column = str(gindex)
+                gi = (index[0] + data['u']['x'].offset['kspace'],) + index[1:]
+                column = str(gi)
             column = com_sys.comm.reduce(column, root=0)
             if com_sys.myproc == 0:
                 columnnames += '\t' + column
 
         if com_sys.myproc == 0:
+        
             # Create file for each field component
             for fname in self.fieldlist:
                 field = data[fname]
@@ -582,19 +596,47 @@ class PowerSpectrum(AnalysisTask):
             
     def setup(self, data, it):
     
+        self.firstrun = True
+    
         # Default to all fields in data
         if self.fieldlist is None:
             self.fieldlist = data.fields.keys()
-
+        
         if com_sys.myproc == 0:
-            self.firstrun = True
             if self.plot:
             
-                # Create figure and axes
-                ncols = len(self.fieldlist)
-                self.fig, self.axes = plt.subplots(1, ncols, num=self._n, 
-                        figsize=(6 * ncols, 6), squeeze=False)
                 self.lines = {}
+                self.axes = {}
+            
+                # Determine grid size
+                ncols = len(self.fieldlist)
+                
+                # Setup spacing [top, bottom, left, right] and [height, width]
+                t_mar, b_mar, l_mar, r_mar = (0.2, 0.2, 0.2, 0.2)
+                t_pad, b_pad, l_pad, r_pad = (0.15, 0.03, 0.03, 0.03)
+                h_data, w_data = (1., 1.)
+                
+                h_im = t_pad + h_data + b_pad
+                w_im = l_pad + w_data + r_pad
+                h_total = t_mar + h_im + b_mar
+                w_total = l_mar + ncols * w_im + r_mar
+                scale = 4.0
+                
+                # Create figure and axes
+                self.fig = plt.figure(self._n, figsize=(scale * w_total, 
+                                                        scale * h_total))
+                for col, fname in enumerate(self.fieldlist):
+                    left = (l_mar + w_im * col + l_pad) / w_total
+                    bottom = 1 - (t_mar + h_im - b_pad) / h_total
+                    width = w_data / w_total
+                    height = h_data / h_total
+                    self.axes[col] = self.fig.add_axes([left, bottom, 
+                                                        width, height])
+                    self.axes[col].firstcol = (col == 0)
+            
+                # Time title
+                height = 1 - (0.6 * t_mar) / h_total
+                self.timestring = self.fig.suptitle(r'', y=height, size=16)
                                          
                 # Directory setup
                 if not os.path.exists('frames'):
@@ -610,7 +652,7 @@ class PowerSpectrum(AnalysisTask):
     
     def run(self, data, it):
     
-        for i, fname in enumerate(self.fieldlist):
+        for col, fname in enumerate(self.fieldlist):
             field = data[fname]
             
             # Compute spectrum
@@ -623,7 +665,7 @@ class PowerSpectrum(AnalysisTask):
                     if spectrum.nonzero()[0].size <= 1:
                         continue                 
                                 
-                    ax = self.axes[0, i]
+                    ax = self.axes[col]
                     if self.firstrun:
                     
                         # Plot and store lines
@@ -631,12 +673,21 @@ class PowerSpectrum(AnalysisTask):
                             ll = ax.loglog(k, spectrum, 'b.-', mew=0, ms=5)
                         else:
                             ll = ax.semilogy(k, spectrum, 'b.-', mew=0, ms=5)
-                        self.lines[i] = ll[0]
+                        self.lines[col] = ll[0]
                         
-                        # Labels
-                        ax.set_title(r'$%s$' %fname, size=14)
-                        ax.set_xlabel(r'$k$', size=10)
-                        ax.set_ylabel(r'$E(k)$', size=10)
+                        # Title
+                        title = ax.set_title(r'$%s$' %fname, size=14)
+                        title.set_y(1.05)
+                        
+                        # Axis labels
+                        ax.set_xlabel(r'$k$', size=12)
+                        plt.setp(ax.get_xticklabels(), size=10)
+                            
+                        if ax.firstcol:
+                            ax.set_ylabel(r'$E(k)$', size=12)
+                            plt.setp(ax.get_yticklabels(), size=10)
+                        else:
+                            plt.setp(ax.get_yticklabels(), visible=False)   
                         
                         # Nyquist and dealiasing lines
                         for kny in field[0].kny:
@@ -654,7 +705,7 @@ class PowerSpectrum(AnalysisTask):
                     else:
                     
                         # Update line position and rescale
-                        line = self.lines[i]
+                        line = self.lines[col]
                         line.set_ydata(spectrum)
                         ax.relim()
                         ax.autoscale_view()
@@ -675,19 +726,16 @@ class PowerSpectrum(AnalysisTask):
         if com_sys.myproc == 0:
             if self.plot:
             
-                # Add time to figure title
+                # Update time title
                 tstr = r'$t = %6.3f$' %data.time
-                if self.firstrun:
-                    self.timestr = self.fig.suptitle(tstr, size=16)
-                else:
-                    self.timestr.set_text(tstr)
+                self.timestring.set_text(tstr)
                 
                 # Save in frames folder
                 outfile = 'frames/power_spectra_n%07i.png' %it
                 self.fig.savefig(outfile, dpi=100)
                 
-            if self.firstrun:
-                self.firstrun = False
+        if self.firstrun:
+            self.firstrun = False
 
     def _compute_spectrum(self, field, norm):
 
