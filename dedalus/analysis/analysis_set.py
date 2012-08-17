@@ -655,7 +655,7 @@ class PowerSpectrum(AnalysisTask):
                     
                         # Update line position and rescale
                         line = self.lines[i]
-                        line.set_ydata(spectrum[1:])
+                        line.set_ydata(spectrum)
                         ax.relim()
                         ax.autoscale_view()
                                      
@@ -744,6 +744,7 @@ class VolumeAverage(AnalysisTask):
         
         """
         
+        # Store inputs
         self.cadence = cadence
         self.volume_average_object = va
         
