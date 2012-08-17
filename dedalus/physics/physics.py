@@ -535,10 +535,11 @@ class BoussinesqHydro(IncompressibleHydro):
         # Thermal diffusivity for T
         kappa = self.parameters['kappa']
         vo = self.parameters['viscosity_order']
+        comp = self._RHS['T'][0]
         if kappa == 0.:
-            self._RHS['T'][0].integrating_factor = None
+            comp.integrating_factor = None
         else:
-            self._RHS['T'][0].integrating_factor = kappa * comp.k2() ** vo
+            comp.integrating_factor = kappa * comp.k2() ** vo
 
     def set_thermal_drive(self, func):
         self.ThermalDrive = func
