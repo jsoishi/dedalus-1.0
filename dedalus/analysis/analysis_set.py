@@ -63,7 +63,6 @@ class AnalysisTask(object):
 
     def __init__(self, cadence, **kwargs):
         self.cadence = cadence
-        self.options = kwargs
         
     def setup(self, data, iter):
         pass
@@ -75,7 +74,6 @@ class AnalysisTask(object):
         pass
         
 class Snapshot(AnalysisTask):
-
     def __init__(self, cadence, space=None, axis=None, index=None, units=None):
         """
         Save image of specified plane in data.
@@ -416,7 +414,7 @@ class Snapshot(AnalysisTask):
             xstr = r'$%s$' %self.namex
             ystr = r'$%s$' %self.namey
         
-        if not units:
+        if not self.units:
             xstr += r'$\;\mathrm{index}$'
             ystr += r'$\;\mathrm{index}$'
             
@@ -433,41 +431,53 @@ class Snapshot(AnalysisTask):
             plt.setp(imax.get_yticklabels(), visible=False)            
 
 class TrackMode(AnalysisTask):
-    """
-    Record complex amplitude of specified modes to text file.
-    
-    Keywords
-    --------
-    fieldlist : None or list of strings
-        List containing names of fields to track: ['u', ...]. If None, all fields
-        in data will be tracked.
-    modelist : list of tuples of floats
-        List containing physical wavevectors to track: [(0., 0., -3.), ...]
-    indexlist : None or list of tuples of ints
-        List containing local kspace indices to track : [(1, 0, 0), ...]
-        None should be passed to all processors without the desired mode.
-    
-    Notes
-    -----        
-    Keep in mind that for parallelism the data layouts in k-space when specifying
-    modes and indices:
 
-    In 3D: y, z, x
-    In 2D: x, y
+    def __init__(self, cadence, fieldlist=None, modelist=[], indexlist=[]):
+        """
+        Record complex amplitude of specified modes to text file.
+        
+        Parameters
+        ----------
+        cadence : int
+            Iteration cadence for running task.
+        fieldlist : None or list of strings
+            List containing names of fields to track: ['u', ...]. If None, all fields
+            in data will be tracked.
+        modelist : list of tuples of floats
+            List containing physical wavevectors to track: [(0., 0., -3.), ...]
+        indexlist : None or list of tuples of ints
+            List containing *local* kspace indices to track : [(1, 0, 0), ...]
+            None should be passed to all processors without the desired mode.
+        
+        Notes
+        -----        
+        Keep in mind that for parallelism the data layouts in k-space when specifying
+        modes and indices:
     
-    """
+            In 3D: y, z, x
+            In 2D: x, y
+        
+        """
     
-    def setup(self, data, it, fieldlist=None, modelist=[], indexlist=[]):
-    
+        # Store inputs
+        self.cadence = cadence
+        
         if fieldlist is None:
-            fieldlist = data.fields.keys()
+            self.fieldlist = data.fields.keys()
+        else:
+            self.fieldlist = fieldlist
+        
+        self.modelist = modelist
+        self.indexlist = indexlist
+    
+    def setup(self, data, it):
                               
         # Construct string defining columns
         if com_sys.myproc == 0:
             columnnames = 'time'
-            for mode in modelist:
+            for mode in self.modelist:
                 columnnames += '\t' + str(list(mode))
-        for index in indexlist:
+        for index in self.indexlist:
             if index is None:
                 column = ''
             else:
@@ -479,7 +489,7 @@ class TrackMode(AnalysisTask):
 
         if com_sys.myproc == 0:
             # Create file for each field component
-            for fname in fieldlist:
+            for fname in self.fieldlist:
                 field = data[fname]
                 for cindex, comp in field:
                     name = fname + field.ctrans[cindex]
@@ -489,19 +499,16 @@ class TrackMode(AnalysisTask):
                     file.write('\n')
                     file.close()
 
-    def run(self, data, it, fieldlist=None, modelist=[], indexlist=[]):
-            
-        if fieldlist is None:
-            fieldlist = data.fields.keys()
-            
-        for fname in fieldlist:
+    def run(self, data, it):
+
+        for fname in self.fieldlist:
             field = data[fname]
             for cindex, comp in field:
                 if com_sys.myproc == 0:
                     amplitudes = []
                 
                 # Gather mode amplitudes
-                for mode in modelist:
+                for mode in self.modelist:
                     index = comp.find_mode(mode)
                     if index:
                         amp = comp['kspace'][index]
@@ -512,7 +519,7 @@ class TrackMode(AnalysisTask):
                         amplitudes.append(amp)
 
                 # Gather index amplitudes
-                for index in indexlist:
+                for index in self.indexlist:
                     if index is None:
                         amp = 0.
                     else:
@@ -532,159 +539,183 @@ class TrackMode(AnalysisTask):
                     file.write('\n')
                     file.close()
                     
+                    
 class PowerSpectrum(AnalysisTask):
-    """
-    Save and plot power spectrum of specified field.
 
-    Keywords
-    --------
-    fieldlist : None or list of strings
-        List containing names of fields to track: ['u', ...]. If None, all fields
-        in data will be tracked.
-    norm : int    
-        Power in each mode is multiplied by normalization
-    loglog : bool
-        Plot log-log plot if True, semilogy otherwise.
-    plot : bool
-        Save plot of power spectra.
-    write : bool
-        Write power spectra to text file.
-    nyquistlines : bool
-        Plot lines at individual and composite Nyquist wavenumbers
-    dealiasinglines : bool
-        Plot lines at 2/3 of the individual and composite Nyquist wavenumbers
-        
-    """
+    def __init__(self, cadence, fieldlist=None, norm=1., write=True, plot=True,
+                 loglog=True, nyquistlines=False, dealiasinglines=True):
+        """
+        Save and plot power spectrum of specified fields.
     
-    def setup(self, data, it, fieldlist=None, plot=True, write=True, **kwargs):
+        Parameters
+        ----------
+        cadence : int
+            Iteration cadence for running task.
+        fieldlist : list of str, optional
+            List containing names of fields to track, e.g. ['u', ...]. 
+            Default: None ==> track all fields
+        norm : int, optional
+            Scaling factor for power in each mode. Default: 1.0
+        write : bool, optional
+            Write power spectra to text file. Default: True
+        plot : bool, optional
+            Create and save plot of power spectra. Default: True
+        loglog : bool, optional
+            Plot loglog if True, semilogy if False. Default: True
+        nyquistlines : bool, optional
+            Plot lines at individual and composite Nyquist wavenumbers. 
+            Default: True
+        dealiasinglines : bool, optional
+            Plot lines at 2/3 of the individual and composite Nyquist 
+            wavenumbers. Default: True
+            
+        """
     
-        if fieldlist is None:
-            fieldlist = data.fields.keys()
+        # Store inputs
+        self.cadence = cadence
+        self.fieldlist = fieldlist
+        self.norm = norm
+        self.loglog = loglog
+        self.plot = plot
+        self.write = write
+        self.nyquistlines = nyquistlines
+        self.dealiasinglines = dealiasinglines
+            
+    def setup(self, data, it):
+    
+        # Default to all fields in data
+        if self.fieldlist is None:
+            self.fieldlist = data.fields.keys()
 
         if com_sys.myproc == 0:
-            self.first = True
-            self.lines = {}
-            if plot:
-                # Create figure and axes grid
-                ncols = len(fieldlist)
+            self.firstrun = True
+            if self.plot:
+            
+                # Create figure and axes
+                ncols = len(self.fieldlist)
                 self.fig, self.axes = plt.subplots(1, ncols, num=self._n, 
                         figsize=(6 * ncols, 6), squeeze=False)
+                self.lines = {}
                                          
                 # Directory setup
                 if not os.path.exists('frames'):
                     os.mkdir('frames')
                     
-            if write:
+            if self.write:
+            
                 # Create file for each field
-                for fname in fieldlist:
+                for fname in self.fieldlist:
                     file = open('%s_power_spectra.dat' %fname, 'w')
                     file.write("# Dedalus Power Spectrum\n")
                     file.close()
     
-    def run(self, data, it, fieldlist=None, norm=1.0, loglog=True, plot=True, 
-                write=True, nyquistlines=False, dealiasinglines=True):
-
-        if fieldlist is None:
-            fieldlist = data.fields.keys()
-
-        for i, fname in enumerate(fieldlist):
+    def run(self, data, it):
+    
+        for i, fname in enumerate(self.fieldlist):
             field = data[fname]
             
             # Compute spectrum
-            k, spectrum = self.compute_spectrum(field, norm=norm)
+            k, spectrum = self._compute_spectrum(field, norm=self.norm)
     
             if com_sys.myproc == 0:
-                if plot:
-                    # Skip if all modes are zero
-                    if spectrum[1:].nonzero()[0].size == 0:
+                if self.plot:
+                
+                    # Skip if there are not multiple populated modes
+                    if spectrum.nonzero()[0].size <= 1:
                         continue                 
                                 
-                    # Plot
                     ax = self.axes[0, i]
-                        
-                    if self.first:
-                        if loglog:
-                            linelist = ax.loglog(k[1:], spectrum[1:], 'b.-', mew=0, ms=5)
+                    if self.firstrun:
+                    
+                        # Plot and store lines
+                        if self.loglog:
+                            ll = ax.loglog(k, spectrum, 'b.-', mew=0, ms=5)
                         else:
-                            linelist = ax.semilogy(k[1:], spectrum[1:], 'b.-', mew=0, ms=5)
-                        self.lines[i] = linelist[0]
-                        ax.set_title(fname, size=16, color='k')
-                        ax.set_xlabel('k')
-                        ax.set_ylabel('E(k)')
+                            ll = ax.semilogy(k, spectrum, 'b.-', mew=0, ms=5)
+                        self.lines[i] = ll[0]
+                        
+                        # Labels
+                        ax.set_title(r'$%s$' %fname, size=14)
+                        ax.set_xlabel(r'$k$', size=10)
+                        ax.set_ylabel(r'$E(k)$', size=10)
+                        
+                        # Nyquist and dealiasing lines
                         for kny in field[0].kny:
-                            if nyquistlines:
-                                ax.axvline(kny, ls='dashed', color='k')
-                            if dealiasinglines:
-                                ax.axvline(kny * 2. / 3., ls='dotted', color='k')
-                        if nyquistlines:
-                            ax.axvline(na.sqrt(na.sum(field[0].kny ** 2)), ls='dashed', color='r') 
-                        if dealiasinglines:
-                            ax.axvline(na.sqrt(na.sum((2./3. * field[0].kny) ** 2)), ls='dotted', color='r')
+                            if self.nyquistlines:
+                                ax.axvline(kny, ls='dashed', c='k')
+                            if self.dealiasinglines:
+                                ax.axvline(2. / 3. * kny, ls='dotted', c='k')
+                                
+                        kmax = na.sqrt(na.sum(field[0].kny ** 2))
+                        if self.nyquistlines:
+                            ax.axvline(kmax, ls='dashed', c='r') 
+                        if self.dealiasinglines:
+                            ax.axvline(2. / 3. * kmax, ls='dotted', c='r')
                     
                     else:
+                    
+                        # Update line position and rescale
                         line = self.lines[i]
                         line.set_ydata(spectrum[1:])
                         ax.relim()
                         ax.autoscale_view()
                                      
-                if write:
+                if self.write:
                     file = open('%s_power_spectra.dat' %fname, 'a')
-                    if self.first:
+                    if self.firstrun:
                         columnnames = 'time\t'
                         columnnames += '\t'.join([repr(ki) for ki in k])
                         file.write(columnnames)
                         file.write('\n')
                     tstring = '%s\t' %data.time
-                    ampstring = '\t'.join([repr(amp) for amp in spectrum])
-                    file.write(tstring + ampstring)
+                    specstring = '\t'.join([repr(si) for si in spectrum])
+                    file.write(tstring + specstring)
                     file.write('\n')
                     file.close()
                
         if com_sys.myproc == 0:
-            if plot:
+            if self.plot:
+            
                 # Add time to figure title
-                tstr = 't = %6.3f' % data.time
-                if self.first:
-                    self.timestr = self.fig.suptitle(tstr, size=20, color='k')
-                    self.first = False
+                tstr = r'$t = %6.3f$' %data.time
+                if self.firstrun:
+                    self.timestr = self.fig.suptitle(tstr, size=16)
                 else:
                     self.timestr.set_text(tstr)
                 
                 # Save in frames folder
-                outfile = "frames/power_spectra_n%07i.png" %it
-                self.fig.savefig(outfile)
+                outfile = 'frames/power_spectra_n%07i.png' %it
+                self.fig.savefig(outfile, dpi=100)
                 
-            if self.first:
-                self.first = False
+            if self.firstrun:
+                self.firstrun = False
 
-    def compute_spectrum(self, field, norm=1.0):
+    def _compute_spectrum(self, field, norm):
 
         # Compute 1D power samples
         kmag = na.sqrt(field[0].k2())
-        power = na.zeros(field[0].local_shape['kspace'])
+        power = na.zeros_like(kmag)
         for cindex, comp in field:
             power += na.abs(comp['kspace']) ** 2
-        power *= norm
         if field.ndim == 2:
-            power1d = power * 2. * na.pi * kmag
+            power1d = norm * power * 2. * na.pi * kmag
         else:
-            power1d = power * 4. * na.pi * kmag ** 2
+            power1d = norm * power * 4. * na.pi * kmag ** 2
     
-        # Construct bins by wavevector magnitude (evenly spaced)
+        # Construct wavevector magnitude bins
         kmax = na.sqrt(na.sum(field[0].kny ** 2))
-        n = int(na.product(field[0].global_shape['xspace'] / 2.) ** (1. / field.ndim))
-        k = na.linspace(0, kmax, n, endpoint=False)
-        kbottom = k
-        ktop = k + k[1]
+        n = na.min(field[0].global_shape['xspace']) / 2.
+        n = int(na.min([n, 100]))
+        kbottom = na.linspace(0, kmax, n, endpoint=False)
+        ktop = kbottom + kbottom[1]
         
-        # Bin power samples
-        spectrum = na.zeros_like(k)
-        n = na.zeros_like(k)
-        for i in xrange(k.size):
-            mask = (kmag >= kbottom[i]) & (kmag < ktop[i])
-            nonzero = (power1d != 0)
+        # Bin the power samples
+        spectrum = na.zeros_like(kbottom)
+        n = na.zeros_like(kbottom)
+        for i in xrange(kbottom.size):
+            mask = (kmag >= kbottom[i]) & (kmag < ktop[i]) & (power1d != 0)
             spectrum[i] = na.sum(power1d[mask])
-            n[i] = na.sum(mask * nonzero)
+            n[i] = na.asfarray(na.sum(mask))
         
         # Collect from all processes
         if com_sys.nproc != 1:
@@ -695,15 +726,27 @@ class PowerSpectrum(AnalysisTask):
                 return (None, None)
         
         # Return bin centers and 1D power sample averages
-        n[n == 0] = 1
-        return k + k[1] / 2. , spectrum / n
+        n[n == 0] = 1.
+        return (kbottom + kbottom[1] / 2. , spectrum / n)
 
-class VolumeAverage(AnalysisTask):
-    """Run volume average tasks."""
-    
-    def __init__(self, cadence, volume_average_object):
+
+class VolumeAverage(AnalysisTask):    
+
+    def __init__(self, cadence, va):
+        """
+        Run volume average tasks.
+        
+        Parameters
+        ----------
+        cadence : int
+            Iteration cadence for running task.
+        va : VolumeAverageSet object
+            Set to run
+        
+        """
+        
         self.cadence = cadence
-        self.volume_average_object = volume_average_object
+        self.volume_average_object = va
         
     def run(self, data, it):
         self.volume_average_object.run()
