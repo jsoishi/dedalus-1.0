@@ -328,19 +328,17 @@ class IncompressibleHydro(Physics):
     
     Parameters *** Set in self.parameters dictionary after instantiation. ***
     ----------
-    'viscous_order' : int or dict
-        Hyperviscosity order, specified for each direction through a dictionary,
-        or with an integer for all directions.  Defaults to 1.
-    'nu' : kinematic viscosity
-        Kinematic viscosity, specified for each direction through a dictionary, 
-        or with an integer for all directions.  Defaults to 0.
+    'viscosity_order' : int
+        Hyperviscosity order. Defaults to 1.
+    'nu' : int
+        Kinematic viscosity. Defaults to 0.
     'rho0' : float
         Background density. Defaults to 1.
     
     Example
     -------
     >>> physics = IncompressibleHydro((128, 128), FourierRepresentation)
-    >>> physics.parameters['viscous_order'] = {'x': 1, 'y': 2}
+    >>> physics.parameters['viscosity_order'] = 2
     
     """
     
@@ -358,27 +356,19 @@ class IncompressibleHydro(Physics):
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         self.parameters = {'rho0': 1.,
-                           'viscous_order': 1,
+                           'viscosity_order': 1,
                            'nu': 0.}
                            
     def _setup_integrating_factors(self):
-        
-        if na.isscalar(self.parameters['viscous_order']):
-            vo = self.parameters['viscous_order']
-            self.parameters['viscous_order'] = {'x': vo, 'y': vo, 'z': vo}
-        if na.isscalar(self.parameters['nu']):
-            nu = self.parameters['nu']
-            self.parameters['nu'] = {'x': nu, 'y': nu, 'z': nu}
-            
+                    
         # Kinematic viscosity for u
-        du = self._RHS['u']
-        for cindex, comp in du:
-            nu = self.parameters['nu'][du.ctrans[cindex]]
-            vo = self.parameters['viscous_order'][du.ctrans[cindex]]
-            if nu != 0.:
-                comp.integrating_factor = nu * comp.k2() ** vo
-            else:
+        for cindex, comp in self._RHS['u']:
+            nu = self.parameters['nu']
+            vo = self.parameters['viscosity_order']
+            if nu == 0.:
                 comp.integrating_factor = None
+            else:
+                comp.integrating_factor = nu * comp.k2() ** vo
 
     def RHS(self, data):
         """
@@ -527,42 +517,28 @@ class BoussinesqHydro(IncompressibleHydro):
                             ('ugradT', 'ScalarField')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
-        self.parameters = {'nu': 0., 'rho0': 1., 'kappa': 0., 'g': 1.,
-                           'viscous_order': 1,
-                           'alpha_t': 1., 'beta': 1.}
+        self.parameters = {'rho0': 1.,
+                           'viscosity_order': 1,
+                           'nu': 0.,
+                           'kappa': 0.,
+                           'g': 1.,
+                           'alpha_t': 1.
+                           'beta': 1.}
+
         self.ThermalDrive = None
         
     def _setup_integrating_factors(self):
-        
-        if na.isscalar(self.parameters['viscous_order']):
-            vo = self.parameters['viscous_order']
-            self.parameters['viscous_order'] = {'x': vo, 'y': vo, 'z': vo}
-        if na.isscalar(self.parameters['nu']):
-            nu = self.parameters['nu']
-            self.parameters['nu'] = {'x': nu, 'y': nu, 'z': nu}
-        if na.isscalar(self.parameters['kappa']):
-            kappa = self.parameters['kappa']
-            self.parameters['kappa'] = {'x': kappa, 'y': kappa, 'z': kappa}
-            
+    
         # Kinematic viscosity for u
-        du = self._RHS['u']
-        for cindex, comp in du:
-            nu = self.parameters['nu'][du.ctrans[cindex]]
-            vo = self.parameters['viscous_order'][du.ctrans[cindex]]
-            if nu != 0.:
-                comp.integrating_factor = nu * comp.k2() ** vo
-            else:
-                comp.integrating_factor = None
-            
+        IncompressibleHydro._setup_integrating_factors()
+
         # Thermal diffusivity for T
-        dT = self._RHS['T']
-        for cindex, comp in dT:
-            kappa = self.parameters['kappa'][dT.ctrans[cindex]]
-            vo = self.parameters['viscous_order'][dT.ctrans[cindex]]
-            if kappa != 0.:
-                comp.integrating_factor = kappa * comp.k2() ** vo
-            else:
-                comp.integrating_factor = None
+        kappa = self.parameters['kappa']
+        vo = self.parameters['viscosity_order']
+        if kappa == 0.:
+            self._RHS['T'][0].integrating_factor = None
+        else:
+            self._RHS['T'][0].integrating_factor = kappa * comp.k2() ** vo
 
     def set_thermal_drive(self, func):
         self.ThermalDrive = func
@@ -600,7 +576,7 @@ class BoussinesqHydro(IncompressibleHydro):
         if self.ThermalDrive:
             self._RHS['T']['kspace'] += self.ThermalDrive(data)
         self._RHS['T']['kspace'][0,0,0] = 0. # must ensure (0,0,0) T mode does not grow.
-        self._RHS['T'].integrating_factor = self.parameters['kappa'] * T.k2() ** self.parameters['viscous_order']
+        self._RHS['T'].integrating_factor = self.parameters['kappa'] * T.k2() ** self.parameters['viscosity_order']
 
         return self._RHS
 
@@ -639,41 +615,23 @@ class IncompressibleMHD(IncompressibleHydro):
 
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         self.parameters = {'rho0': 1.,
-                           'viscous_order': 1,
+                           'viscosity_order': 1,
                            'nu': 0.,
                            'eta': 0.}
                            
     def _setup_integrating_factors(self):
-        
-        if na.isscalar(self.parameters['viscous_order']):
-            vo = self.parameters['viscous_order']
-            self.parameters['viscous_order'] = {'x': vo, 'y': vo, 'z': vo}
-        if na.isscalar(self.parameters['nu']):
-            nu = self.parameters['nu']
-            self.parameters['nu'] = {'x': nu, 'y': nu, 'z': nu}
-        if na.isscalar(self.parameters['eta']):
-            eta = self.parameters['eta']
-            self.parameters['eta'] = {'x': eta, 'y': eta, 'z': eta}
-            
+    
         # Kinematic viscosity for u
-        du = self._RHS['u']
-        for cindex, comp in du:
-            nu = self.parameters['nu'][du.ctrans[cindex]]
-            vo = self.parameters['viscous_order'][du.ctrans[cindex]]
-            if nu != 0.:
-                comp.integrating_factor = nu * comp.k2() ** vo
-            else:
-                comp.integrating_factor = None
-            
+        IncompressibleHydro._setup_integrating_factors()
+
         # Magnetic diffusivity for B
-        dB = self._RHS['B']
-        for cindex, comp in dB:
-            eta = self.parameters['eta'][dB.ctrans[cindex]]
-            vo = self.parameters['viscous_order'][dB.ctrans[cindex]]
-            if eta != 0.:
-                comp.integrating_factor = eta * comp.k2() ** vo
-            else:
+        for cindex, comp in self._RHS['B']:
+            eta = self.parameters['eta']
+            vo = self.parameters['viscosity_order']
+            if eta == 0.:
                 comp.integrating_factor = None
+            else:
+                comp.integrating_factor = eta * comp.k2() ** vo
 
     def RHS(self, data):
         """
