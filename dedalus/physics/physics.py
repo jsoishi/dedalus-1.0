@@ -527,9 +527,9 @@ class BoussinesqHydro(IncompressibleHydro):
                             ('ugradT', 'ScalarField')]
         
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
-        params = {'nu': 0., 'rho0': 1., 'kappa': 0., 'g': 1.,
-                  'alpha_t': 1., 'beta': 1.}
-        self._setup_parameters(params)
+        self.parameters = {'nu': 0., 'rho0': 1., 'kappa': 0., 'g': 1.,
+                           'viscous_order': 1,
+                           'alpha_t': 1., 'beta': 1.}
         self._finalized = False
         self.ThermalDrive = None
 
@@ -545,7 +545,7 @@ class BoussinesqHydro(IncompressibleHydro):
         T_t + kappa k^2 T = -ugradT + stratification term
 
         """
-        Hydro.RHS(self, data)
+        IncompressibleHydro.RHS(self, data)
         
         # Place references
         g = self.parameters['g']
@@ -569,7 +569,7 @@ class BoussinesqHydro(IncompressibleHydro):
         if self.ThermalDrive:
             self._RHS['T']['kspace'] += self.ThermalDrive(data)
         self._RHS['T']['kspace'][0,0,0] = 0. # must ensure (0,0,0) T mode does not grow.
-        self._RHS['T'].integrating_factor = self.parameters['kappa'] * T.k2() ** self.visc_order
+        self._RHS['T'].integrating_factor = self.parameters['kappa'] * T.k2() ** self.parameters['viscous_order']
 
         return self._RHS
 
@@ -584,7 +584,7 @@ class BoussinesqHydro(IncompressibleHydro):
         k2 = data['T'].k2(no_zero=True)
         
         pressure = self.aux_fields['pressure']
-        Hydro.pressure(self, data)
+        IncompressibleHydro.pressure(self, data)
         for i in self.dims:
             pressure[i]['kspace'] += data['T'].k[self._trans[i]] * self.parameters['g'] * self.parameters['alpha_t'] * data['T'].k['z'] * data['T']['kspace']/k2
 
