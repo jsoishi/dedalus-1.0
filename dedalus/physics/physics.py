@@ -522,7 +522,7 @@ class BoussinesqHydro(IncompressibleHydro):
                            'nu': 0.,
                            'kappa': 0.,
                            'g': 1.,
-                           'alpha_t': 1.
+                           'alpha_t': 1.,
                            'beta': 1.}
 
         self.ThermalDrive = None
