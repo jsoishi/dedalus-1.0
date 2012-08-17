@@ -24,9 +24,9 @@ License:
 from .physics import \
     IncompressibleHydro,\
     BoussinesqHydro,\
-    ShearHydro, \
-    MHD, \
-    ShearMHD, \
+    ShearIncompressibleHydro, \
+    IncompressibleMHD, \
+    ShearIncompressibleMHD, \
     LinearCollisionlessCosmology, \
     CollisionlessCosmology, \
     LinearBaryonCDMCosmology, \
