@@ -1,4 +1,7 @@
 syntax: glob
-*pyc
+*.pyc
+*.c
+*.so
+*.o
 *.DS_Store
 *~
