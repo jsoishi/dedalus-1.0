@@ -530,8 +530,39 @@ class BoussinesqHydro(IncompressibleHydro):
         self.parameters = {'nu': 0., 'rho0': 1., 'kappa': 0., 'g': 1.,
                            'viscous_order': 1,
                            'alpha_t': 1., 'beta': 1.}
-        self._finalized = False
         self.ThermalDrive = None
+        
+    def _setup_integrating_factors(self):
+        
+        if na.isscalar(self.parameters['viscous_order']):
+            vo = self.parameters['viscous_order']
+            self.parameters['viscous_order'] = {'x': vo, 'y': vo, 'z': vo}
+        if na.isscalar(self.parameters['nu']):
+            nu = self.parameters['nu']
+            self.parameters['nu'] = {'x': nu, 'y': nu, 'z': nu}
+        if na.isscalar(self.parameters['kappa']):
+            kappa = self.parameters['kappa']
+            self.parameters['kappa'] = {'x': kappa, 'y': kappa, 'z': kappa}
+            
+        # Kinematic viscosity for u
+        du = self._RHS['u']
+        for cindex, comp in du:
+            nu = self.parameters['nu'][du.ctrans[cindex]]
+            vo = self.parameters['viscous_order'][du.ctrans[cindex]]
+            if nu != 0.:
+                comp.integrating_factor = nu * comp.k2() ** vo
+            else:
+                comp.integrating_factor = None
+            
+        # Thermal diffusivity for T
+        dT = self._RHS['T']
+        for cindex, comp in dT:
+            kappa = self.parameters['kappa'][dT.ctrans[cindex]]
+            vo = self.parameters['viscous_order'][dT.ctrans[cindex]]
+            if kappa != 0.:
+                comp.integrating_factor = kappa * comp.k2() ** vo
+            else:
+                comp.integrating_factor = None
 
     def set_thermal_drive(self, func):
         self.ThermalDrive = func
@@ -636,9 +667,9 @@ class IncompressibleMHD(IncompressibleHydro):
             
         # Magnetic diffusivity for B
         dB = self._RHS['B']
-        for cindex, comp in du:
-            eta = self.parameters['eta'][du.ctrans[cindex]]
-            vo = self.parameters['viscous_order'][du.ctrans[cindex]]
+        for cindex, comp in dB:
+            eta = self.parameters['eta'][dB.ctrans[cindex]]
+            vo = self.parameters['viscous_order'][dB.ctrans[cindex]]
             if eta != 0.:
                 comp.integrating_factor = eta * comp.k2() ** vo
             else:
