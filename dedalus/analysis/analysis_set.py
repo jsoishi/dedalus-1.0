@@ -461,16 +461,15 @@ class TrackMode(AnalysisTask):
     
         # Store inputs
         self.cadence = cadence
-        
-        if fieldlist is None:
-            self.fieldlist = data.fields.keys()
-        else:
-            self.fieldlist = fieldlist
-        
+        self.fieldlist = fieldlist
         self.modelist = modelist
         self.indexlist = indexlist
     
     def setup(self, data, it):
+    
+        # Default to all fields in data
+        if self.fieldlist is None:
+            self.fieldlist = data.fields.keys()
                               
         # Construct string defining columns
         if com_sys.myproc == 0:
