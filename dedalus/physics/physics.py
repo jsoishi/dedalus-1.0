@@ -722,7 +722,7 @@ class IncompressibleMHD(IncompressibleHydro):
             Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             #Ptotal[i].zero_nyquist()
     
-class ShearIncompressibleMHD(MHD):
+class ShearIncompressibleMHD(IncompressibleMHD):
     """Incompressible magnetohydrodynamics in a shearing box."""
 
     def RHS(self, data):
