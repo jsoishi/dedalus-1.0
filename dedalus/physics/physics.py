@@ -457,7 +457,7 @@ class ShearIncompressibleHydro(IncompressibleHydro):
         Omega = self.parameters['Omega']
         
         # Compute terms
-        Hydro.RHS(self, data)
+        IncompressibleHydro.RHS(self, data)
         self._RHS['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
         self._RHS['u']['x']['kspace'] += (2. + S) * Omega * data['u']['y']['kspace']
         

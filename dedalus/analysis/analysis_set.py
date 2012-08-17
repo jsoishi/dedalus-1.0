@@ -410,11 +410,15 @@ class Snapshot(AnalysisTask):
         
         # Axis labels
         if self.space == 'kspace':
-            xstr = r'$k_{%s} \; \mathrm{index}$' %self.namex[1]
-            ystr = r'$k_{%s} \; \mathrm{index}$' %self.namey[1]
+            xstr = r'$k_{%s}$' %self.namex[1]
+            ystr = r'$k_{%s}$' %self.namey[1]
         else:
             xstr = r'$%s$' %self.namex
             ystr = r'$%s$' %self.namey
+        
+        if not units:
+            xstr += r'$\;\mathrm{index}$'
+            ystr += r'$\;\mathrm{index}$'
             
         if imax.lastrow:
             imax.set_xlabel(xstr)

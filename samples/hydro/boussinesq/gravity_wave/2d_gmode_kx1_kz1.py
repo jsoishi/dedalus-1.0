@@ -72,11 +72,10 @@ vs.add('divergence', '%10.5e')
 vs.add('divergence_sum', '%10.5e')
 
 an = AnalysisSet(data, ti)
-#an.add(VolumeAverage(20,va_obj=vs))
-an.add('volume_average', 20, {'va_obj': vs})
-an.add("field_snap", 50)
-an.add("mode_track", 10, {'flist': ['u','T'],
-                        'klist': [(0, 1, 1)]})
+an.add(VolumeAverage(20, vs))
+an.add(Snapshot(50))
+an.add(TrackMode(10, modelist=[(0., 1., 1.)]))
+
 # Main loop
 #dt = 0.1
 dt = 0.001
