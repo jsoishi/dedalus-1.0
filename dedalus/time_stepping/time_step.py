@@ -252,6 +252,28 @@ class RK2mid(TimeStepBase):
         self.time += dt
         self.iter += 1
         
+        
+class RK2trap(TimeStepBase):
+    """
+    Second-order explicit trapezoidal Runge-Kutta method, using exponential
+    time differencing to handle integrating factors.
+   
+    k1 = h * f(t_n, y_n)
+    k2 = h * f(t_n + h, y_n + k1)
+    
+    y_(n+1) = y_n + (k1 + k2) / 2 + O(h ** 3)   
+    
+      0  |  0    0    
+      1  |  1    0
+    ----------------
+         | 1/2  1/2
+   
+    """
+        
+    def __init__(self, *arg, **kwargs):        
+        pass
+        
+        
 class RK4(TimeStepBase):
     """
     Fourth-order explicit classical Runge-Kutta method.
