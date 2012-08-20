@@ -103,7 +103,6 @@ class Physics(object):
         
     def _finalize(self):
         self._setup_aux_fields(0., self._aux_fields)
-        self._RHS = self.create_fields(0.)
         self._is_finalized = True
 
     def create_fields(self, time, field_list=None):        
@@ -359,10 +358,10 @@ class IncompressibleHydro(Physics):
                            'viscosity_order': 1,
                            'nu': 0.}
                            
-    def _setup_integrating_factors(self):
+    def _setup_integrating_factors(self, deriv):
                     
         # Kinematic viscosity for u
-        for cindex, comp in self._RHS['u']:
+        for cindex, comp in deriv['u']:
             nu = self.parameters['nu']
             vo = self.parameters['viscosity_order']
             if nu == 0.:
@@ -370,9 +369,9 @@ class IncompressibleHydro(Physics):
             else:
                 comp.integrating_factor = nu * comp.k2() ** vo
 
-    def RHS(self, data):
+    def RHS(self, data, deriv):
         """
-        Compute right hand side of fluid equations, populating self._RHS with
+        Compute right hand side of fluid equations, populating deriv with
         the time derivatives of the fields.
 
         u_t + nu k^2 u = -ugradu - i k p / rho0
@@ -382,9 +381,9 @@ class IncompressibleHydro(Physics):
         # Finalize and setup integrating factors
         if not self._is_finalized:
             self._finalize()
-            self._setup_integrating_factors()
+            self._setup_integrating_factors(deriv)
             
-        self._RHS.set_time(data.time)
+        deriv.set_time(data.time)
         self.aux_fields.set_time(data.time)
             
         # Place references
@@ -404,9 +403,7 @@ class IncompressibleHydro(Physics):
         
         # Construct time derivatives
         for i in self.dims:
-            self._RHS['u'][i]['kspace'] = -ugradu[i]['kspace'] - pressure[i]['kspace']
-
-        return self._RHS
+            deriv['u'][i]['kspace'] = -ugradu[i]['kspace'] - pressure[i]['kspace']
 
     def pressure(self, data):
         """
@@ -440,9 +437,9 @@ class ShearIncompressibleHydro(IncompressibleHydro):
     
     allowable_representations = [FourierShearRepresentation]
 
-    def RHS(self, data):
+    def RHS(self, data, deriv):
         """
-        Compute right hand side of fluid equations, populating self._RHS with
+        Compute right hand side of fluid equations, populating deriv with
         the time derivatives of the fields.
 
         u_t + nu K^2 u = -ugradu - i K p / rho0 + rotation + shear
@@ -457,14 +454,12 @@ class ShearIncompressibleHydro(IncompressibleHydro):
         Omega = self.parameters['Omega']
         
         # Compute terms
-        IncompressibleHydro.RHS(self, data)
-        self._RHS['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
-        self._RHS['u']['x']['kspace'] += (2. + S) * Omega * data['u']['y']['kspace']
+        IncompressibleHydro.RHS(self, data, deriv)
+        deriv['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
+        deriv['u']['x']['kspace'] += (2. + S) * Omega * data['u']['y']['kspace']
         
         # Recalculate integrating factors
-        self._setup_integrating_factors()
-        
-        return self._RHS
+        self._setup_integrating_factors(deriv)
 
     def pressure(self, data):
         """
@@ -527,13 +522,13 @@ class BoussinesqHydro(IncompressibleHydro):
 
         self.ThermalDrive = None
         
-    def _setup_integrating_factors(self):
+    def _setup_integrating_factors(self, deriv):
     
         # Kinematic viscosity for u
-        IncompressibleHydro._setup_integrating_factors(self)
+        IncompressibleHydro._setup_integrating_factors(self, deriv)
 
         # Thermal diffusivity for T
-        comp = self._RHS['T'][0]
+        comp = deriv['T'][0]
         kappa = self.parameters['kappa']
         vo = self.parameters['viscosity_order']
         if kappa == 0.:
@@ -544,16 +539,16 @@ class BoussinesqHydro(IncompressibleHydro):
     def set_thermal_drive(self, func):
         self.ThermalDrive = func
 
-    def RHS(self, data):
+    def RHS(self, data, deriv):
         """
-        Compute right hand side of fluid equations, populating self._RHS with
+        Compute right hand side of fluid equations, populating deriv with
         the time derivatives of the fields.
 
         u_t + nu k^2 u = -ugradu - i k p / rho0 + buoyancy
         T_t + kappa k^2 T = -ugradT + stratification term
 
         """
-        IncompressibleHydro.RHS(self, data)
+        IncompressibleHydro.RHS(self, data, deriv)
         
         # Place references
         g = self.parameters['g']
@@ -568,18 +563,15 @@ class BoussinesqHydro(IncompressibleHydro):
         # Compute terms
 
         # add buoyancy term
-        self._RHS['u']['z']['kspace'] += g * alpha_t * T['kspace']
+        deriv['u']['z']['kspace'] += g * alpha_t * T['kspace']
 
         # temperature equation
         self.XlistgradY([u], T, mathtmp, [Tcopy], [ugradT])
-        self._RHS['T']['kspace'] = -ugradT['kspace'] - beta * u['z']['kspace']
+        deriv['T']['kspace'] = -ugradT['kspace'] - beta * u['z']['kspace']
         
         if self.ThermalDrive:
-            self._RHS['T']['kspace'] += self.ThermalDrive(data)
-        self._RHS['T']['kspace'][0,0,0] = 0. # must ensure (0,0,0) T mode does not grow.
-        self._RHS['T'].integrating_factor = self.parameters['kappa'] * T.k2() ** self.parameters['viscosity_order']
-
-        return self._RHS
+            deriv['T']['kspace'] += self.ThermalDrive(data)
+        deriv['T']['kspace'][0,0,0] = 0. # must ensure (0,0,0) T mode does not grow.å
 
     def pressure(self, data):
         """
@@ -620,13 +612,13 @@ class IncompressibleMHD(IncompressibleHydro):
                            'nu': 0.,
                            'eta': 0.}
                            
-    def _setup_integrating_factors(self):
+    def _setup_integrating_factors(self, deriv):
     
         # Kinematic viscosity for u
         IncompressibleHydro._setup_integrating_factors(self)
 
         # Magnetic diffusivity for B
-        for cindex, comp in self._RHS['B']:
+        for cindex, comp in deriv['B']:
             eta = self.parameters['eta']
             vo = self.parameters['viscosity_order']
             if eta == 0.:
@@ -634,9 +626,9 @@ class IncompressibleMHD(IncompressibleHydro):
             else:
                 comp.integrating_factor = eta * comp.k2() ** vo
 
-    def RHS(self, data):
+    def RHS(self, data, deriv):
         """
-        Compute right hand side of fluid equations, populating self._RHS with
+        Compute right hand side of fluid equations, populating deriv with
         the time derivatives of the fields.
         
         u_t + nu k^2 u = -ugradu + BgradB / (4 pi rho0) - i k Ptot / rho0
@@ -647,9 +639,9 @@ class IncompressibleMHD(IncompressibleHydro):
         
         if not self._finalized:
             self._finalize_init()
-            self._setup_integrating_factors()
+            self._setup_integrating_factors(deriv)
         
-        self._RHS.set_time(data.time)
+        deriv.set_time(data.time)
         self.aux_fields.set_time(data.time)
             
         # Place references
@@ -673,14 +665,11 @@ class IncompressibleMHD(IncompressibleHydro):
         
         # Construct time derivatives
         for i in self.dims:
-            self._RHS['u'][i]['kspace'] = (-ugradu[i]['kspace'] + 
-                                           BgradB[i]['kspace'] / pr4 -
-                                           Ptotal[i]['kspace'])
+            deriv['u'][i]['kspace'] = (-ugradu[i]['kspace'] + 
+                                        BgradB[i]['kspace'] / pr4 -
+                                        Ptotal[i]['kspace'])
                                            
-            self._RHS['B'][i]['kspace'] = Bgradu[i]['kspace'] - ugradB[i]['kspace']
-
-        self._RHS.time = data.time        
-        return self._RHS
+            deriv['B'][i]['kspace'] = Bgradu[i]['kspace'] - ugradB[i]['kspace']
         
     def total_pressure(self, data):
         """
@@ -715,9 +704,9 @@ class IncompressibleMHD(IncompressibleHydro):
 class ShearIncompressibleMHD(IncompressibleMHD):
     """Incompressible magnetohydrodynamics in a shearing box."""
 
-    def RHS(self, data):
+    def RHS(self, data, deriv):
         """
-        Compute right hand side of fluid equations, populating self._RHS with
+        Compute right hand side of fluid equations, populating deriv with
         the time derivatives of the fields.
         
         u_t + nu k^2 u = -ugradu + BgradB / (4 pi rho0) - i k Ptot / rho0 + rotation + shear
@@ -736,15 +725,13 @@ class ShearIncompressibleMHD(IncompressibleMHD):
         Omega = self.parameters['Omega']
         
         # Compute terms
-        MHD.RHS(self, data)
-        self._RHS['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
-        self._RHS['u']['x']['kspace'] += (2 + S) * Omega * data['u']['y']['kspace']
-        self._RHS['B']['x']['kspace'] += -S * Omega * data['B']['y']['kspace']
+        MHD.RHS(self, data, deriv)
+        deriv['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
+        deriv['u']['x']['kspace'] += (2 + S) * Omega * data['u']['y']['kspace']
+        deriv['B']['x']['kspace'] += -S * Omega * data['B']['y']['kspace']
         
         # Recalculate integrating factors
-        self._setup_integrating_factors()
-        
-        return self._RHS
+        self._setup_integrating_factors(deriv)
         
     def total_pressure(self, data):
         """
