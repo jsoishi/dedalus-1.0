@@ -20,7 +20,7 @@ License:
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  
+
 """
 
 import numpy as na
@@ -35,8 +35,8 @@ class CommunicationSystem(object):
             self.comm = MPI.COMM_WORLD
             self.MPI = MPI
         except ImportError:
-            print "Cannot import mpi4py. Parallelism disabled" 
-    
+            print "Cannot import mpi4py. Parallelism disabled"
+
         if self.comm:
             self.myproc = self.comm.Get_rank()
             self.nproc = self.comm.Get_size()
@@ -128,16 +128,16 @@ def reduce_min(data):
     local_min = data.min()
     if com_sys.comm == None:
         return local_min
-    
+
     global_min = com_sys.comm.reduce(local_min,op=com_sys.MPI.MIN)
     if com_sys.myproc == 0:
         return global_min
-    
+
 def reduce_max(data):
     local_max = data.max()
     if com_sys.comm == None:
         return local_max
-    
+
     global_max = com_sys.comm.reduce(local_max,op=com_sys.MPI.MAX)
     if com_sys.myproc == 0:
         return global_max
@@ -146,9 +146,9 @@ def swap_indices(arr):
     """
     Simple function to swap index [0] and [1].  Useful for
     constructing quantities for the FFTW parallel data objects.
-    
+
     """
-    
+
     if type(arr) == na.ndarray:
         out_arr = arr.copy()
     elif type(arr) == list:
@@ -171,17 +171,17 @@ def pickle(data,name):
     outf = open(filen,'w')
     cPickle.dump(data,outf)
     outf.close()
-    
+
 def strided_copy(input):
     """Helper function to 'deep copy' a view using stridetricks."""
-    
+
     return st.as_strided(input, shape=input.shape, strides=input.strides)
 
 def get_plane(comp, space='xspace', axis='z', index='middle',
               return_position_arrays=True):
     """
     Return 2D slice of data, assembling across processes if needed.
-    
+
     Parameters
     ----------
     comp : Representation object
@@ -198,7 +198,7 @@ def get_plane(comp, space='xspace', axis='z', index='middle',
         Ignored for 2D data.
     return_position_arrays : boolean, optional
         Return arrays of the x or k positions of the output plane data. Defaults True.
-        
+
     Returns
     -------
     plane_data : ndarray
@@ -217,23 +217,23 @@ def get_plane(comp, space='xspace', axis='z', index='middle',
         Array of positions along 1st-dimension of the output plane
         i.e. 'z' for axis = 'x' or 'y'
              'y' for axis = 'z'
-        
+
     Examples
     --------
-    >>> get_plane(data['u']['x'], 'kspace', 'x', 0) 
+    >>> get_plane(data['u']['x'], 'kspace', 'x', 0)
     (global_ux[:, :, 0], 'ky', global_ky, 'kz', global_kz)
-        
+
     """
-    
+
     # Check space
     comp.require_space(space)
-    
+
     # Retrieve translation table for requested space
     if space == 'kspace':
         trans = comp.ktrans
     elif space == 'xspace':
         trans = comp.xtrans
-        
+
     # Determine slice index for string inputs
     if comp.ndim == 2:
         index = 0
@@ -246,18 +246,18 @@ def get_plane(comp, space='xspace', axis='z', index='middle',
     else:
         index = int(index)
         if index < 0: index = index % comp.global_shape[space][trans[axis]]
-                    
+
     # Prepare data from each process
     gather = False
     reduce = False
-    
+
     if comp.ndim == 2:
         if com_sys.nproc == 1:
             plane_data = strided_copy(comp.data)
         else:
             proc_data = strided_copy(comp.data)
             gather = True
-                
+
     elif comp.ndim == 3:
         slicelist = [slice(None)] * 3
         if com_sys.nproc == 1:
@@ -270,15 +270,15 @@ def get_plane(comp, space='xspace', axis='z', index='middle',
                     slicelist[trans[axis]] = index - comp.offset[space]
                     proc_data = strided_copy(comp.data[slicelist])
                 else:
-                    proc_data = 0.    
+                    proc_data = 0.
                 reduce = True
             else:
                 slicelist[trans[axis]] = index
                 proc_data = strided_copy(comp.data[slicelist])
                 gather = True
-                
+
     # Gather or reduce if necessary
-    if gather: 
+    if gather:
         gathered_data = com_sys.comm.gather(proc_data, root=0)
         if com_sys.myproc == 0:
             plane_data = na.concatenate(gathered_data)
@@ -286,7 +286,7 @@ def get_plane(comp, space='xspace', axis='z', index='middle',
             plane_data = None
     elif reduce:
         plane_data = com_sys.comm.reduce(proc_data, op=com_sys.MPI.SUM, root=0)
-        
+
     # Transpose if necessary
     if (comp.ndim == 2) and (space == 'kspace'):
         plane_data = na.transpose(plane_data)
@@ -303,16 +303,16 @@ def get_plane(comp, space='xspace', axis='z', index='middle',
             name0, name1 = ('x', 'z')
         elif axis == 'z':
             name0, name1 = ('x', 'y')
-            
+
         if space == 'xspace':
             if com_sys.myproc != 0:
                 return (None,) * 6
-            
+
             grid1, grid0 = na.mgrid[slice(float(comp.global_shape[space][trans[name1]])),
                               slice(float(comp.global_shape[space][trans[name0]]))]
-            grid0 *= comp.length[trans[name0]] / comp.global_shape[space][trans[name0]]            
-            grid1 *= comp.length[trans[name1]] / comp.global_shape[space][trans[name1]]  
-            
+            grid0 *= comp.length[trans[name0]] / comp.global_shape[space][trans[name0]]
+            grid1 *= comp.length[trans[name1]] / comp.global_shape[space][trans[name1]]
+
         elif space == 'kspace':
             k = {}
             if comp.ndim == 2:
@@ -340,11 +340,11 @@ def get_plane(comp, space='xspace', axis='z', index='middle',
                         k['y'] = na.transpose(na.concatenate(gathered_ky)[:, 0, :])
             if com_sys.myproc != 0:
                 return (None,) * 6
-            
+
             grid0 = k[name0] * na.ones(plane_data.shape)
             grid1 = na.transpose(k[name1]) * na.ones(plane_data.shape)
             name0 = 'k' + name0
             name1 = 'k' + name1
-        
+
         return (plane_data, index, name0, grid0, name1, grid1)
-        
+

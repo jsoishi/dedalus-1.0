@@ -1,4 +1,4 @@
-"""API for Time Integrators. 
+"""API for Time Integrators.
 
 Author: J. S. Oishi <jsoishi@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford

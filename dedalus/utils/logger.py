@@ -1,7 +1,7 @@
 """
-Logging facility for Dedalus. 
+Logging facility for Dedalus.
 
-Parts of this file were borrowed from yt. yt is GPLv3 licensed. 
+Parts of this file were borrowed from yt. yt is GPLv3 licensed.
 
 Author: J. S. Oishi <jsoishi@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
@@ -22,7 +22,7 @@ License:
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  
+
 """
 
 import logging, os, sys
@@ -34,7 +34,7 @@ class SingleLevelFilter(logging.Filter):
     Grabbed from http://stackoverflow.com/questions/1383254/logging-streamhandler-and-standard-streams
 
     """
-    
+
     def __init__(self, passlevel, reject):
         self.passlevel = passlevel
         self.reject = reject

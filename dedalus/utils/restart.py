@@ -32,14 +32,14 @@ def restart(snap_dir):
     """restarts a run from the snapshot in snap_dir.
 
     returns a tuple of (Physics (RHS), data, time integrator)
-    
+
     """
     myproc = com_sys.myproc
     obj_file = open(os.path.join(snap_dir,OBJECT_FILENAME % myproc), 'r')
     RHS = cPickle.load(obj_file)
     data = cPickle.load(obj_file)
     ti = cPickle.load(obj_file)
-    
+
     RHS._setup_aux_fields(data.time, RHS._aux_fields)
     # now load data from hdf5 file...
     DATA_FILENAME = 'data.cpu%04i' % myproc
@@ -62,7 +62,7 @@ def load_all_data(data, filename):
 
     """
     data_file = h5py.File(filename, mode='r')
-    
+
     for field in data.fields:
         field_name = '/fields/' + field
         for comp in range(data.fields[field].ncomp):

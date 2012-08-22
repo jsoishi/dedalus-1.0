@@ -19,11 +19,11 @@ def dealias_23(np.ndarray[DTYPE1_t, ndim=2] data not None,
     assert data.dtype == DTYPE1
     assert kx.dtype == DTYPE2
     assert ky.dtype == DTYPE2
-    
+
     cdef int xmax = data.shape[0]
     cdef int ymax = data.shape[1]
     cdef unsigned int x, y
-    
+
     if ky.shape[0] == 1:
         for x in range(xmax):
             for y in range(ymax):

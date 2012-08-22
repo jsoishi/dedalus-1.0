@@ -69,11 +69,11 @@ def get_mercurial_changeset_id():
         import dedalus
         targetDir = dedalus.__path__[0]
         getChangeset = subprocess.Popen('hg parent --template "{node|short}" --cwd ' + targetDir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        
+
         if (getChangeset.stderr.read() != ""):
             mylog.warning("Error in obtaining current changeset of the Mercurial repository. changeset set to None")
             changeset = None
-            
+
         changeset = getChangeset.stdout.read()
         if (not re.search("^[0-9a-f]{12}$", changeset)):
             mylog.warning("Current changeset of the Mercurial repository is malformed. changeset set to None")

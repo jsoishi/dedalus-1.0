@@ -13,7 +13,7 @@ dd = []
 for cpu in cpus:
     files.append(h5py.File(cpu,'r'))
     dd.append(files[-1][field])
-    
+
 data = np.concatenate(dd,axis=0)
 print data
 for i in range(len(cpus)):
