@@ -216,12 +216,13 @@ class RK2mid(TimeStepBase):
         TimeStepBase.__init__(self, *arg, **kwargs)
         
         # Create StateData for constructing increments
+        self.deriv = self.RHS.create_fields(0.)
         self.temp_data = self.RHS.create_fields(0.)
        
     def do_advance(self, data, dt):
 
         # Construct k1
-        deriv = self.RHS.RHS(data)
+        self.RHS.RHS(data, deriv)
         
         # Store initial integrating factors for the complete step
         for fname, field in self.temp_data:
