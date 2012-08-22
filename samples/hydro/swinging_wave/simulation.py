@@ -1,10 +1,10 @@
 """
 Swinging vorticity wave test from
 
-    Lithwick, Y. Nonlinear Evolution of Hydrodynamical Shear Flows in Two 
-        Dimensions. The Astrophysical Journal 670, 789-804 (2007).    
+    Lithwick, Y. Nonlinear Evolution of Hydrodynamical Shear Flows in Two
+        Dimensions. The Astrophysical Journal 670, 789-804 (2007).
         http://labs.adsabs.harvard.edu/ui/abs/2007ApJ...670..789L
-            
+
 Author: K. J. Burns <keaton.burns@gmail.com>
 Affiliation: UC Berkeley
 License:
@@ -24,7 +24,7 @@ License:
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  
+
 """
 
 import numpy as np

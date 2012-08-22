@@ -1,5 +1,5 @@
 """
-Plot swinging wave amplitude vs. time and compare to analytic results of 
+Plot swinging wave amplitude vs. time and compare to analytic results of
 Lithwick (2007).
 
 Author: K. J. Burns <keaton.burns@gmail.com>
@@ -21,7 +21,7 @@ License:
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  
+
 """
 
 import numpy as np
@@ -59,6 +59,6 @@ axes[0].set_ylabel(r'$\Im(\hat{u}_x)$')
 axes[1].semilogy(a_t, np.abs(a_uy.imag), '-k')
 axes[1].semilogy(s_t, np.abs(s_uy.imag), '.b')
 axes[1].set_xlabel(r'$t$')
-axes[1].set_ylabel(r'$|\Im(\hat{u}_y)|$') 
+axes[1].set_ylabel(r'$|\Im(\hat{u}_y)|$')
 
 fig.savefig("mode_amplification.png")

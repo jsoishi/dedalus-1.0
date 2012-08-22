@@ -222,30 +222,30 @@ class RK2mid(TimeStepBase):
     def do_advance(self, data, dt):
 
         # Construct k1
-        self.RHS.RHS(data, deriv)
+        self.RHS.RHS(data, self.deriv)
 
         # Store initial integrating factors for the complete step
         for fname, field in self.temp_data:
             for cindex, comp in field:
-                if comp._static_k or (deriv[fname][cindex].integrating_factor is None):
-                    comp.integrating_factor = deriv[fname][cindex].integrating_factor
+                if comp._static_k or (self.deriv[fname][cindex].integrating_factor is None):
+                    comp.integrating_factor = self.deriv[fname][cindex].integrating_factor
                 else:
-                    comp.integrating_factor = deriv[fname][cindex].integrating_factor.copy()
+                    comp.integrating_factor = self.deriv[fname][cindex].integrating_factor.copy()
 
         # Construct k2
-        self.forward_step(data, deriv, self.temp_data, dt / 2.)
+        self.forward_step(data, self.deriv, self.temp_data, dt / 2.)
         for a in self.RHS.aux_eqns.values():
             a_old = a.value
             a.value = a_old + dt / 2. * a.RHS(a.value)
-        deriv = self.RHS.RHS(self.temp_data)
+        self.RHS.RHS(self.temp_data, self.deriv)
 
         # Retrieve initial integrating factors for the complete step
         for fname, field in self.temp_data:
             for cindex, comp in field:
-                deriv[fname][cindex].integrating_factor = comp.integrating_factor
+                self.deriv[fname][cindex].integrating_factor = comp.integrating_factor
 
         # Complete step
-        self.forward_step(data, deriv, data, dt)
+        self.forward_step(data, self.deriv, data, dt)
         for a in self.RHS.aux_eqns.values():
             a.value = a_old + dt * a.RHS(a.value)
 

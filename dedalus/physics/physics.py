@@ -571,7 +571,7 @@ class BoussinesqHydro(IncompressibleHydro):
 
         if self.ThermalDrive:
             deriv['T']['kspace'] += self.ThermalDrive(data)
-        deriv['T']['kspace'][0,0,0] = 0. # must ensure (0,0,0) T mode does not grow.å
+        deriv['T']['kspace'][0,0,0] = 0. # must ensure (0,0,0) T mode does not grow.
 
     def pressure(self, data):
         """
