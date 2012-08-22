@@ -5,7 +5,7 @@ import numpy as na
 
 def integrate_quad(f,x):
     """integrates f with quadratic interpolation over sample points x.
-    Relative error of ~2e-6 compared with SciPy's integrate.simps on 
+    Relative error of ~2e-6 compared with SciPy's integrate.simps on
     typical cosmology normalization data.
 
     """
@@ -17,7 +17,7 @@ def integrate_quad(f,x):
         y1 = f[2*i]
         y2 = f[2*i+1]
         y3 = f[2*i+2]
-        a = ((y2-y1)*(x1-x3) + (y3-y1)*(x2-x1))/((x1-x3)*(x2**2-x1**2) + 
+        a = ((y2-y1)*(x1-x3) + (y3-y1)*(x2-x1))/((x1-x3)*(x2**2-x1**2) +
                                                  (x2-x1)*(x3**2-x1**2))
         b = ((y2-y1) - a*(x2**2-x1**2))/(x2-x1)
         c = y1 - a*x1**2 - b*x1
@@ -32,7 +32,7 @@ def integrate_simp(f,x_0, x_f, n):
     integral = 0
     x = [x_0 + i*1./n*(x_f - x_0) for i in range(int(n)+1)]
     for i in range((len(x)-1)/2):
-        integral += ((x[2*i+2]-x[2*i])/6 * 
+        integral += ((x[2*i+2]-x[2*i])/6 *
                      (f(x[2*i]) + 4*f(x[2*i+1]) + f(x[2*i+2])))
     # If we have an even number of points, use trapezoid for the last interval
     if (len(x) % 2) == 0:
@@ -40,8 +40,8 @@ def integrate_simp(f,x_0, x_f, n):
     return integral
 
 def interp_linear(x, f):
-    """return function for linear interpolation of f sampled at points x 
-    (where x is strictly increasing). The returned function returns zero 
+    """return function for linear interpolation of f sampled at points x
+    (where x is strictly increasing). The returned function returns zero
     outside interpolation range.
 
     """
@@ -52,7 +52,7 @@ def interp_linear(x, f):
     # function to return index of interval containing z
     in_interval = lambda z: na.nonzero((xleft <= z)&(z < xright))[0]
     # function to evaluate f at array of points
-    f_lin = lambda zz: na.reshape([piecewise(in_interval(z),z) 
+    f_lin = lambda zz: na.reshape([piecewise(in_interval(z),z)
                                   for z in zz.flatten(1)], zz.shape)
     return f_lin
 
@@ -62,7 +62,7 @@ def find_zero(func, left, right, eps_abs = 1e-10):
 
     Input:
         func          function to find zeros for
-        left          left endpoint(s) of range to search. If func 
+        left          left endpoint(s) of range to search. If func
                       is a function of nvar variables then left should
                       be an array of length nvar.
         right         right endpoint(s) of range to search
@@ -79,14 +79,14 @@ def find_zero(func, left, right, eps_abs = 1e-10):
         f_left = func(left)
         f_right = func(right)
         f_midpoint = func(midpoint)
-        
+
         for i in range(nvar):
             if f_midpoint[i] == 0:
                 left[i] = midpoint[i]
                 right[i] = midpoint[i]
             elif na.sign(f_midpoint[i]) == na.sign(f_left[i]):
                 left[i] = midpoint[i]
-            else: 
+            else:
                 right[i] = midpoint[i]
         err = max(right - left)
     return midpoint

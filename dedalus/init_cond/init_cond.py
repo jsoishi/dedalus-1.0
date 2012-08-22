@@ -32,7 +32,7 @@ from dedalus.utils.misc_numeric import find_zero, integrate_quad, interp_linear
 from dedalus.analysis.volume_average import volume_average
 def taylor_green(data):
     """The famous Taylor-Green vortex in 2 or 3D.
-    
+
     Inputs:
         data: StateData object
 
@@ -83,15 +83,15 @@ def taylor_green(data):
             data['u']['y']['kspace'][-1,-1,1] = -1j/8.
         if data['u']['y'].find_mode((-1,-1,-1)):
             data['u']['y']['kspace'][-1,-1,-1] = -1j/8.
-            
+
 def kida_vortex(data, a, chi=None, smooth=False):
     """Generate ICs for the Kida steady-state vortex.
-    
+
     Inputs:
         data: StateData object
         a: semi-minor axis of ellipse
         chi: (default None) aspect ratio. if None, will use the aspect ratio of the x-y plane to set the vortex
-    
+
     """
     try:
         Omega = data.parameters['Omega']
@@ -108,7 +108,7 @@ def kida_vortex(data, a, chi=None, smooth=False):
         chi = float(y/x)
 
     b = chi * a
-    vort_ampl = data.parameters['S'] * (1 + chi) * Omega/(chi * (chi - 1.))    
+    vort_ampl = data.parameters['S'] * (1 + chi) * Omega/(chi * (chi - 1.))
     mylog.info("adding vortex with vorticity = %10.5f" % vort_ampl)
     sh = data['u']['x']['kspace'].shape
     le = data['u']['x'].length
@@ -127,7 +127,7 @@ def kida_vortex(data, a, chi=None, smooth=False):
         # or not...
         v = na.zeros_like(ff)
         v[ff < 0] = vort_ampl
-        aux['w']['xspace'] = v 
+        aux['w']['xspace'] = v
 
     aux['psi']['kspace'] = aux['w']['kspace']/aux['w'].k2(no_zero=True)
 
@@ -147,7 +147,7 @@ def alfven(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6, p_vec = [0., 1., 0.]):
     """
     Generate conditions for simulating Alfven waves in MHD.
     For 2d, must have k and B0 in same direction.
-    
+
     Inputs:
         data        StateData object
         k           k-index tuple, (kz, ky, kx), adds sine wave here in u1 and B1
@@ -155,18 +155,18 @@ def alfven(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6, p_vec = [0., 1., 0.]):
         u1mag       u1 magnitude for k-wave being added
         p_vec       polarization vector. USER is responsible for making sure this is perp to x
     """
-    
-    
+
+
     N = len(k)
     if N != 3:
         raise ValueError('Only setup for 3d')
     kmag = na.linalg.norm(k)
-    
+
     # Field setup and calculation
     B0 = na.array([1., 0., 0.])[:N] * B0mag
 
     p_vec = na.array(p_vec)
-    
+
     # Background magnetic field
     if (0 in data['u']['x'].k['z'] and
         0 in data['u']['x'].k['y'] and
@@ -174,7 +174,7 @@ def alfven(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6, p_vec = [0., 1., 0.]):
         for i in xrange(data['B'].ndim):
             k0 = (0,) * N
             data['B'][i]['kspace'][k0] = B0[i]
-    
+
     # Assign modes for k and -k
     if (k[2] in data['u']['x'].k['z'] and
         k[1] in data['u']['x'].k['y'] and
@@ -182,7 +182,7 @@ def alfven(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6, p_vec = [0., 1., 0.]):
         kiz = na.array(na.where(data['u']['x'].k['z'] == k[2]))
         kiy = na.array(na.where(data['u']['x'].k['y'] == k[1]))
         kix = na.array(na.where(data['u']['x'].k['x'] == k[0]))
-        
+
         kindex = tuple(kiz + kiy + kix)
         # Alfven speed and wave frequency
         cA = B0mag / na.sqrt(4 * na.pi * data.parameters['rho0'])
@@ -190,10 +190,10 @@ def alfven(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6, p_vec = [0., 1., 0.]):
         print '-' * 20
         print 'cA = ', cA
         print 'cA * cos(theta) = ', cA * na.dot(k, B0) / B0mag / kmag
-        print 'Max dt (CFL=1) = ', na.min(na.array(data['u']['x'].length) / 
+        print 'Max dt (CFL=1) = ', na.min(na.array(data['u']['x'].length) /
                                           na.array(data['u']['x'].shape)) / cA
         print '-' * 20
-    
+
         # u and B perturbations
         u1 = p_vec[3-N:] * u1mag
         B1 = (na.dot(k, u1) * B0 - na.dot(k, B0) * u1) / omega
@@ -201,10 +201,10 @@ def alfven(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6, p_vec = [0., 1., 0.]):
         for i in xrange(data['u'].ndim):
             data['u'][i]['kspace']
             data['B'][i]['kspace']
-        
+
             data['u'][i].data[kindex] = u1[i] * 1j / 2.
             data['B'][i].data[kindex] = B1[i] * 1j / 2.
-            
+
     if (-k[2] in data['u']['x'].k['z'] and
          -k[1] in data['u']['x'].k['y'] and
          -k[0] in data['u']['x'].k['x']):
@@ -212,22 +212,22 @@ def alfven(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6, p_vec = [0., 1., 0.]):
         kiz = na.array(na.where(data['u']['x'].k['z'] == -k[2]))
         kiy = na.array(na.where(data['u']['x'].k['y'] == -k[1]))
         kix = na.array(na.where(data['u']['x'].k['x'] == -k[0]))
-        
+
         kindex = tuple(kiz + kiy + kix)
         # Alfven speed and wave frequency
         cA = B0mag / na.sqrt(4 * na.pi * data.parameters['rho0'])
         omega = na.abs(cA * na.dot(k, B0) / B0mag)
-    
+
         # u and B perturbations
         u1 = p_vec[3-N:] * u1mag
-        
+
         B1 = (na.dot(k, u1) * B0 - na.dot(k, B0) * u1) / omega
         B1mag = na.linalg.norm(B1)
-        
+
         for i in xrange(data['u'].ndim):
             data['u'][i]['kspace']
             data['B'][i]['kspace']
-        
+
             data['u'][i].data[kindex] = -u1[i] * 1j / 2.
             data['B'][i].data[kindex] = -B1[i] * 1j / 2.
 
@@ -236,30 +236,30 @@ def alfven_old(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6):
     """
     Generate conditions for simulating Alfven waves in MHD.
     For 2d, must have k and B0 in same direction.
-    
+
     Inputs:
         data        StateData object
         k           k-index tuple, (kx, ky, kz), adds sine wave here in u1 and B1
         B0mag       B0 magnitude along x-direction
         u1mag       u1 magnitude for k-wave being added
     """
-    
+
     N = len(k)
     kmag = na.linalg.norm(k)
-    
+
     # Field setup and calculation
     B0 = na.array([1., 0., 0.])[:N] * B0mag
-        
+
     # Alfven speed and wave frequency
     cA = B0mag / na.sqrt(4 * na.pi * data.parameters['rho0'])
     omega = na.abs(cA * na.dot(k, B0) / B0mag)
     print '-' * 20
     print 'cA = ', cA
     print 'cA * cos(theta) = ', cA * na.dot(k, B0) / B0mag / kmag
-    print 'Max dt (CFL=1) = ', na.min(na.array(data['u']['x'].length) / 
+    print 'Max dt (CFL=1) = ', na.min(na.array(data['u']['x'].length) /
                                       na.array(data['u']['x'].shape)) / cA
     print '-' * 20
-    
+
     # Background magnetic field
     for i in xrange(data['B'].ndim):
         k0 = (0,) * N
@@ -267,21 +267,21 @@ def alfven_old(data, k=(1, 0, 0), B0mag=5.0, u1mag=5e-6):
 
     # u and B perturbations
     u1 = na.array([0., 1., 0.])[3-N:] * u1mag
-    
+
     B1 = (na.dot(k, u1) * B0 - na.dot(k, B0) * u1) / omega
     B1mag = na.linalg.norm(B1)
-    
+
     for i in xrange(data['u'].ndim):
         data['u'][i]['kspace']
         data['B'][i]['kspace']
-    
+
         sin_k(data['u'][i].data, k[::-1], ampl=u1[i])
         sin_k(data['B'][i].data, k[::-1], ampl=B1[i])
 
 def turb_new(data, spec, tot_en=0.5, **kwargs):
     """generate noise with a random phase and a spectrum given by
     the spec function.
-    
+
     Uses the Rogallo (1981) algorithm.
 
     MODERINZED, PARALLEL, MULTI-D VERSION
@@ -349,7 +349,7 @@ def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     for i,k in ux.k.iteritems():
         print k.shape
         kk += k**2
-        
+
     kk = na.sqrt(kk)
     k2 = na.sqrt(ux.k['x']**2 + ux.k['y']**2)
     k2[k2==0] = 1.
@@ -357,7 +357,7 @@ def turb(ux, uy, spec, tot_en=0.5, **kwargs):
 
     kk[kk==0] = 1.
     ampl = na.sqrt(sp/(2*na.pi*kk)) # for 2D
-    
+
     # Rogallo alorithm for random-phase, incompressible motions
     alpha = ampl * na.exp(1j*2*na.pi*na.random.random(ux.data.shape)) #* na.cos(2*na.pi*na.random.random(ux.data.shape))
     ux.data[:,:] = alpha*kk*ux.k['y']/(kk*k2)
@@ -388,7 +388,7 @@ def remove_compressible(ux,uy, renorm=False):
     uy.data[:,:] -= ku * uy.k['y']/uy.k2(no_zero=True)
 
 def MIT_vortices(data):
-    """define the 2D vortices from the MIT 18.336 sample matlab script at 
+    """define the 2D vortices from the MIT 18.336 sample matlab script at
 
     http://math.mit.edu/cse/codes/mit18336_spectral_ns2d.m
 
@@ -408,7 +408,7 @@ def MIT_vortices(data):
 
 def vorticity_wave(data, mode, w_amp):
     """
-    Initialize vorticity wave 
+    Initialize vorticity wave
 
     Parameters
     ----------
@@ -420,11 +420,11 @@ def vorticity_wave(data, mode, w_amp):
         Complex z-vorticity amplitude for specified mode
 
     """
-    
+
     aux = data.clone()
     aux.add_field('w','ScalarField')
     aux.add_field('psi','ScalarField')
-    
+
     index0 = data['u']['x'].find_mode(mode)
     if index0:
         aux['w']['kspace'][index0] = w_amp / 2.
@@ -454,14 +454,14 @@ def vorticity_wave(data, mode, w_amp):
 #     for i in xrange(N):
 #         for j in xrange(N):
 #             data['delta']['xspace'][i,j,:] = delta1d
-# 
+#
 #     ampl = ampl * volfac
 #     data['u'][0]['kspace'][0,0,1] = ampl * 1j / 2
 #     data['u'][0]['kspace'][0,0,-1] = -data['u'][0]['kspace'][0,0,1]
-# 
+#
 # def read_linger_transfer_data(fname, ak_trans, Ttot, Tdc, Tdb, dTvc, dTvb, dTtot, Ttot0):
 #     """read values from a transfer-mode linger++ output file
-# 
+#
 #     """
 #     infile = open(fname)
 #     for i,line in enumerate(infile):
@@ -475,75 +475,75 @@ def vorticity_wave(data, mode, w_amp):
 #         dTtot.append(float(values[6]))
 #         Ttot0.append(float(values[7]))
 #     infile.close()
-# 
+#
 # def sig2_integrand(Ttot0, akoh, nspect):
 #     """calculate the integrand in the expression for the mean square
 #     of the overdensity field, smoothed with a top-hat window function W
 #     at 8 Mpc/h.
-# 
+#
 #     """
 #     R = 8.
 #     x = akoh*R
 #     w = 3. * (na.sin(x) - x*na.cos(x))/(x*x*x)
 #     Pk = (akoh**nspect) * (Ttot0*Ttot0)
 #     return (w*w) * Pk * (akoh*akoh)
-# 
+#
 # def get_normalization(Ttot0, ak, sigma_8, nspect, h):
 #     """calculate the normalization for delta_tot using sigma_8
-# 
+#
 #     """
 #     akoh = ak/h
 #     integrand = sig2_integrand(Ttot0, akoh, nspect)
 #     sig2 = 4.*na.pi*integrate_quad(integrand, akoh)
 #     ampl = sigma_8/na.sqrt(sig2)
 #     return ampl
-# 
+#
 # def collisionless_cosmo_fields(delta, u, spec_delta, spec_u, mean=0., stdev=1.):
 #     """create realization of cosmological initial conditions by
 #     filling 3-d k-space fields with values sampled from gaussians with
 #     amplitudes given by spec.
-# 
+#
 #     """
 #     shape = spec_delta.shape
 #     rand = (na.random.normal(mean, stdev, shape) + 1j*na.random.normal(mean, stdev, shape))
 #     delta['kspace'] = spec_delta * rand
 #     hermitianize.enforce_hermitian(delta['kspace'])
 #     delta.dealias()
-# 
+#
 #     for i in xrange(3):
 #         u[i]['kspace'] = rand * spec_u[i]
 #         hermitianize.enforce_hermitian(u[i]['kspace'])
 #         u[i].dealias()
-#         
+#
 #     return rand
-# 
+#
 # def cosmo_fields(delta_c, u_c, delta_b, u_b, spec_delta_c, spec_u_c, spec_delta_b, spec_u_b):
 #     """create realization of baryon and CDM initial conditions
-# 
+#
 #     """
 #     # use the same random number field as for delta_c
 #     rand = collisionless_cosmo_fields(delta_c, u_c, spec_delta_c, spec_u_c)
 #     delta_b['kspace'] = spec_delta_b * rand
 #     hermitianize.enforce_hermitian(delta_b['kspace'])
 #     delta_b.dealias()
-# 
+#
 #     for i in xrange(3):
 #         u_b[i]['kspace'] = rand * spec_u_b[i]
 #         hermitianize.enforce_hermitian(u_b[i]['kspace'])
 #         u_b[i].dealias()
-# 
+#
 # def cosmo_spectra(data, norm_fname, a, nspect=0.961, sigma_8=0.811, h=.703, baryons=False, f_nl=None):
 #     """generate spectra for CDM overdensity and velocity from linger++
 #     output. Assumes 3-dimensional fields.
-# 
+#
 #     Length: Mpc
 #     Time:   Myr (linger++ uses Mpc/c)
-# 
+#
 #     """
-# 
+#
 #     Myr_per_Mpc = 0.3063915366 # 1 c/Mpc = 0.306... 1/Myr
-# 
-#     ak    = [] # the k-values that go with transfer-functions 
+#
+#     ak    = [] # the k-values that go with transfer-functions
 #     Ttot  = [] # linear transfer of total spectrum at initial time
 #     Ttot0 = [] # ... of total spectrum at z = 0, used with sigma_8 for norm
 #     Tdc   = [] # transfer of delta_CDM
@@ -551,24 +551,24 @@ def vorticity_wave(data, mode, w_amp):
 #     dTvc  = [] # rate of change of CDM transfer
 #     dTvb  = [] # rate of change of baryon transfer
 #     dTtot = [] # ... of total spectrum
-#     
+#
 #     read_linger_transfer_data(norm_fname, ak, Ttot, Tdc, Tdb, dTvc, dTvb, dTtot, Ttot0)
 #     ak = na.array(ak) * h
-# 
+#
 #     if baryons:
 #         deltacp = na.array(Tdc)
 #         thetac  = na.array(dTvc) #* (h/299792.458) # linger multiplies by c/h
 #     else:
 #         deltacp = na.array(Ttot)
 #         thetac  = na.array(dTtot)
-# 
-# 
+#
+#
 #     Ttot0 = na.array(Ttot0)
-# 
+#
 #     # ... get sample data object for shape and k-values
 #     sampledata = data.fields.values()[0][0]
 #     shape = sampledata.shape
-# 
+#
 #     nk = shape[0]
 #     k2 = sampledata.k2()
 #     kzero = (k2==0)
@@ -580,13 +580,13 @@ def vorticity_wave(data, mode, w_amp):
 #         mylog.warning('cannot interpolate: some grid wavenumbers larger than input wavenumbers; ICs for those modes are wrong')
 #         # ... any |k| larger than the max input k is replaced by max input k
 #         kk[:,:,:] = na.minimum(kk, maxkinput*na.ones_like(kk))
-# 
+#
 #     # ... normalize
 #     ampl = get_normalization(Ttot0, ak, sigma_8, nspect, h)
 #     ampl = ampl * (2.*na.pi/sampledata.length[0])**1.5 * (sampledata.shape[0])**1.5 # *h**1.5
-# 
+#
 #     f_deltacp = interp_linear(na.log10(ak), na.log10(deltacp))
-# 
+#
 #     # ... calculate spectra
 #     if f_nl is not None:
 #         """ Primordial non-Gaussianity:
@@ -607,40 +607,40 @@ def vorticity_wave(data, mode, w_amp):
 #         # ... delta = delta_transfer * |k|^(n_s/2)
 #         spec_delta = kk**(nspect/2.)*(10.**f_deltacp(na.log10(kk)))*ampl
 #     spec_delta[kzero] = 0.
-# 
+#
 #     vunit = 1.02268944e-6 # km/s in Mpc/Myr
-#     thetac = thetac * ampl * vunit 
-# 
-# 
-#     # ... calculate spectra    
+#     thetac = thetac * ampl * vunit
+#
+#
+#     # ... calculate spectra
 #     # u_j = -i * k_j/|k| * theta * |k|^(n_s/2 - 1)
 #     f_thetac = interp_linear(na.log10(ak), na.log10(thetac), kind='linear')
 #     spec_vel = 1j*kk**(nspect/2. -1.) * 10.**f_thetac(na.log10(kk)) # isotropic
 #     spec_vel[kzero] = 0.
-# 
+#
 #     spec_u = [na.zeros_like(spec_vel),]*3
 #     for i,dim in enumerate(['x','y','z']):
 #         spec_u[i] = (sampledata.k[dim]/kk) * spec_vel
-# 
+#
 #     if baryons:
 #         deltabp = na.array(Tdb)
 #         thetab  = na.array(dTvb)
-# 
+#
 #         deltabp = deltabp * ampl
-#         thetab  = thetab * ampl * vunit 
-#         
+#         thetab  = thetab * ampl * vunit
+#
 #         f_deltabp = interp_linear(na.log10(ak), na.log10(deltabp), kind='linear')
-#         spec_delta_b = kk**(nspect/2.)*10.**f_deltabp(na.log10(kk)) 
+#         spec_delta_b = kk**(nspect/2.)*10.**f_deltabp(na.log10(kk))
 #         spec_delta_b[kzero] = 0.
-#         
+#
 #         f_thetab = interp_linear(na.log10(ak), na.log10(thetab), kind='linear')
 #         spec_vel_b = 1j * kk**(nspect/2. - 1.) * 10.**f_thetab(na.log10(kk))
 #         spec_vel_b[kzero] = 0.
-#         
+#
 #         spec_u_b = [na.zeros_like(spec_vel_b),]*3
 #         for i,dim in enumerate(['x','y','z']):
 #             spec_u_b[i] = (sampledata.k[dim]/kk) * spec_vel_b
-# 
+#
 #         return spec_delta, spec_u, spec_delta_b, spec_u_b
-#        
+#
 #     return spec_delta, spec_u

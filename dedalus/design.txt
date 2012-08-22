@@ -12,13 +12,13 @@ Objects
      the processor layout and do multi-dimensional partial FFTs
 
   -- fftw plan
-  -- pointer to data 
+  -- pointer to data
 
    -- subclass: xspace
    -- subclass: kspace
 
 * Physics
-  -- this *defines* the necessary fields. 
+  -- this *defines* the necessary fields.
   -- should therefore have a class factory to build fields
   -- should manage parameters: nu, eta, Rayleigh number, &c
    -- subclass: MHD
@@ -45,7 +45,7 @@ is the paradigm something like
 
 $ mpirun -np 128 python ./simulation_2B.py
 
-or is it 
+or is it
 
 $ mpirun -np 128 pydro simulation_2B
 
@@ -57,4 +57,4 @@ one timestepper
 
 some physics
 
-some (inline) analysis 
+some (inline) analysis

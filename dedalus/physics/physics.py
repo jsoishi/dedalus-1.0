@@ -22,7 +22,7 @@ License:
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  
+
 """
 
 import numpy as na
@@ -43,16 +43,16 @@ class Physics(object):
     """
     Base class for a physics object. Defines fields and provides
     a right hand side for the time integration scheme.
-    
+
     """
-    
+
     allowable_representations = []
-    
+
     def __init__(self, shape, representation, length=None):
         """
         Base class for a physics object. Defines fields and provides
         a right hand side for the time integration scheme.
-        
+
         Parameters
         ----------
         shape : tuple of ints
@@ -60,11 +60,11 @@ class Physics(object):
         representation : class
             A Dedalus representation class
         length : tuple of floats, optional
-            The length of the data in xspace: (z, y, x) or (y, x), 
+            The length of the data in xspace: (z, y, x) or (y, x),
             defaults to 2 pi in all directions.
-            
+
         """
-    
+
         # Store inputs
         self.shape = shape
         if representation in self.__class__.allowable_representations:
@@ -75,18 +75,18 @@ class Physics(object):
             self.length = length
         else:
             self.length = (2 * na.pi,) * len(self.shape)
-        
+
         # Dimensionality
         self.ndim = len(self.shape)
         self.dims = xrange(self.ndim)
-        
+
         # Additional setup
         self._field_classes = create_field_classes(
                 self._representation, self.shape, self.length)
         self.aux_eqns = {}
-        
+
         self._is_finalized = False
-    
+
     def __getitem__(self, item):
          value = self.parameters.get(item, None)
          if value is None:
@@ -100,16 +100,16 @@ class Physics(object):
             if k not in exclude:
                 savedict[k] = v
         return (_reconstruct_object, (self.__class__, savedict))
-        
+
     def _finalize(self):
         self._setup_aux_fields(0., self._aux_fields)
         self._is_finalized = True
 
-    def create_fields(self, time, field_list=None):        
+    def create_fields(self, time, field_list=None):
         if field_list == None:
             field_list = self.fields
-            
-        return StateData(time, self.shape, self.length, self._field_classes, 
+
+        return StateData(time, self.shape, self.length, self._field_classes,
                          field_list=field_list, params=self.parameters)
 
     def _setup_aux_fields(self, t, aux_field_list=None):
@@ -121,7 +121,7 @@ class Physics(object):
         inputs
         ------
         aux_eqns -- a list of names for the equations
-        RHS -- 
+        RHS --
 
         """
         for f, r, ic, kwargs in zip(aux_eqns, RHS, ics, kwarglists):
@@ -133,7 +133,7 @@ class Physics(object):
     def gradX(self, X, output):
         """
         Compute Jacobian: gradX[N * i + j] = dX_i/dx_j
-        
+
         Parameters
         ----------
         X : Scalar/VectorField object
@@ -148,12 +148,12 @@ class Physics(object):
         # Construct Jacobian
         for i in xrange(X.ncomp):
             for j in self.dims:
-                output[N * i + j]['kspace'] = X[i].deriv(self._trans[j]) 
-                
+                output[N * i + j]['kspace'] = X[i].deriv(self._trans[j])
+
     def divX(self, X, output):
         """
         Compute divergence: divX = dX_i/dx_i
-        
+
         Inputs:
             X           Input VectorField object
             output      Output ScalarField object
@@ -165,25 +165,25 @@ class Physics(object):
 
         # Construct divergence
         for i in xrange(X.ncomp):
-            output['kspace'] += X[i].deriv(self._trans[i]) 
-                
+            output['kspace'] += X[i].deriv(self._trans[i])
+
     def XgradY(self, X, Y, gradY, output, compute_gradY=True):
         """
         Calculate X dot (grad Y).
-        
+
         Inputs:
             X           Input VectorField object
             Y           Input Scalar/VectorField object
             gradY       Vector/TensorField object to hold gradY
             output      Output Scalar/VectorField object
-            
+
         Keywords:
             compute_gradY   Set to False if gradY has been computed
 
         """
 
         N = self.ndim
-    
+
         # Perform gradY calculation
         if compute_gradY:
             self.gradX(Y, gradY)
@@ -197,14 +197,14 @@ class Physics(object):
         for i in xrange(Y.ncomp):
             for j in self.dims:
                 tmp += X[j]['xspace'] * gradY[N * i + j]['xspace']
-            output[i]['xspace'] += tmp.real                    
+            output[i]['xspace'] += tmp.real
             tmp *= 0+0j
-            
+
     def XlistgradY(self, Xlist, Y, stmp, vtmp, outlist):
         """
         Calculate X dot (grad Y) for X in Xlist.
         This is a low-memory alternative to XgradY (never stores a full gradY tensor).
-        
+
         Inputs:
             Xlist       List of input VectorField objects
             Y           Input Scalar/VectorField object
@@ -229,35 +229,35 @@ class Physics(object):
             for j in self.dims:
                 # Compute dY_i/dx_j
                 stmp['kspace'] = Y[i].deriv(self._trans[j])
-                
+
                 # Add term to each output
                 for k,X in enumerate(vtmp):
                     #outlist[k][i]['xspace'] += (X[j]['xspace'] * stmp['xspace']).real
                     na.add(outlist[k][i]['xspace'], (X[j]['xspace'] * stmp['xspace']), outlist[k][i]['xspace'])
-     
+
     def XcrossY(self, X, Y, output, space):
         """
         Calculate X cross Y.
-        
+
         Inputs:
             X           Input VectorField object
             Y           Input VectorField object
             output      Output Vector/ScalarField object (3D/2D)
             space       Space for cross product
-        
-        Note: 
+
+        Note:
             2D inputs require scalar output
             3D inputs require vector output
 
-        """            
+        """
 
         N = X.ndim
-            
+
         # Place references
         X0 = X[0][space]
         X1 = X[1][space]
         if N == 3: X2 = X[2][space]
-            
+
         Y0 = Y[0][space]
         Y1 = Y[1][space]
         if N == 3: Y2 = Y[2][space]
@@ -269,40 +269,40 @@ class Physics(object):
             output[2][space] = X0 * Y1 - X1 * Y0
         else:
             output[space] = X0 * Y1 - X1 * Y0
-            
+
     def XdotY(self, X, Y, output, space):
         """
         Calculate X dot Y.
-        
+
         Inputs:
             X           Input VectorField object
             Y           Input VectorField object
             output      Output ScalarField object
             space       Space for dot product
 
-        """            
+        """
 
         if X.ncomp != Y.ncomp: raise ValueError('Vectors not the same size')
 
-        output.zero()  
+        output.zero()
         for i in xrange(X.ncomp):
             output[space] += X[i][space] * Y[i][space]
-            
+
     def curlX(self, X, output):
         """
         Calculate curl of X.
-        
+
         Inputs:
             X           Input Scalar/Vector/VectorField object
             output      Output Vector/Scalar/VectorField object (2D/2D/3D)
-        
-        Note: 
+
+        Note:
             2D: Vector input requires Scalar output
                 Scalar input requires Vector output
             3D: Vector input requires Vector output
-            
+
         """
-        
+
         N = X.ncomp
 
         # Calculate curl
@@ -311,20 +311,20 @@ class Physics(object):
             output[0]['kspace'] = X[2].deriv(self._trans[1]) - X[1].deriv(self._trans[2])
             output[1]['kspace'] = X[0].deriv(self._trans[2]) - X[2].deriv(self._trans[0])
             output[2]['kspace'] = X[1].deriv(self._trans[0]) - X[0].deriv(self._trans[1])
-        
+
         # 2D input (xy) yields scalar output (z)
         elif N == 2:
-            output['kspace'] = X[1].deriv(self._trans[0]) - X[0].deriv(self._trans[1])    
-            
+            output['kspace'] = X[1].deriv(self._trans[0]) - X[0].deriv(self._trans[1])
+
         # Scalar input (z) yeilds vector output (xy)
         elif N == 1:
             output[0]['kspace'] = X[0].deriv(self._trans[1])
             output[1]['kspace'] = -X[0].deriv(self._trans[0])
-        
+
 class IncompressibleHydro(Physics):
     """
     Incompressible hydrodynamics.
-    
+
     Parameters *** Set in self.parameters dictionary after instantiation. ***
     ----------
     'viscosity_order' : int
@@ -333,33 +333,33 @@ class IncompressibleHydro(Physics):
         Kinematic viscosity. Defaults to 0.
     'rho0' : float
         Background density. Defaults to 1.
-    
+
     Example
     -------
     >>> physics = IncompressibleHydro((128, 128), FourierRepresentation)
     >>> physics.parameters['viscosity_order'] = 2
-    
+
     """
-    
+
     allowable_representations = [FourierRepresentation]
-    
+
     def __init__(self, *args, **kwargs):
         Physics.__init__(self, *args, **kwargs)
-        
+
         # Setup data fields
         self.fields = [('u', 'VectorField')]
         self._aux_fields = [('pressure', 'VectorField'),
                             ('mathtmp', 'ScalarField'),
                             ('ucopy','VectorField'),
                             ('ugradu', 'VectorField')]
-        
+
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         self.parameters = {'rho0': 1.,
                            'viscosity_order': 1,
                            'nu': 0.}
-                           
+
     def _setup_integrating_factors(self, deriv):
-                    
+
         # Kinematic viscosity for u
         for cindex, comp in deriv['u']:
             nu = self.parameters['nu']
@@ -377,15 +377,15 @@ class IncompressibleHydro(Physics):
         u_t + nu k^2 u = -ugradu - i k p / rho0
 
         """
-        
+
         # Finalize and setup integrating factors
         if not self._is_finalized:
             self._finalize()
             self._setup_integrating_factors(deriv)
-            
+
         deriv.set_time(data.time)
         self.aux_fields.set_time(data.time)
-            
+
         # Place references
         u = data['u']
 
@@ -395,12 +395,12 @@ class IncompressibleHydro(Physics):
         pressure = self.aux_fields['pressure']
         ucopy = self.aux_fields['ucopy']
         k2 = data['u']['x'].k2()
-        
+
         # Compute terms
         #self.XgradY(u, u, gradu, ugradu)
-        self.XlistgradY([u], u, mathtmp, [ucopy],[ugradu]) 
+        self.XlistgradY([u], u, mathtmp, [ucopy],[ugradu])
         self.pressure(data)
-        
+
         # Construct time derivatives
         for i in self.dims:
             deriv['u'][i]['kspace'] = -ugradu[i]['kspace'] - pressure[i]['kspace']
@@ -408,33 +408,33 @@ class IncompressibleHydro(Physics):
     def pressure(self, data):
         """
         Compute pressure term for ufields: i k p / rho0
-        
-        p / rho0 = i k * ugradu / k^2     
+
+        p / rho0 = i k * ugradu / k^2
         ==> pressure term = - k (k * ugradu) / k^2
-        
+
         """
-        
+
         # Place references
         ugradu = self.aux_fields['ugradu']
         pressure = self.aux_fields['pressure']
-        
+
         # Setup temporary data container
         sampledata = data['u']['x']
         tmp = na.zeros_like(sampledata.kdata)
         k2 = sampledata.k2(no_zero=True)
-        
+
         # Construct k * ugradu
         for i in self.dims:
             tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace']
 
         # Construct full term
-        for i in self.dims:            
+        for i in self.dims:
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             #pressure[i].zero_nyquist()
 
 class ShearIncompressibleHydro(IncompressibleHydro):
     """Incompressible hydrodynamics in a shearing box."""
-    
+
     allowable_representations = [FourierShearRepresentation]
 
     def RHS(self, data, deriv):
@@ -443,34 +443,34 @@ class ShearIncompressibleHydro(IncompressibleHydro):
         the time derivatives of the fields.
 
         u_t + nu K^2 u = -ugradu - i K p / rho0 + rotation + shear
-        
+
         rotation = -2 Omega u_x e_y
         shear = (2 + S) Omega u_y e_x
 
         """
-        
+
         # Place references
         S = self.parameters['S']
         Omega = self.parameters['Omega']
-        
+
         # Compute terms
         IncompressibleHydro.RHS(self, data, deriv)
         deriv['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
         deriv['u']['x']['kspace'] += (2. + S) * Omega * data['u']['y']['kspace']
-        
+
         # Recalculate integrating factors
         self._setup_integrating_factors(deriv)
 
     def pressure(self, data):
         """
         Compute pressure term for ufields: i K p / rho0
-        
+
         p / rho0 = i (K * ugradu + rotation + shear)/ K^2
         ==> pressure term = - K (K * ugradu + rotation + shear) / K^2
-        
+
         rotation = 2 Omega u_x K_y
         shear = -(1 + S) 2 Omega u_y K_x
-        
+
         """
 
         # Place references
@@ -478,29 +478,29 @@ class ShearIncompressibleHydro(IncompressibleHydro):
         pressure = self.aux_fields['pressure']
         S = self.parameters['S']
         Omega = self.parameters['Omega']
-        
+
         # Setup temporary data container
         sampledata = data['u']['x']
         tmp = na.zeros_like(sampledata.kdata)
         k2 = sampledata.k2(no_zero=True)
-        
+
         # Construct K * ugradu
         for i in self.dims:
-            tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace'] 
+            tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace']
 
         # Add rotation + shear
         tmp += (2. * Omega * data['u']['x']['kspace'] * data['u']['x'].k['y'] -
                 (1. + S) * 2. * Omega * data['u']['y']['kspace'] * data['u']['x'].k['x'])
 
         # Construct full term
-        for i in self.dims:            
+        for i in self.dims:
             pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             #pressure[i].zero_nyquist()
 
 class BoussinesqHydro(IncompressibleHydro):
     def __init__(self, *args, **kwargs):
         Physics.__init__(self, *args, **kwargs)
-        
+
         # Setup data fields
         self.fields = [('u', 'VectorField'),
                        ('T', 'ScalarField')]
@@ -510,7 +510,7 @@ class BoussinesqHydro(IncompressibleHydro):
                             ('Tcopy','VectorField'),
                             ('ugradu', 'VectorField'),
                             ('ugradT', 'ScalarField')]
-        
+
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         self.parameters = {'rho0': 1.,
                            'viscosity_order': 1,
@@ -521,9 +521,9 @@ class BoussinesqHydro(IncompressibleHydro):
                            'beta': 1.}
 
         self.ThermalDrive = None
-        
+
     def _setup_integrating_factors(self, deriv):
-    
+
         # Kinematic viscosity for u
         IncompressibleHydro._setup_integrating_factors(self, deriv)
 
@@ -549,7 +549,7 @@ class BoussinesqHydro(IncompressibleHydro):
 
         """
         IncompressibleHydro.RHS(self, data, deriv)
-        
+
         # Place references
         g = self.parameters['g']
         alpha_t = self.parameters['alpha_t']
@@ -568,7 +568,7 @@ class BoussinesqHydro(IncompressibleHydro):
         # temperature equation
         self.XlistgradY([u], T, mathtmp, [Tcopy], [ugradT])
         deriv['T']['kspace'] = -ugradT['kspace'] - beta * u['z']['kspace']
-        
+
         if self.ThermalDrive:
             deriv['T']['kspace'] += self.ThermalDrive(data)
         deriv['T']['kspace'][0,0,0] = 0. # must ensure (0,0,0) T mode does not grow.å
@@ -576,13 +576,13 @@ class BoussinesqHydro(IncompressibleHydro):
     def pressure(self, data):
         """
         Compute pressure term for ufields: i k p / rho0
-        
+
         p / rho0 = i (k * ugradu + rotation + shear)/ k^2
         ==> pressure term = - k (k * ugradu + rotation + shear) / k^2
-        
+
         """
         k2 = data['T'].k2(no_zero=True)
-        
+
         pressure = self.aux_fields['pressure']
         IncompressibleHydro.pressure(self, data)
         for i in self.dims:
@@ -590,10 +590,10 @@ class BoussinesqHydro(IncompressibleHydro):
 
 class IncompressibleMHD(IncompressibleHydro):
     """Incompressible magnetohydrodynamics."""
-    
+
     def __init__(self, *args, **kwargs):
         Physics.__init__(self, *args, **kwargs)
-        
+
         # Setup data fields
         self.fields = [('u', 'VectorField'),
                        ('B', 'VectorField')]
@@ -611,9 +611,9 @@ class IncompressibleMHD(IncompressibleHydro):
                            'viscosity_order': 1,
                            'nu': 0.,
                            'eta': 0.}
-                           
+
     def _setup_integrating_factors(self, deriv):
-    
+
         # Kinematic viscosity for u
         IncompressibleHydro._setup_integrating_factors(self)
 
@@ -630,20 +630,20 @@ class IncompressibleMHD(IncompressibleHydro):
         """
         Compute right hand side of fluid equations, populating deriv with
         the time derivatives of the fields.
-        
+
         u_t + nu k^2 u = -ugradu + BgradB / (4 pi rho0) - i k Ptot / rho0
-        
+
         B_t + eta k^2 B = Bgradu - ugradB
 
         """
-        
+
         if not self._finalized:
             self._finalize_init()
             self._setup_integrating_factors(deriv)
-        
+
         deriv.set_time(data.time)
         self.aux_fields.set_time(data.time)
-            
+
         # Place references
         u = data['u']
         B = data['B']
@@ -657,27 +657,27 @@ class IncompressibleMHD(IncompressibleHydro):
         Bcopy = self.aux_fields['Bcopy']
         pr4 = 4 * na.pi * self.parameters['rho0']
         k2 = data['u']['x'].k2()
-        
+
         # Compute terms
         self.XlistgradY([u, B], u, mathtmp, [ucopy, Bcopy], [ugradu, Bgradu])
         self.XlistgradY([u, B], B, mathtmp, [ucopy, Bcopy], [ugradB, BgradB])
         self.total_pressure(data)
-        
+
         # Construct time derivatives
         for i in self.dims:
-            deriv['u'][i]['kspace'] = (-ugradu[i]['kspace'] + 
+            deriv['u'][i]['kspace'] = (-ugradu[i]['kspace'] +
                                         BgradB[i]['kspace'] / pr4 -
                                         Ptotal[i]['kspace'])
-                                           
+
             deriv['B'][i]['kspace'] = Bgradu[i]['kspace'] - ugradB[i]['kspace']
-        
+
     def total_pressure(self, data):
         """
         Compute total pressure term (including magnetic): i k Ptot / rho0
-        
-        Ptot / rho0 = i (k * ugradu - k * BgradB / (4 pi rho0)) / k^2  
+
+        Ptot / rho0 = i (k * ugradu - k * BgradB / (4 pi rho0)) / k^2
         ==> pressure term = - k (k * ugradu - k * BgradB / (4 pi rho0)) / k^2
-        
+
         """
 
         # Place references
@@ -695,12 +695,12 @@ class IncompressibleMHD(IncompressibleHydro):
         for i in self.dims:
             tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace']
             tmp -= data['u'][i].k[self._trans[i]] * BgradB[i]['kspace'] / pr4
-        
+
         # Construct full term
-        for i in self.dims:            
+        for i in self.dims:
             Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             #Ptotal[i].zero_nyquist()
-    
+
 class ShearIncompressibleMHD(IncompressibleMHD):
     """Incompressible magnetohydrodynamics in a shearing box."""
 
@@ -708,41 +708,41 @@ class ShearIncompressibleMHD(IncompressibleMHD):
         """
         Compute right hand side of fluid equations, populating deriv with
         the time derivatives of the fields.
-        
+
         u_t + nu k^2 u = -ugradu + BgradB / (4 pi rho0) - i k Ptot / rho0 + rotation + shear
 
         rotation = -2 Omega u_x e_y
         shear =  (2 + S) Omega u_y e_x
-        
+
         B_t + eta k^2 B = Bgradu - ugradB + shear
-        
+
         shear = -S Omega B_y e_x
-        
+
         """
-        
+
         # Place references
         S = self.parameters['S']
         Omega = self.parameters['Omega']
-        
+
         # Compute terms
         MHD.RHS(self, data, deriv)
         deriv['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
         deriv['u']['x']['kspace'] += (2 + S) * Omega * data['u']['y']['kspace']
         deriv['B']['x']['kspace'] += -S * Omega * data['B']['y']['kspace']
-        
+
         # Recalculate integrating factors
         self._setup_integrating_factors(deriv)
-        
+
     def total_pressure(self, data):
         """
         Compute total pressure term (including magnetic): i k Ptot / rho0
-        
-        Ptot / rho0 = i (k * ugradu - k * BgradB / (4 pi rho0) + rotation + shear) / k^2  
+
+        Ptot / rho0 = i (k * ugradu - k * BgradB / (4 pi rho0) + rotation + shear) / k^2
         ==> pressure term = - k (k * ugradu - k * BgradB / (4 pi rho0) + rotation + shear) / k^2
-        
+
         rotation = 2 Omega u_x K_y
         shear = -(1 + S) 2 Omega u_y K_x
-        
+
         """
 
         # Place references
@@ -752,7 +752,7 @@ class ShearIncompressibleMHD(IncompressibleMHD):
         pr4 = 4 * na.pi * self.parameters['rho0']
         S = self.parameters['S']
         Omega = self.parameters['Omega']
-        
+
 
         # Setup temporary data container
         sampledata = data['u']['x']
@@ -763,19 +763,19 @@ class ShearIncompressibleMHD(IncompressibleMHD):
         for i in self.dims:
             tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace']
             tmp -= data['u'][i].k[self._trans[i]] * BgradB[i]['kspace'] / pr4
-            
+
         # Add rotation + shear
-        tmp += (-2. * (1 + S) * Omega * data['u']['y'].k['x'] * data['u']['y']['kspace'] + 
+        tmp += (-2. * (1 + S) * Omega * data['u']['y'].k['x'] * data['u']['y']['kspace'] +
                 2. * Omega * data['u']['x'].k['y'] * data['u']['x']['kspace'])
-                
+
         # Construct full term
-        for i in self.dims:            
+        for i in self.dims:
             Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
             #Ptotal[i].zero_nyquist()
-            
+
 
 class LinearCollisionlessCosmology(Physics):
-    """This class implements linear, collisionless cosmology. 
+    """This class implements linear, collisionless cosmology.
 
     parameters
     ----------
@@ -795,7 +795,7 @@ class LinearCollisionlessCosmology(Physics):
         self.fields = [('delta', 'ScalarField'),
                        ('u', 'VectorField')]
         self._aux_fields = [('gradphi', 'VectorField')]
-                            
+
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
         params = {'Omega_r': 0.,
                   'Omega_m': 0.,
@@ -804,7 +804,7 @@ class LinearCollisionlessCosmology(Physics):
         self._setup_parameters(params)
         self._setup_aux_fields(0., self._aux_fields)
         aux_eqn_rhs = a_friedmann
-        self._setup_aux_eqns(['a'], [aux_eqn_rhs], [0.002], 
+        self._setup_aux_eqns(['a'], [aux_eqn_rhs], [0.002],
                              [self.parameters])
 
         self._RHS = self.create_fields(0.)
@@ -829,9 +829,9 @@ class LinearCollisionlessCosmology(Physics):
         a = self.aux_eqns['a'].value
         adot = self.aux_eqns['a'].RHS(a)
         for i in self.dims:
-            self._RHS['u'][i]['kspace'] = (-gradphi[i]['kspace'] - 
+            self._RHS['u'][i]['kspace'] = (-gradphi[i]['kspace'] -
                                             adot * data['u'][i]['kspace']) / a
-        
+
     def grad_phi(self, data):
         a  = self.aux_eqns['a'].value
         H  = self.aux_eqns['a'].RHS(a) / a
@@ -841,8 +841,8 @@ class LinearCollisionlessCosmology(Physics):
         gradphi = self.aux_fields['gradphi']
         tmp = (-3./2. * H0*H0/a * Om * data['delta']['kspace'] /
                 data['delta'].k2(no_zero=True))
-        
-        for i in self.dims:            
+
+        for i in self.dims:
             gradphi[i]['kspace'] = 1j * data['u'][i].k[self._trans[i]] * tmp
 
 class CollisionlessCosmology(LinearCollisionlessCosmology):
@@ -863,9 +863,9 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         self._aux_fields.append(('deltadivu', 'ScalarField'))
         self._aux_fields.append(('ugradu', 'VectorField'))
         self._setup_aux_fields(0., self._aux_fields) # re-creates gradphi
-    
+
     def delta_div_u(self, data, compute_divu=False):
-        """calculate delta*div(v) in x-space, using 2/3 de-aliasing 
+        """calculate delta*div(v) in x-space, using 2/3 de-aliasing
 
         """
         divu = self.aux_fields['divu']
@@ -894,10 +894,10 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         ugraddelta = self.aux_fields['ugraddelta']
         deltadivu = self.aux_fields['deltadivu']
 
-        self._RHS['delta']['kspace'] = -(divu['kspace'] + 
-                                         deltadivu['kspace'] + 
+        self._RHS['delta']['kspace'] = -(divu['kspace'] +
+                                         deltadivu['kspace'] +
                                          ugraddelta['kspace']) / a
-        
+
     def vel_RHS(self, data):
         self.grad_phi(data)
         gradphi = self.aux_fields['gradphi']
@@ -905,12 +905,12 @@ class CollisionlessCosmology(LinearCollisionlessCosmology):
         a = self.aux_eqns['a'].value
         adot = self.aux_eqns['a'].RHS(a)
 
-        self.XlistgradY([data['u'],], data['u'], 
-                        self.aux_fields['math_tmp'], 
-                        [self.aux_fields['ugradu'],]) 
-        
-        ugradu = self.aux_fields['ugradu'] 
-        
+        self.XlistgradY([data['u'],], data['u'],
+                        self.aux_fields['math_tmp'],
+                        [self.aux_fields['ugradu'],])
+
+        ugradu = self.aux_fields['ugradu']
+
         for i in self.dims:
             self._RHS['u'][i]['kspace'] = -(gradphi[i]['kspace'] +
                                             adot * data['u'][i]['kspace'] +
@@ -932,11 +932,11 @@ class LinearBaryonCDMCosmology(Physics):
     ------
     d_t d_c = -div(v_c) / a
     d_t v_c = -grad(Phi) / a - H v_c
-    
+
     d_t d_b = -div(v_b) / a
-    d_t v_b = -grad(Phi) / a - H v_b 
+    d_t v_b = -grad(Phi) / a - H v_b
               - c_s^2 grad(d_b) / a
-    
+
     laplacian(Phi) = 3/2 H^2 (Omega_c * d_c + Omega_b * d_b)/Omega_m
     """
 
@@ -968,11 +968,11 @@ class LinearBaryonCDMCosmology(Physics):
 
         self._cs2_a = []
         self._cs2_values = []
-    
+
     def init_cs2(self, a, cs2):
         self._cs2_values = cs2
         self._cs2_a = a
-    
+
     def cs2_at(self, a):
         """look up cs2 in internal table at nearest scale factor. Uses
         binary search to find the correct index.
@@ -988,12 +988,12 @@ class LinearBaryonCDMCosmology(Physics):
             elif a < self._cs2_a[i]:
                 upper = i
                 i = upper - int(na.ceil((upper - lower)/2.))
-            
+
             if i == len(self._cs2_a):
                 print "warning: scale factor out of cs2 range; using sound speed at a = ", self._cs2_a[-1]
                 return self._cs2_values[-1]
 
-            if lower >= upper - 1:    
+            if lower >= upper - 1:
                 return self._cs2_values[i]
 
     def RHS(self, data):
@@ -1013,7 +1013,7 @@ class LinearBaryonCDMCosmology(Physics):
         self.divX(u, divu)
 
         self._RHS['delta_b']['kspace'] = -(divu['kspace']) / a
-        
+
     def d_c_RHS(self, data):
         a = self.aux_eqns['a'].value
         u = data['u_c']
@@ -1028,12 +1028,12 @@ class LinearBaryonCDMCosmology(Physics):
         a = self.aux_eqns['a'].value
         H = self.aux_eqns['a'].RHS(a) / a
         H0 = self.parameters['H0']
-        
+
         sampledata = data['delta_c']
-        
+
         gradphi = self.aux_fields['gradphi']
-        tmp = (-3./2. * H0*H0/a * 
-                ((self.parameters['Omega_c'] * data['delta_c']['kspace'] + 
+        tmp = (-3./2. * H0*H0/a *
+                ((self.parameters['Omega_c'] * data['delta_c']['kspace'] +
                   self.parameters['Omega_b'] * data['delta_b']['kspace'])) /
                 sampledata.k2(no_zero=True))
 
@@ -1044,7 +1044,7 @@ class LinearBaryonCDMCosmology(Physics):
         # needs pressure term
         self.grad_phi(data)
         gradphi = self.aux_fields['gradphi']
-        
+
         a = self.aux_eqns['a'].value
         adot = self.aux_eqns['a'].RHS(a)
 
@@ -1059,7 +1059,7 @@ class LinearBaryonCDMCosmology(Physics):
     def v_c_RHS(self, data):
         self.grad_phi(data)
         gradphi = self.aux_fields['gradphi']
-        
+
         a = self.aux_eqns['a'].value
         adot = self.aux_eqns['a'].RHS(a)
 
@@ -1084,11 +1084,11 @@ class BaryonCDMCosmology(Physics):
     ------
     d_t d_c = -(1 + d_c) div(v_c) / a - v_c dot grad(d_c) / a
     d_t v_c = -grad(Phi) / a - H v_c -(v_c dot grad) v_c / a
-    
+
     d_t d_b = -(1 + d_b) div(v_b) / a - v_b dot grad(d_b) / a
-    d_t v_b = -grad(Phi) / a - H v_b -(v_b dot grad) v_b / a 
+    d_t v_b = -grad(Phi) / a - H v_b -(v_b dot grad) v_b / a
               - c_s^2 grad(d_b) / a
-    
+
     laplacian(Phi) = 3/2 H^2 (Omega_c * d_c + Omega_b * d_b)/Omega_m
     """
 
@@ -1128,11 +1128,11 @@ class BaryonCDMCosmology(Physics):
 
         self._cs2_a = []
         self._cs2_values = []
-    
+
     def init_cs2(self, a, cs2):
         self._cs2_values = cs2
         self._cs2_a = a
-    
+
     def cs2_at(self, a):
         """look up cs2 in internal table at nearest scale factor. Uses
         binary search to find the correct index.
@@ -1148,12 +1148,12 @@ class BaryonCDMCosmology(Physics):
             elif a < self._cs2_a[i]:
                 upper = i
                 i = upper - int(na.ceil((upper - lower)/2.))
-            
+
             if i == len(self._cs2_a):
                 print "warning: scale factor out of cs2 range; using sound speed at a = ", self._cs2_a[-1]
                 return self._cs2_values[-1]
 
-            if lower >= upper - 1:    
+            if lower >= upper - 1:
                 return self._cs2_values[i]
 
     def RHS(self, data):
@@ -1180,9 +1180,9 @@ class BaryonCDMCosmology(Physics):
         deltadivu['xspace'] += divu['xspace'] * delta['xspace']
 
         self._RHS['delta_b']['kspace'] = -(divu['kspace'] +
-                                           deltadivu['kspace'] + 
+                                           deltadivu['kspace'] +
                                            ugraddelta['kspace']) / a
-        
+
     def d_c_RHS(self, data):
         a = self.aux_eqns['a'].value
         u = data['u_c']
@@ -1198,19 +1198,19 @@ class BaryonCDMCosmology(Physics):
         deltadivu['xspace'] += divu['xspace'] * delta['xspace']
 
         self._RHS['delta_c']['kspace'] = -(divu['kspace'] +
-                                           deltadivu['kspace'] + 
+                                           deltadivu['kspace'] +
                                            ugraddelta['kspace']) / a
 
     def grad_phi(self, data):
         a = self.aux_eqns['a'].value
         H = self.aux_eqns['a'].RHS(a) / a
         H0 = self.parameters['H0']
-        
+
         sampledata = data['delta_c']
-        
+
         gradphi = self.aux_fields['gradphi']
-        tmp = (-3./2. * H0*H0/a * 
-                ((self.parameters['Omega_c'] * data['delta_c']['kspace'] + 
+        tmp = (-3./2. * H0*H0/a *
+                ((self.parameters['Omega_c'] * data['delta_c']['kspace'] +
                   self.parameters['Omega_b'] * data['delta_b']['kspace'])) /
                 sampledata.k2(no_zero=True))
 
@@ -1221,7 +1221,7 @@ class BaryonCDMCosmology(Physics):
         # needs pressure term
         self.grad_phi(data)
         gradphi = self.aux_fields['gradphi']
-        
+
         a = self.aux_eqns['a'].value
         adot = self.aux_eqns['a'].RHS(a)
 
@@ -1234,13 +1234,13 @@ class BaryonCDMCosmology(Physics):
         for i in self.dims:
             self._RHS['u_b'][i]['kspace'] = -(gradphi[i]['kspace'] +
                                              adot * u[i]['kspace'] +
-                                             ugradu[i]['kspace'] + 
+                                             ugradu[i]['kspace'] +
                                              cs2 * graddelta[i]['kspace']) / a
 
     def v_c_RHS(self, data):
         self.grad_phi(data)
         gradphi = self.aux_fields['gradphi']
-        
+
         a = self.aux_eqns['a'].value
         adot = self.aux_eqns['a'].RHS(a)
 
@@ -1252,7 +1252,7 @@ class BaryonCDMCosmology(Physics):
             self._RHS['u_c'][i]['kspace'] = -(gradphi[i]['kspace'] +
                                              adot * u[i]['kspace'] +
                                              ugradu[i]['kspace']) / a
-        
+
 if __name__ == "__main__":
     import pylab as P
     from representations import FourierData

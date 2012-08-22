@@ -31,7 +31,7 @@ class VolumeAverageSet(object):
 
     # Dictionary of registered tasks
     known_analysis = {}
-    
+
     def __init__(self, data, filename='time_series.dat'):
         self.data = data
         self.filename = filename
@@ -48,7 +48,7 @@ class VolumeAverageSet(object):
         self.tasks.append((self.known_analysis[name], fmt, options))
         if com_sys.myproc == 0:
             self.outfile.write("# Column %i: %s\n" % (len(self.tasks), name))
-        
+
     def run(self):
         if com_sys.myproc == 0:
             line = []
@@ -82,13 +82,13 @@ def volume_average(data, kdict=None, space='kspace', reduce_all=False):
             data_values = data
             if k == None:
                 raise ValueError("volume_average: data is not a Dedalus representation, so you must pass k vectors via kdict")
-        
+
         if data.ndim == 3:
             if k['x'][...,0] == 0:
                 local_sum = 2*data_values[...,1:].sum() + data_values[...,0].sum()
             else:
                 local_sum = 2*data_values.sum()
-                
+
         else:
             if k['x'][0, ...] == 0:
                 local_sum = 2*data_values[1:, ...].sum() + data_values[0, ...].sum()
@@ -101,7 +101,7 @@ def volume_average(data, kdict=None, space='kspace', reduce_all=False):
         return reduce_mean(data_values)
     else:
         raise ValueError("volume_average: must be either xspace or kspace")
-                
+
 @VolumeAverageSet.register_task
 def ekin(data, scratch, space='kspace'):
     for i in xrange(data['u'].ncomp):
@@ -141,10 +141,10 @@ def emag(data, scratch, space='kspace'):
             scratch['scalar']['xspace'] += 0.5 * na.abs(data['B'][i]['xspace']) ** 2
 
     return volume_average(scratch['scalar'], space=space)
-    
+
 @VolumeAverageSet.register_task
 def enstrophy(data, scratch, space='kspace'):
-    """compute enstrophy 
+    """compute enstrophy
 
     HARDCODED FOR 2D CARTESIAN ONLY!
 
@@ -190,7 +190,7 @@ def energy_dissipation(data, scratch):
     scratch['scalar']['kspace'] = 0.5 * ((na.abs(data['u']['z'].deriv('y') - data['u']['y'].deriv('z')))**2 \
         + (na.abs(data['u']['x'].deriv('z') - data['u']['z'].deriv('x')))**2 \
         + (na.abs(data['u']['y'].deriv('x') - data['u']['x'].deriv('y')))**2)
-    
+
     en_dis = 2*data.parameters['nu']*(scratch['scalar']['kspace']).real
 
     return volume_average(en_dis,kdict=scratch['scalar'].k)
@@ -200,7 +200,7 @@ def thermal_energy_dissipation(data, scratch):
     """energy dissipation rate: kappa <d_i T>**2
 
     """
-    scratch['scalar']['kspace'] = data.parameters['kappa'] * ((na.abs(data['T'].deriv('x')))**2 
+    scratch['scalar']['kspace'] = data.parameters['kappa'] * ((na.abs(data['T'].deriv('x')))**2
         + (na.abs(data['T'].deriv('y')))**2 \
         + (na.abs(data['T'].deriv('z')))**2)
 

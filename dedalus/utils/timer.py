@@ -20,10 +20,10 @@ License:
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  
+
 """
 
-import time 
+import time
 from dedalus.utils.parallelism import com_sys
 
 class Timer(object):
@@ -34,12 +34,12 @@ class Timer(object):
         their cumulative times.
 
         """
-        
+
         self.timers = {}
-        
+
     def __call__(self, func):
         """Decorator to time function execution."""
-    
+
         def wrapper(*args, **kwargs):
             start = time.time()
             retval = func(*args, **kwargs)
@@ -54,7 +54,7 @@ class Timer(object):
 
     def print_stats(self, proc=0):
         """Print cumulative times for functions executed on a specified processor."""
-    
+
         if com_sys.myproc == proc:
             print
             print "---Timings (proc %i)---" % (proc)

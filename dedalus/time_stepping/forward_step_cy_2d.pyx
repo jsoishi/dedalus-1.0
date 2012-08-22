@@ -20,7 +20,7 @@ def linear_step(np.ndarray[DTYPE1_t, ndim=2] start not None,
     assert start.dtype == DTYPE1
     assert deriv.dtype == DTYPE1
     assert output.dtype == DTYPE1
-    
+
     cdef int xmax = output.shape[0]
     cdef int ymax = output.shape[1]
     cdef unsigned int x, y
@@ -28,7 +28,7 @@ def linear_step(np.ndarray[DTYPE1_t, ndim=2] start not None,
     for x in range(xmax):
         for y in range(ymax):
             output[x, y] = start[x, y] + deriv[x, y] * dt
-                
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def intfac_step(np.ndarray[DTYPE1_t, ndim=2] start not None,
@@ -42,7 +42,7 @@ def intfac_step(np.ndarray[DTYPE1_t, ndim=2] start not None,
     assert deriv.dtype == DTYPE1
     assert output.dtype == DTYPE1
     assert intfactor.dtype == DTYPE2
-    
+
     cdef int xmax = output.shape[0]
     cdef int ymax = output.shape[1]
     cdef unsigned int x, y

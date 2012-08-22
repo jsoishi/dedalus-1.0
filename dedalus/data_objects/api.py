@@ -30,6 +30,6 @@ from .state_data import \
 from .representations import \
     FourierRepresentation, \
     FourierShearRepresentation
-    
+
 from .aux_equation import \
     AuxEquation
