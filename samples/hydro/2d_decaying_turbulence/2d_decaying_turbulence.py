@@ -48,7 +48,7 @@ an = AnalysisSet(data, ti)
 an.add(Snapshot(10, space='kspace'))
 an.add(Snapshot(10, space='xspace'))
 an.add(PowerSpectrum(10))
-an.add("volume_average",10,{'va_obj': vs})
+an.add(VolumeAverage(10, vs))
 
 # Main loop
 an.run()
