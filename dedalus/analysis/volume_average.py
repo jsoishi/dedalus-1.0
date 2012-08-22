@@ -155,7 +155,7 @@ def enstrophy(data, scratch, space='kspace'):
     return volume_average(scratch['scalar'],space='kspace')
 
 @VolumeAverageSet.register_task
-def vort_cenk(data):
+def vort_cenk(data, scratch):
     """Centroid wavenumber from McWilliams 1990.
 
     """
