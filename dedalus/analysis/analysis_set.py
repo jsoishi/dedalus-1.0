@@ -76,7 +76,8 @@ class AnalysisTask(object):
 
 
 class Snapshot(AnalysisTask):
-    def __init__(self, cadence, space=None, axis=None, index=None, units=None):
+    def __init__(self, cadence, space=None, axis=None, index=None, units=None,
+                 dpi=None):
         """
         Save image of specified plane in data.
 
@@ -99,6 +100,10 @@ class Snapshot(AnalysisTask):
             True for physical-space layout and units.
             False for array-based layout and indexing.
             Default: config setting
+        dpi : int, optional
+            DPI setting for images.  Each plot is set to be 4 inches, so each
+            plot in the image will be 4*DPI pixels in each direction.
+            Default: config setting
 
         """
 
@@ -108,6 +113,7 @@ class Snapshot(AnalysisTask):
         self.axis = axis
         self.index = index
         self.units = units
+        self.dpi = dpi
 
         # Get defaults from config
         if self.space is None:
@@ -118,6 +124,8 @@ class Snapshot(AnalysisTask):
             self.index = decfg.get('analysis','snapshot_index')
         if self.units is None:
             self.units = decfg.getboolean('analysis', 'snapshot_units')
+        if self.dpi is None:
+            self.dpi = decfg.getint('analysis', 'snapshot_dpi')
 
     def setup(self, data, it):
 
@@ -244,7 +252,7 @@ class Snapshot(AnalysisTask):
             else:
                 slicestr = '%s_%i_' %(self.axis, outindex)
             outfile = "frames/%s_snap_%sn%07i.png" %(spacestr, slicestr, it)
-            self.fig.savefig(outfile, dpi=100)
+            self.fig.savefig(outfile, dpi=self.dpi)
 
         if self.firstrun:
             self.firstrun = False
@@ -556,7 +564,7 @@ class TrackMode(AnalysisTask):
 class PowerSpectrum(AnalysisTask):
 
     def __init__(self, cadence, fieldlist=None, norm=1., write=True, plot=True,
-                 loglog=True, nyquistlines=False, dealiasinglines=True):
+                 loglog=True, nyquistlines=False, dealiasinglines=True, dpi=None):
         """
         Save and plot power spectrum of specified fields.
 
@@ -581,6 +589,10 @@ class PowerSpectrum(AnalysisTask):
         dealiasinglines : bool, optional
             Plot lines at 2/3 of the individual and composite Nyquist
             wavenumbers. Default: True
+        dpi : int, optional
+            DPI setting for images.  Each plot is set to be 4 inches, so each
+            plot in the image will be 4*DPI pixels in each direction.
+            Default: config setting
 
         """
 
@@ -593,6 +605,11 @@ class PowerSpectrum(AnalysisTask):
         self.write = write
         self.nyquistlines = nyquistlines
         self.dealiasinglines = dealiasinglines
+        self.dpi = dpi
+
+        # Get defaults from config
+        if self.dpi is None:
+            self.dpi = decfg.getint('analysis', 'powerspectrum_dpi')
 
     def setup(self, data, it):
 
@@ -732,7 +749,7 @@ class PowerSpectrum(AnalysisTask):
 
                 # Save in frames folder
                 outfile = 'frames/power_spectra_n%07i.png' %it
-                self.fig.savefig(outfile, dpi=100)
+                self.fig.savefig(outfile, dpi=self.dpi)
 
         if self.firstrun:
             self.firstrun = False
