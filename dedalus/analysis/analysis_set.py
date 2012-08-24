@@ -77,7 +77,7 @@ class AnalysisTask(object):
 
 class Snapshot(AnalysisTask):
     def __init__(self, cadence, space=None, axis=None, index=None, units=None,
-                 dpi=None):
+                 dpi=None, cmap=None):
         """
         Save image of specified plane in data.
 
@@ -104,6 +104,8 @@ class Snapshot(AnalysisTask):
             DPI setting for images.  Each plot is set to be 4 inches, so each
             plot in the image will be 4*DPI pixels in each direction.
             Default: config setting
+        cmap : str, optional
+            Name of colormap for plots. Default: config setting
 
         """
 
@@ -114,6 +116,7 @@ class Snapshot(AnalysisTask):
         self.index = index
         self.units = units
         self.dpi = dpi
+        self.cmapname = cmap
 
         # Get defaults from config
         if self.space is None:
@@ -126,6 +129,8 @@ class Snapshot(AnalysisTask):
             self.units = decfg.getboolean('analysis', 'snapshot_units')
         if self.dpi is None:
             self.dpi = decfg.getint('analysis', 'snapshot_dpi')
+        if self.cmapname is None:
+            self.cmapname = decfg.get('analysis', 'snapshot_cmap')
 
     def setup(self, data, it):
 
@@ -275,7 +280,7 @@ class Snapshot(AnalysisTask):
                 patches.append(rect)
 
         # Set values and colorbar
-        cmap = matplotlib.cm.Spectral_r
+        cmap = matplotlib.cm.get_cmap(self.cmapname)
         cmap.set_bad('0.7')
         pc = PatchCollection(patches, cmap=cmap, zorder=1, edgecolors='white')
         pc.set_array(na.ma.ravel(plane_data))
@@ -335,7 +340,7 @@ class Snapshot(AnalysisTask):
         else:
             extent = None
 
-        cmap = matplotlib.cm.Spectral_r
+        cmap = matplotlib.cm.get_cmap(self.cmapname)
         cmap.set_bad('0.7')
         im = imax.imshow(plane_data, cmap=cmap, zorder=1, aspect='auto',
                 interpolation='nearest', origin='lower', extent=extent)

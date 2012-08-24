@@ -42,6 +42,7 @@ decfg.set('analysis', 'snapshot_axis', 'z')
 decfg.set('analysis', 'snapshot_index', 'middle')
 decfg.set('analysis', 'snapshot_units', 'True')
 decfg.set('analysis', 'snapshot_dpi', '100')
+decfg.set('analysis', 'snapshot_cmap', 'Spectral_r')
 decfg.set('analysis', 'powerspectrum_dpi', '100')
 
 # Read user config, local config
