@@ -22,8 +22,8 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 from dedalus.mods import *
-from dedalus.funcs import insert_ipython
 import numpy as np
 
 decfg.set('analysis','slice_axis', 'y')
@@ -54,7 +54,6 @@ if mode:
     data['T']['kspace'][tuple(mode)] = -1j*RHS.parameters['beta']/np.sqrt(kx**2/(kx**2 + kz**2)) * uz
 
 # Integration parameters
-ti = RK2simplevisc(RHS)
 ti = RK2mid(RHS)
 ti.stop_time(tstop) # 2 wave periods
 #ti.stop_iter(1)

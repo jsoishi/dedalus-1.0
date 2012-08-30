@@ -307,9 +307,9 @@ class FourierRepresentation(Representation):
             raise NotImplementedError("Specified FFT method not implemented.")
 
     def create_fftw_plans(self):
-        self.fplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'],
+        self.fplan = fftw.rPlan(self.xdata, self.kdata, com_sys, self.global_shape['xspace'],
                 forward=True, flags=['FFTW_MEASURE'])
-        self.rplan = fftw.rPlan(self.xdata, self.kdata, com_sys, shape=self.global_shape['xspace'],
+        self.rplan = fftw.rPlan(self.xdata, self.kdata, com_sys, self.global_shape['xspace'],
                 forward=False, flags=['FFTW_MEASURE'])
 
     def fwd_fftw(self):

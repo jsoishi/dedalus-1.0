@@ -530,6 +530,7 @@ class TrackMode(AnalysisTask):
         for fname in self.fieldlist:
             field = data[fname]
             for cindex, comp in field:
+                comp.require_space('kspace')
                 if com_sys.myproc == 0:
                     amplitudes = []
 
@@ -540,7 +541,7 @@ class TrackMode(AnalysisTask):
                         amp = comp['kspace'][index]
                     else:
                         amp = 0.
-                    amp = com_sys.comm.reduce(amp, root=0)
+                    amp = com_sys.comm.reduce(amp, op=com_sys.MPI.SUM, root=0)
                     if com_sys.myproc == 0:
                         amplitudes.append(amp)
 
@@ -550,7 +551,7 @@ class TrackMode(AnalysisTask):
                         amp = 0.
                     else:
                         amp = comp['kspace'][index]
-                    amp = com_sys.comm.reduce(amp, root=0)
+                    amp = com_sys.comm.reduce(amp, op=com_sys.MPI.SUM, root=0)
                     if com_sys.myproc == 0:
                         amplitudes.append(amp)
 
