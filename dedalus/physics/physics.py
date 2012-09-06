@@ -127,8 +127,16 @@ class Physics(object):
         for f, r, ic, kwargs in zip(aux_eqns, RHS, ics, kwarglists):
             self.aux_eqns[f] = AuxEquation(r, kwargs, ic)
 
-    def RHS(self):
-        pass
+    def RHS(self, data, deriv):
+        # Finalize and setup integrating factors
+        if not self._is_finalized:
+            self._finalize()
+            self._setup_integrating_factors(deriv)
+
+        for name,f in deriv:
+            f.zero_all()
+        deriv.set_time(data.time)
+        self.aux_fields.set_time(data.time)
 
     def gradX(self, X, output):
         """
@@ -377,35 +385,24 @@ class IncompressibleHydro(Physics):
         u_t + nu k^2 u = -ugradu - i k p / rho0
 
         """
+        Physics.RHS(data, deriv)
 
-        # Finalize and setup integrating factors
-        if not self._is_finalized:
-            self._finalize()
-            self._setup_integrating_factors(deriv)
+        self.ugradu(data, deriv)
+        self.pressure(data, deriv)
 
-        deriv.set_time(data.time)
-        self.aux_fields.set_time(data.time)
 
+    def ugradu(self, data, deriv):
         # Place references
-        u = data['u']
-
-        mathtmp = self.aux_fields['mathtmp']
-        #gradu = self.aux_fields['gradu']
-        ugradu = self.aux_fields['ugradu']
-        pressure = self.aux_fields['pressure']
-        ucopy = self.aux_fields['ucopy']
         k2 = data['u']['x'].k2()
-
-        # Compute terms
-        #self.XgradY(u, u, gradu, ugradu)
+        u = data['u']
+        ucopy = self.aux_fields['ucopy']
+        ugradu = self.aux_fields['ugradu']
+        mathtmp = self.aux_fields['mathtmp']
         self.XlistgradY([u], u, mathtmp, [ucopy],[ugradu])
-        self.pressure(data)
-
-        # Construct time derivatives
         for i in self.dims:
-            deriv['u'][i]['kspace'] = -ugradu[i]['kspace'] - pressure[i]['kspace']
+            deriv['u'][i]['kspace'] -= ugradu[i]['kspace'] 
 
-    def pressure(self, data):
+    def pressure(self, data, deriv):
         """
         Compute pressure term for ufields: i k p / rho0
 
@@ -413,9 +410,7 @@ class IncompressibleHydro(Physics):
         ==> pressure term = - k (k * ugradu) / k^2
 
         """
-
         # Place references
-        ugradu = self.aux_fields['ugradu']
         pressure = self.aux_fields['pressure']
 
         # Setup temporary data container
@@ -425,12 +420,11 @@ class IncompressibleHydro(Physics):
 
         # Construct k * ugradu
         for i in self.dims:
-            tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace']
+            tmp += data['u'][i].k[self._trans[i]] * deriv['u'][i]['kspace']
 
-        # Construct full term
+        # apply it
         for i in self.dims:
-            pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            #pressure[i].zero_nyquist()
+            deriv['u'][i]['kspace'] -= data['u'][i].k[self._trans[i]] * tmp / k2
 
 class ShearIncompressibleHydro(IncompressibleHydro):
     """Incompressible hydrodynamics in a shearing box."""
@@ -448,54 +442,25 @@ class ShearIncompressibleHydro(IncompressibleHydro):
         shear = (2 + S) Omega u_y e_x
 
         """
-
+        Physics.RHS(self, data, deriv)
         # Place references
         S = self.parameters['S']
         Omega = self.parameters['Omega']
 
         # Compute terms
-        IncompressibleHydro.RHS(self, data, deriv)
-        deriv['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
-        deriv['u']['x']['kspace'] += (2. + S) * Omega * data['u']['y']['kspace']
+        self.ugradu(data, deriv)
+        self.shear_rotation(data, deriv)
+        self.pressure(data, deriv)
 
         # Recalculate integrating factors
         self._setup_integrating_factors(deriv)
 
-    def pressure(self, data):
+    def shear_rotation(self, data, deriv):
+        """add shear and rotation terms
         """
-        Compute pressure term for ufields: i K p / rho0
+        deriv['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
+        deriv['u']['x']['kspace'] += (2. + S) * Omega * data['u']['y']['kspace']
 
-        p / rho0 = i (K * ugradu + rotation + shear)/ K^2
-        ==> pressure term = - K (K * ugradu + rotation + shear) / K^2
-
-        rotation = 2 Omega u_x K_y
-        shear = -(1 + S) 2 Omega u_y K_x
-
-        """
-
-        # Place references
-        ugradu = self.aux_fields['ugradu']
-        pressure = self.aux_fields['pressure']
-        S = self.parameters['S']
-        Omega = self.parameters['Omega']
-
-        # Setup temporary data container
-        sampledata = data['u']['x']
-        tmp = na.zeros_like(sampledata.kdata)
-        k2 = sampledata.k2(no_zero=True)
-
-        # Construct K * ugradu
-        for i in self.dims:
-            tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace']
-
-        # Add rotation + shear
-        tmp += (2. * Omega * data['u']['x']['kspace'] * data['u']['x'].k['y'] -
-                (1. + S) * 2. * Omega * data['u']['y']['kspace'] * data['u']['x'].k['x'])
-
-        # Construct full term
-        for i in self.dims:
-            pressure[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            #pressure[i].zero_nyquist()
 
 class BoussinesqHydro(IncompressibleHydro):
     def __init__(self, *args, **kwargs):
@@ -548,45 +513,40 @@ class BoussinesqHydro(IncompressibleHydro):
         T_t + kappa k^2 T = -ugradT + stratification term
 
         """
-        IncompressibleHydro.RHS(self, data, deriv)
+        Physics.RHS(self, data, deriv)
 
-        # Place references
+        self.ugradu(data, deriv)
+
+        # temperature equation
+        self.temperature(data, deriv)
+
+        # add buoyancy term
+        self.buoyancy(data, deriv)
+
+        self.pressure(data, deriv)
+
+    def buoyancy(self, data, deriv):
         g = self.parameters['g']
         alpha_t = self.parameters['alpha_t']
-        beta = self.parameters['beta']
 
+        u = data['u']
+        T = data['T']
+        deriv['u']['z']['kspace'] += g * alpha_t * T['kspace']        
+
+    def temperature(self, data, deriv):
+        beta = self.parameters['beta']
         u = data['u']
         T = data['T']
         mathtmp = self.aux_fields['mathtmp']
         Tcopy = self.aux_fields['Tcopy']
         ugradT = self.aux_fields['ugradT']
-        # Compute terms
 
-        # add buoyancy term
-        deriv['u']['z']['kspace'] += g * alpha_t * T['kspace']
-
-        # temperature equation
         self.XlistgradY([u], T, mathtmp, [Tcopy], [ugradT])
         deriv['T']['kspace'] = -ugradT['kspace'] - beta * u['z']['kspace']
 
         if self.ThermalDrive:
             deriv['T']['kspace'] += self.ThermalDrive(data)
         deriv['T']['kspace'][0,0,0] = 0. # must ensure (0,0,0) T mode does not grow.
-
-    def pressure(self, data):
-        """
-        Compute pressure term for ufields: i k p / rho0
-
-        p / rho0 = i (k * ugradu + rotation + shear)/ k^2
-        ==> pressure term = - k (k * ugradu + rotation + shear) / k^2
-
-        """
-        k2 = data['T'].k2(no_zero=True)
-
-        pressure = self.aux_fields['pressure']
-        IncompressibleHydro.pressure(self, data)
-        for i in self.dims:
-            pressure[i]['kspace'] += data['T'].k[self._trans[i]] * self.parameters['g'] * self.parameters['alpha_t'] * data['T'].k['z'] * data['T']['kspace']/k2
 
 class IncompressibleMHD(IncompressibleHydro):
     """Incompressible magnetohydrodynamics."""
