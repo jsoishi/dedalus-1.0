@@ -390,7 +390,6 @@ class IncompressibleHydro(Physics):
         self.ugradu(data, deriv)
         self.pressure(data, deriv)
 
-
     def ugradu(self, data, deriv):
         # Place references
         k2 = data['u']['x'].k2()
@@ -424,7 +423,7 @@ class IncompressibleHydro(Physics):
 
         # apply it
         for i in self.dims:
-            deriv['u'][i]['kspace'] += data['u'][i].k[self._trans[i]] * tmp / k2
+            deriv['u'][i]['kspace'] -= data['u'][i].k[self._trans[i]] * tmp / k2
 
 class ShearIncompressibleHydro(IncompressibleHydro):
     """Incompressible hydrodynamics in a shearing box."""
