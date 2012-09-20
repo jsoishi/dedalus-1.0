@@ -447,7 +447,7 @@ def add_gaussian_white_noise(comp, std):
     Parameters
     ----------
     comp : Representation object
-        Component to which noise will be added
+        Component to be augmented by noise.
     std : float
         x-space standard deviation.
 
