@@ -204,6 +204,8 @@ class FourierRepresentation(Representation):
         self._static_k = True
 
         # Get Nyquist wavenumbers
+        self.dk = 2 * na.pi / self.length
+        self.dk = swap_indices(self.dk)
         self.kny = na.pi * self.global_shape['xspace'] / self.length
         self.kny = swap_indices(self.kny)
 
@@ -358,6 +360,7 @@ class FourierRepresentation(Representation):
 
         if dealiasing == '2/3':
             self.dealias = self.dealias_23
+            self.nmodes = na.prod(2 * na.ceil(self.global_shape['xspace'] / 3. - 1) + 1)
         elif dealiasing == '2/3 cython':
             if self.ndim == 2:
                 from dealias_cy_2d import dealias_23
@@ -365,10 +368,13 @@ class FourierRepresentation(Representation):
                 from dealias_cy_3d import dealias_23
             self._cython_dealias_function = dealias_23
             self.dealias = self.dealias_23_cython
+            self.nmodes = na.prod(2 * na.ceil(self.global_shape['xspace'] / 3. - 1) + 1)
         elif dealiasing == '2/3 spherical':
             self.dealias = self.dealias_23_spherical
+            self.nmodes = None
         elif dealiasing in ['None', None, 0]:
             self.dealias = self.zero_nyquist
+            self.nmodes = na.prod(2 * na.ceil(self.global_shape['xspace'] / 2. - 1) + 1)
         else:
             raise NotImplementedError("Specified dealiasing method not implemented.")
 
