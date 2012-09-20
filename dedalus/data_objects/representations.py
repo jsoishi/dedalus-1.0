@@ -367,7 +367,7 @@ class FourierRepresentation(Representation):
             self.dealias = self.dealias_23_cython
         elif dealiasing == '2/3 spherical':
             self.dealias = self.dealias_23_spherical
-        elif dealiasing == 'None':
+        elif dealiasing in ['None', None, 0]:
             self.dealias = self.zero_nyquist
         else:
             raise NotImplementedError("Specified dealiasing method not implemented.")
@@ -459,7 +459,7 @@ class FourierRepresentation(Representation):
 
         if self.ndim == 2:
             # Enforce along kx=0 pencil, which is local to one process
-            zindex = self.find_mode((0, 0), exact=True)
+            zindex = self.find_mode((0., 0.), exact=True)
             if zindex:
                 self.data[0, 0] = self.data[0, 0].real
                 nyindex = self.local_shape['kspace'][1] / 2
@@ -490,8 +490,8 @@ class FourierRepresentation(Representation):
 
             plane_data = com_sys.comm.bcast(plane_data, root=0)
             lstart = self.offset['kspace']
-            lstop = self.local_shape['kspace'][0]
-            self.kdata[:, :, 0] = plane_data[lstart:lstop, :]
+            lsize = self.local_shape['kspace'][0]
+            self.kdata[:, :, 0] = plane_data[lstart:lstart + lsize, :]
 
     def zero_under_eps(self):
         """Zero out any modes with coefficients smaller than machine epsilon."""
