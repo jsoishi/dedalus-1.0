@@ -128,7 +128,19 @@ class Physics(object):
             self.aux_eqns[f] = AuxEquation(r, kwargs, ic)
 
     def RHS(self):
-        pass
+
+        # Finalize and setup initial integrating factors
+        if not self._is_finalized:
+            self._finalize()
+            self._setup_integrating_factors(deriv)
+
+        # Zero derivative fields
+        for fname, field in deriv:
+                field.zero_all()
+
+        # Synchronize times
+        deriv.set_time(data.time)
+        self.aux_fields.set_time(data.time)
 
     def gradX(self, X, output):
         """
@@ -372,17 +384,12 @@ class IncompressibleHydro(Physics):
         """
         Compute right-hand side of fluid equations:
 
-        u_t + nu k^2 u = - u * grad(u) - i k p / rho0
+        u_t + nu k^2 u = - u dot grad u - i k p / rho0
 
         """
 
-        # Finalize and setup integrating factors
-        if not self._is_finalized:
-            self._finalize()
-            self._setup_integrating_factors(deriv)
-
-        deriv.set_time(data.time)
-        self.aux_fields.set_time(data.time)
+        # Inherited RHS
+        Physics.RHS(self, data, deriv)
 
         # Place references
         u = data['u']
@@ -417,12 +424,14 @@ class ShearIncompressibleHydro(IncompressibleHydro):
 
         """
 
+        # Inherited RHS
+        IncompressibleHydro.RHS(self, data, deriv)
+
         # Place references
         S = self.parameters['S']
         Omega = self.parameters['Omega']
 
         # Compute terms
-        IncompressibleHydro.RHS(self, data, deriv)
         deriv['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
         deriv['u']['x']['kspace'] += (2. + S) * Omega * data['u']['y']['kspace']
 
@@ -484,6 +493,7 @@ class BoussinesqHydro(IncompressibleHydro):
 
         """
 
+        # Inherited RHS
         IncompressibleHydro.RHS(self, data, deriv)
 
         # Place references
