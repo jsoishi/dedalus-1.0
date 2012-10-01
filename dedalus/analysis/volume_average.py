@@ -216,8 +216,10 @@ def divergence(data, scratch):
 
 @VolumeAverageSet.register_task
 def divergence_sum(data, scratch):
-    scratch['scalar']['kspace'] = data['u']['x'].deriv('x') \
-        + data['u']['y'].deriv('y') \
-        + data['u']['z'].deriv('z')
+
+    scratch['scalar'].zero()
+    for cindex, comp in data['u']:
+        cname = data['u'].ctrans[cindex]
+        scratch['scalar']['kspace'] += comp.deriv(cname)
 
     return abs(scratch['scalar']['kspace']).sum()
