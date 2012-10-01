@@ -32,6 +32,9 @@ from dedalus.utils.logger import mylog
 from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
 from dedalus.utils.api import a_friedmann
 from dedalus.funcs import insert_ipython
+from dedalus.utils.parallelism import com_sys
+
+shearing_representations = [FourierShearRepresentation]
 
 def _reconstruct_object(*args, **kwargs):
     new_args = [args[1]['shape'], args[1]['_representation'], args[1]['length']]
@@ -127,7 +130,7 @@ class Physics(object):
         for f, r, ic, kwargs in zip(aux_eqns, RHS, ics, kwarglists):
             self.aux_eqns[f] = AuxEquation(r, kwargs, ic)
 
-    def RHS(self):
+    def RHS(self, data, deriv):
 
         # Finalize and setup initial integrating factors
         if not self._is_finalized:
@@ -333,18 +336,32 @@ class Physics(object):
             output[0]['kspace'] = X[0].deriv(self._trans[1])
             output[1]['kspace'] = -X[0].deriv(self._trans[0])
 
+    def laplace_solve(self, X, output):
+        """
+        Solve laplace(output) = X.
+        """
+        k2 = output.k2(no_zero=True)
+        output['kspace'] = -X['kspace'] / k2
+
 class IncompressibleHydro(Physics):
     """
     Incompressible hydrodynamics.
 
-    Parameters *** Set in self.parameters dictionary after instantiation. ***
+    Parameters
     ----------
+    *** Set in self.parameters dictionary after instantiation. ***
     'viscosity_order' : int
         Hyperviscosity order. Defaults to 1.
-    'nu' : int
+    'nu' : float
         Kinematic viscosity. Defaults to 0.
-    'rho0' : float
-        Background density. Defaults to 1.
+    'shear_rate': float
+        Linear shearing rate L, such that v_x = L * y. Defaults to 0.
+    'Omega': float
+        Angular velocity in the z-direction. Defaults to 0.
+
+    Notes
+    -----
+    For a Keplerian angular velocity profile, ...
 
     Example
     -------
@@ -356,18 +373,37 @@ class IncompressibleHydro(Physics):
     allowable_representations = [FourierRepresentation]
 
     def __init__(self, *args, **kwargs):
+
+        # Inherited initialization
         Physics.__init__(self, *args, **kwargs)
 
         # Setup data fields
         self.fields = [('u', 'VectorField')]
-        self._aux_fields = [('mathtmp', 'ScalarField'),
+        self._aux_fields = [('mathscalar', 'ScalarField'),
                             ('ucopy','VectorField'),
                             ('ugradu', 'VectorField')]
 
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
-        self.parameters = {'rho0': 1.,
-                           'viscosity_order': 1,
-                           'nu': 0.}
+
+        # Default parameters
+        self.parameters = {'viscosity_order': 1,
+                           'nu': 0.,
+                           'shear_rate': 0.,
+                           'Omega': 0.}
+
+    def _finalize(self):
+
+        print self._representation
+        # Reconcile representation and shear_rate
+        if self.parameters['shear_rate'] == 0.:
+            if self._representation in shearing_representations:
+                mylog.warning("Performance suffers when using a shearing representation without a linear shear.")
+        else:
+            if self._representation not in shearing_representations:
+                raise ValueError("A shearing representation must be used if shear_rate parameter is not None.")
+
+        # Inherited finalization
+        Physics._finalize(self)
 
     def _setup_integrating_factors(self, deriv):
 
@@ -393,12 +429,12 @@ class IncompressibleHydro(Physics):
 
         # Place references
         u = data['u']
-        mathtmp = self.aux_fields['mathtmp']
+        mathscalar = self.aux_fields['mathscalar']
         ugradu = self.aux_fields['ugradu']
         ucopy = self.aux_fields['ucopy']
 
         # Compute terms
-        self.XlistgradY([u], u, mathtmp, [ucopy], [ugradu])
+        self.XlistgradY([u], u, mathscalar, [ucopy], [ugradu])
 
         # Construct time derivatives
         for i in self.dims:
@@ -414,10 +450,9 @@ class ShearIncompressibleHydro(IncompressibleHydro):
 
     def RHS(self, data, deriv):
         """
-        Compute right hand side of fluid equations, populating deriv with
-        the time derivatives of the fields.
+        Compute right-hand side of fluid equations:
 
-        u_t + nu K^2 u = -ugradu - i K p / rho0 + rotation + shear
+        u_t + nu K^2 u = - u dot grad u - i K p / rho0 + rotation + shear
 
         rotation = -2 Omega u_x e_y
         shear = (2 + S) Omega u_y e_x
@@ -425,18 +460,30 @@ class ShearIncompressibleHydro(IncompressibleHydro):
         """
 
         # Inherited RHS
-        IncompressibleHydro.RHS(self, data, deriv)
+        Physics.RHS(self, data, deriv)
 
         # Place references
+        mathscalar = self.aux_fields['mathscalar']
+        ugradu = self.aux_fields['ugradu']
+        ucopy = self.aux_fields['ucopy']
         S = self.parameters['S']
         Omega = self.parameters['Omega']
 
-        # Compute terms
+        # Inertial term
+        self.XlistgradY([data['u']], data['u'], mathscalar, [ucopy], [ugradu])
+        for i in self.dims:
+            deriv['u'][i]['kspace'] = -ugradu[i]['kspace']
+
+        # Shear terms
         deriv['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
         deriv['u']['x']['kspace'] += (2. + S) * Omega * data['u']['y']['kspace']
 
-        # Pressure term projects off irrotational part of velocity derivative
-        deriv['u'].div_free()
+        # Pressure term
+        self.divX(deriv['u'], mathscalar)
+        mathscalar['kspace'] += S * Omega * data['u']['y'].deriv('x')
+        self.laplace_solve(mathscalar, mathscalar)
+        for i in self.dims:
+            deriv['u'][i]['kspace'] -= mathscalar.deriv(self._trans[i])
 
         # Recalculate integrating factors
         self._setup_integrating_factors(deriv)
