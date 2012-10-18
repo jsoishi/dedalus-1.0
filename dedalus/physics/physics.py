@@ -182,7 +182,7 @@ class Physics(object):
         for i in xrange(X.ncomp):
             output['kspace'] += X[i].deriv(self._trans[i])
 
-    def XgradY(self, X, Y, gradY, output, compute_gradY=True):
+    def XgradY(self, X, Y, stmp, vtmp, output):
         """
         Calculate X dot (grad Y).
 
@@ -197,23 +197,22 @@ class Physics(object):
 
         """
 
-        N = self.ndim
+        # Zero output field
+        output.zero_all('xspace')
 
-        # Perform gradY calculation
-        if compute_gradY:
-            self.gradX(Y, gradY)
-
-        # Setup temporary data container
-        sampledata = output[0]
-        output.zero_all()
-        tmp = na.zeros_like(sampledata['xspace'])
+        # Copy and transform X
+        for cindex, comp in X:
+            vtmp[cindex]['kspace'] = comp['kspace']
+            #vtmp[cindex].require_space('xspace')
 
         # Construct XgradY
-        for i in xrange(Y.ncomp):
-            for j in self.dims:
-                tmp += X[j]['xspace'] * gradY[N * i + j]['xspace']
-            output[i]['xspace'] += tmp.real
-            tmp *= 0+0j
+        for cindex, comp in Y:
+            for i in self.dims:
+                stmp['kspace'] = comp.deriv(self._trans[i])
+                output[cindex]['xspace'] += stmp['xspace'] * vtmp[i]['xspace']
+                #na.add(output[cindex]['xspace'],
+                #       stmp['xspace'] * vtmp[i]['xspace'],
+                #       output[cindex]['xspace'])
 
     def XlistgradY(self, Xlist, Y, stmp, vtmp, outlist):
         """
@@ -250,40 +249,96 @@ class Physics(object):
                     #outlist[k][i]['xspace'] += (X[j]['xspace'] * stmp['xspace']).real
                     na.add(outlist[k][i]['xspace'], (X[j]['xspace'] * stmp['xspace']), outlist[k][i]['xspace'])
 
+
+    def XconstcrossY(self, X, Y, output):
+        """
+        Calculate X cross Y, where X is a constant, computed in kspace.
+
+        Parameters
+        ----------
+        X : float or array of floats
+        Y : VectorField object
+        output : Scalar/VectorField object
+
+        Notes
+        -----
+        In 2D, if X is a float/array then output must be a Vector/ScalarField.
+
+        """
+
+        # X references
+        if self.ndim == 2:
+            if na.isscalar(X):
+                Xz = X
+            else:
+                Xy, Xx = X
+        else:
+            Xz, Xy, Xx = X
+
+        # Y references
+        Yx = Y['x']['kspace']
+        Yy = Y['y']['kspace']
+        if self.ndim == 3:
+            Yz = Y['z']['kspace']
+
+        # Calculate cross product
+        if self.ndim == 2:
+            if na.isscalar(X):
+                output['x']['kspace'] = - Xz * Yy
+                output['y']['kspace'] = Xz * Yx
+            else:
+                output['kspace'] = Xx * Yy - Xy * Yx
+        else:
+            output['x']['kspace'] = Xy * Yz - Xz * Yy
+            output['y']['kspace'] = Xz * Yx - Xx * Yz
+            output['z']['kspace'] = Xx * Yy - Xy * Yx
+
     def XcrossY(self, X, Y, output, space):
         """
-        Calculate X cross Y.
+        Calculate X cross Y, computed in xspace.
 
-        Inputs:
-            X           Input VectorField object
-            Y           Input VectorField object
-            output      Output Vector/ScalarField object (3D/2D)
-            space       Space for cross product
+        Parameters
+        ----------
+        X : Scalar/VectorField object
+        Y : VectorField object
+        output : Vector/ScalarField object
 
-        Note:
-            2D inputs require scalar output
-            3D inputs require vector output
+        Notes
+        -----
+        In 2D, if X is a ScalarField then output must be a VectorField, and
+        vice versa.  In 3D, all must be VectorFields.
 
         """
 
-        N = X.ndim
-
-        # Place references
-        X0 = X[0][space]
-        X1 = X[1][space]
-        if N == 3: X2 = X[2][space]
-
-        Y0 = Y[0][space]
-        Y1 = Y[1][space]
-        if N == 3: Y2 = Y[2][space]
-
-        # Calculate cross product, scalar if N == 2
-        if N == 3:
-            output[0][space] = X1 * Y2 - X2 * Y1
-            output[1][space] = X2 * Y0 - X0 * Y2
-            output[2][space] = X0 * Y1 - X1 * Y0
+        # X references
+        if self.ndim == 2:
+            if X.ncomp == 1:
+                Xz = X['xspace']
+            else:
+                Xx = X['x']['xspace']
+                Xy = X['y']['xspace']
         else:
-            output[space] = X0 * Y1 - X1 * Y0
+            Xx = X['x']['xspace']
+            Xy = X['y']['xspace']
+            Xz = X['z']['xspace']
+
+        # Y references
+        Yx = Y['x']['xspace']
+        Yy = Y['y']['xspace']
+        if self.ndim == 3:
+            Yz = Y['z']['xspace']
+
+        # Calculate cross product
+        if self.ndim == 2:
+            if X.ncomp == 1:
+                output['x']['xspace'] = - Xz * Yy
+                output['y']['xspace'] = Xz * Yx
+            else:
+                output['xspace'] = Xx * Yy - Xy * Yx
+        else:
+            output['x']['xspace'] = Xy * Yz - Xz * Yy
+            output['y']['xspace'] = Xz * Yx - Xx * Yz
+            output['z']['xspace'] = Xx * Yy - Xy * Yx
 
     def XdotY(self, X, Y, output, space):
         """
@@ -345,19 +400,21 @@ class Physics(object):
 
 class IncompressibleHydro(Physics):
     """
-    Incompressible hydrodynamics.
+    Homogeneous incompressible hydrodynamics.
 
     Parameters
     ----------
     *** Set in self.parameters dictionary after instantiation. ***
+
     'viscosity_order' : int
         Hyperviscosity order. Defaults to 1.
     'nu' : float
         Kinematic viscosity. Defaults to 0.
-    'shear_rate': float
-        Linear shearing rate L, such that v_x = L * y. Defaults to 0.
-    'Omega': float
-        Angular velocity in the z-direction. Defaults to 0.
+    'shear_rate' : float
+        Linear shearing rate S, such that v_x = S * y. Defaults to 0.
+    'Omega' : float, array of floats, or None
+        Angular velocity vector np.array[(Omega_z, Omega_y, Omega_x)].  Float
+        for z-direction in 2D.  Defaults to None.
 
     Notes
     -----
@@ -370,7 +427,8 @@ class IncompressibleHydro(Physics):
 
     """
 
-    allowable_representations = [FourierRepresentation]
+    allowable_representations = [FourierRepresentation,
+                                 FourierShearRepresentation]
 
     def __init__(self, *args, **kwargs):
 
@@ -380,8 +438,7 @@ class IncompressibleHydro(Physics):
         # Setup data fields
         self.fields = [('u', 'VectorField')]
         self._aux_fields = [('mathscalar', 'ScalarField'),
-                            ('ucopy','VectorField'),
-                            ('ugradu', 'VectorField')]
+                            ('mathvector', 'VectorField')]
 
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
 
@@ -389,18 +446,27 @@ class IncompressibleHydro(Physics):
         self.parameters = {'viscosity_order': 1,
                            'nu': 0.,
                            'shear_rate': 0.,
-                           'Omega': 0.}
+                           'Omega': None}
 
     def _finalize(self):
 
-        print self._representation
         # Reconcile representation and shear_rate
         if self.parameters['shear_rate'] == 0.:
+            self._shear = False
             if self._representation in shearing_representations:
                 mylog.warning("Performance suffers when using a shearing representation without a linear shear.")
         else:
+            self._shear = True
             if self._representation not in shearing_representations:
-                raise ValueError("A shearing representation must be used if shear_rate parameter is not None.")
+                raise ValueError("A shearing representation must be used if shear_rate is nonzero.")
+
+        # Set rotation flag
+        if self.parameters['Omega'] == None:
+            self._rotation = False
+        else:
+            self._rotation = True
+            if self.ndim == 2:
+                mylog.warning("Rotation is dynamically insignificant in 2D incrompressible hydrodynamics.  Remove for optimal performance.")
 
         # Inherited finalization
         Physics._finalize(self)
@@ -418,44 +484,10 @@ class IncompressibleHydro(Physics):
 
     def RHS(self, data, deriv):
         """
-        Compute right-hand side of fluid equations:
+        Compute right-hand side of fluid equations, cast in the form
+            f_t + S y f_x - c div.grad(f) = RHS(f).
 
-        u_t + nu k^2 u = - u dot grad u - i k p / rho0
-
-        """
-
-        # Inherited RHS
-        Physics.RHS(self, data, deriv)
-
-        # Place references
-        u = data['u']
-        mathscalar = self.aux_fields['mathscalar']
-        ugradu = self.aux_fields['ugradu']
-        ucopy = self.aux_fields['ucopy']
-
-        # Compute terms
-        self.XlistgradY([u], u, mathscalar, [ucopy], [ugradu])
-
-        # Construct time derivatives
-        for i in self.dims:
-            deriv['u'][i]['kspace'] = -ugradu[i]['kspace']
-
-        # Pressure term projects off irrotational part of velocity derivative
-        deriv['u'].div_free()
-
-class ShearIncompressibleHydro(IncompressibleHydro):
-    """Incompressible hydrodynamics in a shearing box."""
-
-    allowable_representations = [FourierShearRepresentation]
-
-    def RHS(self, data, deriv):
-        """
-        Compute right-hand side of fluid equations:
-
-        u_t + nu K^2 u = - u dot grad u - i K p / rho0 + rotation + shear
-
-        rotation = -2 Omega u_x e_y
-        shear = (2 + S) Omega u_y e_x
+        RHS(u) = - u.grad(u) - S u_y e_x - grad(p) / rho_0 - 2 Omega * u
 
         """
 
@@ -464,29 +496,36 @@ class ShearIncompressibleHydro(IncompressibleHydro):
 
         # Place references
         mathscalar = self.aux_fields['mathscalar']
-        ugradu = self.aux_fields['ugradu']
-        ucopy = self.aux_fields['ucopy']
-        S = self.parameters['S']
+        mathvector = self.aux_fields['mathvector']
+        S = self.parameters['shear_rate']
         Omega = self.parameters['Omega']
 
         # Inertial term
-        self.XlistgradY([data['u']], data['u'], mathscalar, [ucopy], [ugradu])
+        self.XgradY(data['u'], data['u'], mathscalar, mathvector, deriv['u'])
         for i in self.dims:
-            deriv['u'][i]['kspace'] = -ugradu[i]['kspace']
+            deriv['u'][i]['kspace'] *= -1.
 
-        # Shear terms
-        deriv['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
-        deriv['u']['x']['kspace'] += (2. + S) * Omega * data['u']['y']['kspace']
+        # Shear term
+        if self._shear:
+            deriv['u']['x']['kspace'] -= S * data['u']['y']['kspace']
+
+        # Rotation terms
+        if self._rotation:
+            self.XconstcrossY(Omega, data['u'], mathvector)
+            for i in self.dims:
+                deriv['u'][i]['kspace'] -= 2 * mathvector[i]['kspace']
 
         # Pressure term
         self.divX(deriv['u'], mathscalar)
-        mathscalar['kspace'] += S * Omega * data['u']['y'].deriv('x')
+        if self._shear:
+            mathscalar['kspace'] -= S * data['u']['y'].deriv('x')
         self.laplace_solve(mathscalar, mathscalar)
         for i in self.dims:
             deriv['u'][i]['kspace'] -= mathscalar.deriv(self._trans[i])
 
         # Recalculate integrating factors
-        self._setup_integrating_factors(deriv)
+        if self._shear:
+            self._setup_integrating_factors(deriv)
 
 class BoussinesqHydro(IncompressibleHydro):
     def __init__(self, *args, **kwargs):
