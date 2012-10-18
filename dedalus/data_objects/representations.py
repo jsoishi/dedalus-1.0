@@ -594,10 +594,10 @@ class FourierShearRepresentation(FourierRepresentation):
             xkx[-1] *= -1.
         xkx.resize((self.ndim - 1) * (1,) + (ksize,))
         y = self.xspace_grid(open=True)[self.xtrans['y']]
-        self._phase_rate = -self.sd.parameters['S'] * self.sd.parameters['Omega'] * xkx * y
+        self._phase_rate = self.sd.parameters['shear_rate'] * xkx * y
 
         # Calculate wave rate for use in wavenumber update
-        self._wave_rate = -self.sd.parameters['S'] * self.sd.parameters['Omega'] * self.k['x']
+        self._wave_rate = self.sd.parameters['shear_rate'] * self.k['x']
 
         # Update wavenumbers in case component is initialized at non-zero time
         self._update_k()
@@ -619,9 +619,9 @@ class FourierShearRepresentation(FourierRepresentation):
 
         # Wrap wavenumbers past Nyquist value
         kny_y = self.kny[3 - self.ndim]
-        while self.k['y'].min() <= -kny_y:
+        if self.k['y'].min() <= -kny_y:
             self.k['y'][self.k['y'] <= -kny_y] += 2 * kny_y
-        while self.k['y'].max() > kny_y:
+        if self.k['y'].max() > kny_y:
             self.k['y'][self.k['y'] > kny_y] -= 2 * kny_y
 
         # Dealias
