@@ -29,6 +29,7 @@ import numpy as na
 from dedalus.data_objects.representations import FourierRepresentation, \
         FourierShearRepresentation
 from dedalus.utils.logger import mylog
+from dedalus.config import decfg
 from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
 from dedalus.utils.api import a_friedmann
 from dedalus.funcs import insert_ipython
@@ -353,7 +354,12 @@ class IncompressibleHydro(Physics):
 
     def __init__(self, *args, **kwargs):
         Physics.__init__(self, *args, **kwargs)
-
+    
+        
+        if decfg.getboolean('physics','use_tracer'):
+            self._do_tracer = True
+        else:
+            self._do_tracer = False
         # Setup data fields
         self.fields = [('u', 'VectorField')]
         self._aux_fields = [('pressure', 'VectorField'),
@@ -365,6 +371,12 @@ class IncompressibleHydro(Physics):
         self.parameters = {'rho0': 1.,
                            'viscosity_order': 1,
                            'nu': 0.}
+        if self._do_tracer:
+            self.fields.append(('c', 'ScalarField'))
+            self._aux_fields.append(('ccopy', 'VectorField'))
+            self._aux_fields.append(('ugradc', 'ScalarField'))
+            self.parameters['c_diff'] = 0. 
+
 
     def _setup_integrating_factors(self, deriv):
 
@@ -376,6 +388,14 @@ class IncompressibleHydro(Physics):
                 comp.integrating_factor = None
             else:
                 comp.integrating_factor = nu * comp.k2() ** vo
+
+        if self._do_tracer:
+            comp = deriv['c'][0]
+            diff = self.parameters['c_diff']
+            if diff == 0.:
+                comp.integrating_factor = None
+            else:
+                comp.integrating_factor = diff * comp.k2() ** vo
 
     def RHS(self, data, deriv):
         """
@@ -390,6 +410,9 @@ class IncompressibleHydro(Physics):
         self.ugradu(data, deriv)
         self.pressure(data, deriv)
 
+        if self._do_tracer:
+            self.tracer(data, deriv)
+
     def ugradu(self, data, deriv):
         # Place references
         k2 = data['u']['x'].k2()
@@ -400,6 +423,16 @@ class IncompressibleHydro(Physics):
         self.XlistgradY([u], u, mathtmp, [ucopy],[ugradu])
         for i in self.dims:
             deriv['u'][i]['kspace'] -= ugradu[i]['kspace'] 
+
+    def tracer(self, data, deriv):
+        u = data['u']
+        c = data['c']
+        mathtmp = self.aux_fields['mathtmp']
+        ccopy = self.aux_fields['ccopy']
+        ugradc = self.aux_fields['ugradc']
+
+        self.XlistgradY([u], c, mathtmp, [ccopy], [ugradc])
+        deriv['c']['kspace'] = -ugradc['kspace'] 
 
     def pressure(self, data, deriv):
         """
