@@ -156,11 +156,6 @@ class FourierRepresentation(Representation):
         # Scalar assignment
         if type(data) == float or type(data) == complex:
             self.data[:] = data
-        # Mis-matched size assignment
-        elif data.size < self.data.size:
-            mylog.warning("Size of assignment and data don't agree. This may be disallowed in future versions.")
-            sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
-            self.data[sli] = data
         # Regular assignment by slicing
         else:
             sli = [slice(i) for i in self.data.shape]
@@ -807,36 +802,6 @@ class ChebyshevRepresentation(FourierRepresentation):
         # Set transform counters
         self.fwd_count = 0
         self.rev_count = 0
-
-    def __getitem__(self, space):
-        """Return data in specified space, transforming as necessary."""
-
-        self.require_space(space)
-        return self.data
-
-    def __setitem__(self, space, data):
-        """
-        Set data while ensuring the pointer for the field's data member doesn't
-        change for FFTW. Currently done by slicing the entire data array.
-
-        """
-
-        if space == 'xspace':
-            self.data = self.xdata
-        elif space == 'kspace':
-            self.data = self.kdata
-        else:
-            raise KeyError("space must be either xspace or kspace.")
-
-        # Scalar assignment
-        if type(data) == float or type(data) == complex:
-            self.data[:] = data
-        # Regular assignment by slicing
-        else:
-            sli = [slice(i) for i in self.data.shape]
-            self.data[:] = data[sli]
-
-        self._curr_space = space
 
     def _create_differentiation_matrix(self):
 
