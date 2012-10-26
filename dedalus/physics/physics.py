@@ -27,7 +27,7 @@ License:
 
 import numpy as na
 from dedalus.data_objects.representations import FourierRepresentation, \
-        FourierShearRepresentation
+        FourierShearRepresentation, ChebyshevRepresentation
 from dedalus.utils.logger import mylog
 from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
 from dedalus.utils.api import a_friedmann
@@ -428,7 +428,8 @@ class IncompressibleHydro(Physics):
     """
 
     allowable_representations = [FourierRepresentation,
-                                 FourierShearRepresentation]
+                                 FourierShearRepresentation,
+                                 ChebyshevRepresentation]
 
     def __init__(self, *args, **kwargs):
 
