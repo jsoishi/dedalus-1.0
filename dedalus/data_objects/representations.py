@@ -383,12 +383,12 @@ class FourierRepresentation(Representation):
 
         # Zeroing mask
         if self.ndim ==2:
-            dmask = ((np.abs(self.k['x']) >= 2 / 3. * self.kny[0]) |
-                     (np.abs(self.k['y']) >= 2 / 3. * self.kny[1]))
+            dmask = ((np.abs(self.k['x']) >= 2. / 3. * self.kny[0]) |
+                     (np.abs(self.k['y']) >= 2. / 3. * self.kny[1]))
         else:
-            dmask = ((np.abs(self.k['x']) >= 2 / 3. * self.kny[2]) |
-                     (np.abs(self.k['y']) >= 2 / 3. * self.kny[0]) |
-                     (np.abs(self.k['z']) >= 2 / 3. * self.kny[1]))
+            dmask = ((np.abs(self.k['x']) >= 2. / 3. * self.kny[2]) |
+                     (np.abs(self.k['y']) >= 2. / 3. * self.kny[0]) |
+                     (np.abs(self.k['z']) >= 2. / 3. * self.kny[1]))
 
         self.require_space('kspace')
         self.data[dmask] = 0.
@@ -761,47 +761,11 @@ class ChebyshevRepresentation(FourierRepresentation):
 
         """
 
-        # Store inputs
-        self.sd = sd
-        self.global_shape = {'xspace': np.array(shape)}
-        self.length = np.asfarray(length)
-        self.ndim = len(shape)
+        # Fourier initialization
+        FourierRepresentation.__init__(self, sd, shape, length)
 
-        # Make sure all dimensions make sense
-        if self.ndim not in (2, 3):
-            raise ValueError("Must use either 2 or 3 dimensions.")
-        if len(shape) != len(length):
-            raise ValueError("Shape and Length must have same dimensions.")
-
-        # Flexible datatypes not currently supported
-        self.dtype = {'kspace': 'complex128',
-                      'xspace': 'float64'}
-        self._eps = {'kspace': np.finfo(self.dtype['kspace']).eps,
-                      'xspace': np.finfo(self.dtype['xspace']).eps}
-
-        # Retrieve FFT method and dealiasing method from config
-        method = decfg.get('FFT', 'method')
-        dealiasing = decfg.get('FFT', 'dealiasing')
-
-        # Translation tables
-        if self.ndim == 2:
-            self.ktrans = {'x':0, 0:'x', 'y':1, 1:'y'}
-            self.xtrans = {'x':1, 1:'x', 'y':0, 0:'y'}
-        else:
-            self.ktrans = {'x':2, 2:'x', 'y':0, 0:'y', 'z':1, 1:'z'}
-            self.xtrans = {'x':2, 2:'x', 'y':1, 1:'y', 'z':0, 0:'z'}
-
-        # Complete setup
-        self.set_fft(method)
-        self.set_dealiasing(dealiasing)
-        self._setup_k()
+        # Chebyshev differentiation matrix
         self._create_differentiation_matrix()
-        self._curr_space = 'kspace'
-        self.data = self.kdata
-
-        # Set transform counters
-        self.fwd_count = 0
-        self.rev_count = 0
 
     def _create_differentiation_matrix(self):
 
@@ -896,18 +860,6 @@ class ChebyshevRepresentation(FourierRepresentation):
         # Restrict to local
         scomp = self.ktrans[0]
         self.k[scomp] = self.k[scomp][self.offset['kspace']:self.offset['kspace'] + self.local_shape['kspace'][0]]
-
-    def require_space(self, space):
-        """Transform to required space if not there already."""
-
-        if self._curr_space == space:
-            pass
-        elif space == 'xspace':
-            self.backward()
-        elif space == 'kspace':
-            self.forward()
-        else:
-            raise ValueError("space must be either xspace or kspace.")
 
     def find_mode(self, mode, exact=False):
         """
@@ -1007,32 +959,14 @@ class ChebyshevRepresentation(FourierRepresentation):
         self.xdata[:] = npfft.irfft(self._mdata, n=nx, axis=2)
         self.xdata[:] = spfft.idct(self.xdata, type=2, axis=0)
 
-    def forward(self):
-        """FFT method to go from xspace to kspace."""
-
-        if self._curr_space == 'kspace':
-            raise ValueError("Forward transform cannot be called from kspace.")
-
-        self.fft()
-        self.data = self.kdata
-        self._curr_space = 'kspace'
-        self.dealias()
-        self.fwd_count += 1
-
-    def backward(self):
-        """IFFT method to go from kspace to xspace."""
-
-        if self._curr_space == 'xspace':
-            raise ValueError("Backward transform cannot be called from xspace.")
-
-        self.dealias()
-        self.ifft()
-        self.data = self.xdata
-        self._curr_space = 'xspace'
-        self.rev_count += 1
 
     def set_dealiasing(self, dealiasing):
-        """Assign dealiasing method."""
+        """
+        Assign dealiasing method.
+
+        *****NEED TO UPDATE nmodes FOR CHEBYSHEV*****
+
+        """
 
         mylog.debug("Setting dealiasing method to %s." % dealiasing)
 
@@ -1055,21 +989,6 @@ class ChebyshevRepresentation(FourierRepresentation):
             self.nmodes = np.prod(2 * np.ceil(self.global_shape['xspace'] / 2. - 1) + 1)
         else:
             raise NotImplementedError("Specified dealiasing method not implemented.")
-
-    def dealias_23(self):
-        """Orszag 2/3 dealiasing rule."""
-
-        # Zeroing mask
-        if self.ndim ==2:
-            dmask = ((np.abs(self.k['x']) >= 2 / 3. * self.kny[0]) |
-                     (np.abs(self.k['y']) >= 2 / 3. * self.kny[1]))
-        else:
-            dmask = ((np.abs(self.k['x']) >= 2 / 3. * self.kny[2]) |
-                     (np.abs(self.k['y']) >= 2 / 3. * self.kny[0]) |
-                     (np.abs(self.k['z']) >= 2 / 3. * self.kny[1]))
-
-        self.require_space('kspace')
-        self.data[dmask] = 0.
 
     @timer
     def dealias_23_cython(self):
@@ -1183,13 +1102,6 @@ class ChebyshevRepresentation(FourierRepresentation):
         #     lsize = self.local_shape['kspace'][0]
         #     self.kdata[:, :, 0] = plane_data[lstart:lstart + lsize, :]
 
-    def zero_under_eps(self):
-        """Zero out any modes with coefficients smaller than machine epsilon."""
-
-        raise NotImplementedError()
-        # self.require_space('kspace')
-        # self.data[np.abs(self.data) < self._eps['kspace']] = 0.
-
     def save(self, dataset):
         """
         Save data to HDF5 dataset.
@@ -1210,19 +1122,21 @@ class ChebyshevRepresentation(FourierRepresentation):
     def xspace_grid(self, open=False):
         """Return the xspace grid for the local processor."""
 
-        if open:
-            refgrid = np.ogrid
-        else:
-            refgrid = np.mgrid
+        raise NotImplementedError()
 
-        # Create integer array based on local shape and offset
-        grid = refgrid[[slice(i) for i in np.asfarray(self.local_shape['xspace'])]]
-        grid[0] += self.offset['xspace']
+        # if open:
+        #     refgrid = np.ogrid
+        # else:
+        #     refgrid = np.mgrid
 
-        # Multiply integer array by grid spacing
-        dx = self.length / self.global_shape['xspace']
-        for i in xrange(self.ndim):
-            grid[i] *= dx[i]
+        # # Create integer array based on local shape and offset
+        # grid = refgrid[[slice(i) for i in np.asfarray(self.local_shape['xspace'])]]
+        # grid[0] += self.offset['xspace']
 
-        return grid
+        # # Multiply integer array by grid spacing
+        # dx = self.length / self.global_shape['xspace']
+        # for i in xrange(self.ndim):
+        #     grid[i] *= dx[i]
+
+        # return grid
 
