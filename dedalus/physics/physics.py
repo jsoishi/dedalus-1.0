@@ -385,7 +385,7 @@ class IncompressibleHydro(Physics):
         u_t + nu k^2 u = -ugradu - i k p / rho0
 
         """
-        Physics.RHS(data, deriv)
+        Physics.RHS(self, data, deriv)
 
         self.ugradu(data, deriv)
         self.pressure(data, deriv)
