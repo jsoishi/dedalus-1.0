@@ -21,6 +21,10 @@ License:
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import numpy as np
+from dedalus.config import decfg
+decfg.set('physics','use_tracer', 'True')
+decfg.set('analysis', 'snapshot_cmap','bone')
+
 from dedalus.mods import *
 
 shape = (128, 128) # low resolution run
@@ -42,6 +46,9 @@ def kelvin_helmholz(data, L=0.025):
     u1 = 0.5
     u2 = -0.5
     um = (u1 - u2)/2.
+    rho1 = 1.0
+    rho2 = 2.0
+    rhom = (rho1 - rho2)/2.
 
     grid = data['u']['x'].xspace_grid()
     y = grid[0]
@@ -49,12 +56,19 @@ def kelvin_helmholz(data, L=0.025):
     # base flow
     y1 = (y >= 0) & (y < 0.25)
     data['u']['x']['xspace'][y1] = u1 - um * np.exp((y[y1] - 0.25)/L)
+    data['c']['xspace'][y1] = rho1 - rhom * np.exp((y[y1] - 0.25)/L)
+
     y2 = (y >= 0.25) & (y < 0.5)
     data['u']['x']['xspace'][y2] = u2 + um * np.exp((-y[y2] + 0.25)/L)
+    data['c']['xspace'][y2] = rho2 + rhom * np.exp((-y[y2] + 0.25)/L)
+
     y3 = (y >= 0.5) & (y < 0.75)
     data['u']['x']['xspace'][y3] = u2 + um * np.exp(-(0.75 - y[y3])/L)
+    data['c']['xspace'][y3] = rho2 + rhom * np.exp(-(0.75 - y[y3])/L)
+
     y4 = (y >= 0.75) & (y < 1.)
     data['u']['x']['xspace'][y4] = u1 - um * np.exp(-(y[y4] - 0.75)/L)
+    data['c']['xspace'][y4] = rho1 - rhom * np.exp(-(y[y4] - 0.75)/L)
 
     # perturbation
     data['u']['y']['xspace'] = 0.01 * np.sin(4*np.pi* grid[1])
