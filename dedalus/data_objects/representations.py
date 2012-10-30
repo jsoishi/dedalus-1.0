@@ -523,7 +523,10 @@ class FourierRepresentation(Representation):
         dataset.attrs['space'] = self._curr_space
 
     def xspace_grid(self, open=False):
-        """Return the xspace grid for the local processor."""
+        """Return the xspace grid for the local processor,
+        [3, z, y, x] in 3D
+        [2, y, x] in 2D
+        """
 
         if open:
             refgrid = na.ogrid

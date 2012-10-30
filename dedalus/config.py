@@ -33,6 +33,9 @@ decfg.add_section('FFT')
 decfg.set('FFT', 'method', 'fftw')
 decfg.set('FFT', 'dealiasing', '2/3 cython')
 
+decfg.add_section('physics')
+decfg.set('physics', 'use_tracer', 'False')
+
 decfg.add_section('utils')
 decfg.set('utils', 'loglevel', 'debug')
 
