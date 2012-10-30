@@ -84,6 +84,8 @@ class Physics(object):
                 self._representation, self.shape, self.length)
         self.aux_eqns = {}
 
+        self.parameters = {}
+
         self._is_finalized = False
 
         self._tracer = decfg.getboolean('physics','use_tracer')
@@ -104,12 +106,12 @@ class Physics(object):
         return (_reconstruct_object, (self.__class__, savedict))
 
     def _finalize(self):
-        self._setup_aux_fields(0., self._aux_fields)
+        self._setup_aux_fields(0., self._aux_field_list)
         self._is_finalized = True
 
     def create_fields(self, time, field_list=None):
         if field_list == None:
-            field_list = self.fields
+            field_list = self._field_list
 
         return StateData(time, self.shape, self.length, self._field_classes,
                          field_list=field_list, params=self.parameters)
@@ -432,21 +434,21 @@ class IncompressibleHydro(Physics):
         Physics.__init__(self, *args, **kwargs)
 
         # Setup data fields
-        self.fields = [('u', 'VectorField')]
-        self._aux_fields = [('mathscalar', 'ScalarField'),
-                            ('mathvector', 'VectorField')]
+        self._field_list = [('u', 'VectorField')]
+        self._aux_field_list = [('mathscalar', 'ScalarField'),
+                                ('mathvector', 'VectorField')]
 
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
 
         # Default parameters
-        self.parameters = {'viscosity_order': 1,
-                           'nu': 0.,
-                           'shear_rate': 0.,
-                           'Omega': None}
+        self.parameters['viscosity_order'] = 1
+        self.parameters['nu'] = 0.
+        self.parameters['shear_rate'] = 0.
+        self.parameters['Omega'] = None
 
         # Tracer field and parameters
         if self._tracer:
-            self.fields.append(('c', 'ScalarField'))
+            self._field_list.append(('c', 'ScalarField'))
             self.parameters['c_diff'] = 0.
 
         self._finalize()
@@ -550,33 +552,28 @@ class IncompressibleHydro(Physics):
             self._setup_integrating_factors(deriv)
 
 class BoussinesqHydro(IncompressibleHydro):
+
     def __init__(self, *args, **kwargs):
-        Physics.__init__(self, *args, **kwargs)
 
-        # Setup data fields
-        self.fields = [('u', 'VectorField'),
-                       ('T', 'ScalarField')]
-        self._aux_fields = [('pressure', 'VectorField'),
-                            ('mathtmp', 'ScalarField'),
-                            ('ucopy','VectorField'),
-                            ('Tcopy','VectorField'),
-                            ('ugradu', 'VectorField'),
-                            ('ugradT', 'ScalarField')]
+        # Inherited initialization
+        IncompressibleHydro.__init__(self, *args, **kwargs)
 
-        self._trans = {0: 'x', 1: 'y', 2: 'z'}
-        self.parameters = {'rho0': 1.,
-                           'viscosity_order': 1,
-                           'nu': 0.,
-                           'kappa': 0.,
-                           'g': 1.,
-                           'alpha_t': 1.,
-                           'beta': 1.}
+        # Add temperature field
+        self._field_list.append(('T', 'ScalarField'))
 
+        # Add default parameters
+        self.parameters['rho0'] = 1.
+        self.parameters['kappa'] = 0.
+        self.parameters['g'] = 1.
+        self.parameters['alpha_t'] = 1.
+        self.parameters['beta'] = 1.
+
+        # Add thermal drive function
         self.ThermalDrive = None
 
     def _setup_integrating_factors(self, deriv):
 
-        # Kinematic viscosity for u
+        # Kinematic viscosity for u, diffusion for tracer
         IncompressibleHydro._setup_integrating_factors(self, deriv)
 
         # Thermal diffusivity for T
