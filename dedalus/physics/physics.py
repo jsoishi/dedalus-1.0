@@ -50,8 +50,6 @@ class Physics(object):
 
     """
 
-    allowable_representations = []
-
     def __init__(self, shape, representation, length=None):
         """
         Base class for a physics object. Defines fields and provides
@@ -71,10 +69,7 @@ class Physics(object):
 
         # Store inputs
         self.shape = shape
-        if representation in self.__class__.allowable_representations:
-            self._representation = representation
-        else:
-            raise ValueError("Specified representation is incompatible with this physics class.")
+        self._representation = representation
         if length:
             self.length = length
         else:
@@ -206,7 +201,7 @@ class Physics(object):
         # Zero output field
         output.zero_all('xspace')
 
-        # Copy and transform X
+        # Copy X
         for cindex, comp in X:
             vtmp[cindex]['kspace'] = comp['kspace']
             #vtmp[cindex].require_space('xspace')
@@ -433,9 +428,6 @@ class IncompressibleHydro(Physics):
 
     """
 
-    allowable_representations = [FourierRepresentation,
-                                 FourierShearRepresentation]
-
     def __init__(self, *args, **kwargs):
 
         # Inherited initialization
@@ -454,15 +446,17 @@ class IncompressibleHydro(Physics):
                            'shear_rate': 0.,
                            'Omega': None}
 
-        if self._do_tracer:
+        # Tracer field and parameters
+        if self._tracer:
             self.fields.append(('c', 'ScalarField'))
-            self._aux_fields.append(('ccopy', 'VectorField'))
-            self._aux_fields.append(('ugradc', 'ScalarField'))
             self.parameters['c_diff'] = 0.
 
     def _finalize(self):
 
-        # Reconcile representation and shear_rate
+        # Inherited finalization
+        Physics._finalize(self)
+
+        # Set shear flag and check representation
         if self.parameters['shear_rate'] == 0.:
             self._shear = False
             if self._representation in shearing_representations:
@@ -480,9 +474,6 @@ class IncompressibleHydro(Physics):
             if self.ndim == 2:
                 mylog.warning("Rotation is dynamically insignificant in 2D incrompressible hydrodynamics.  Remove for optimal performance.")
 
-        # Inherited finalization
-        Physics._finalize(self)
-
     def _setup_integrating_factors(self, deriv):
 
         # Kinematic viscosity for u
@@ -494,7 +485,8 @@ class IncompressibleHydro(Physics):
             else:
                 comp.integrating_factor = nu * comp.k2() ** vo
 
-        if self._do_tracer:
+        # Diffusion for tracer
+        if self.tracer:
             comp = deriv['c'][0]
             diff = self.parameters['c_diff']
             if diff == 0.:
@@ -513,9 +505,6 @@ class IncompressibleHydro(Physics):
 
         # Inherited RHS
         Physics.RHS(self, data, deriv)
-
-        if self._do_tracer:
-            self.tracer(data, deriv)
 
         # Place references
         mathscalar = self.aux_fields['mathscalar']
@@ -546,19 +535,14 @@ class IncompressibleHydro(Physics):
         for i in self.dims:
             deriv['u'][i]['kspace'] -= mathscalar.deriv(self._trans[i])
 
+        # Tracer derivative
+        if self._do_tracer:
+            self.XgradY(data['u'], data['c'], mathscalar, mathvector, deriv['c'])
+            deriv['c'][0]['kspace'] *= -1
+
         # Recalculate integrating factors
         if self._shear:
             self._setup_integrating_factors(deriv)
-
-    def tracer(self, data, deriv):
-        u = data['u']
-        c = data['c']
-        mathtmp = self.aux_fields['mathtmp']
-        ccopy = self.aux_fields['ccopy']
-        ugradc = self.aux_fields['ugradc']
-
-        self.XlistgradY([u], c, mathtmp, [ccopy], [ugradc])
-        deriv['c']['kspace'] = -ugradc['kspace']
 
 
 class BoussinesqHydro(IncompressibleHydro):
