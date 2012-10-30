@@ -534,22 +534,31 @@ class IncompressibleHydro(Physics):
 
         # Pressure term
         if self.__class__ == IncompressibleHydro:
-            self.divX(deriv['u'], mathscalar)
-            if self._shear:
-                mathscalar['kspace'] -= S * data['u']['y'].deriv('x')
-            self.laplace_solve(mathscalar, mathscalar)
-            for i in self.dims:
-                deriv['u'][i]['kspace'] -= mathscalar.deriv(self._trans[i])
+            self.pressure_projection(data, deriv)
 
         # Tracer RHS
         # Inertial term
         if self._tracer:
             self.XgradY(data['u'], data['c'], mathscalar, mathvector, deriv['c'])
-            deriv['c'][0]['kspace'] *= -1
+            deriv['c']['kspace'] *= -1
 
         # Recalculate integrating factors
         if self._shear:
             self._setup_integrating_factors(deriv)
+
+    def pressure_projection(self, data, deriv):
+
+        # Place references
+        mathscalar = self.aux_fields['mathscalar']
+        S = self.parameters['shear_rate']
+
+        # Perform solenoidal projection
+        self.divX(deriv['u'], mathscalar)
+        if self._shear:
+            mathscalar['kspace'] -= S * data['u']['y'].deriv('x')
+        self.laplace_solve(mathscalar, mathscalar)
+        for i in self.dims:
+            deriv['u'][i]['kspace'] -= mathscalar.deriv(self._trans[i])
 
 class BoussinesqHydro(IncompressibleHydro):
 
@@ -590,11 +599,12 @@ class BoussinesqHydro(IncompressibleHydro):
 
     def RHS(self, data, deriv):
         """
-        Compute right hand side of fluid equations, populating deriv with
-        the time derivatives of the fields.
+        Compute right-hand side of fluid equations, cast in the form
+            f_t + S y f_x - c div.grad(f) = RHS(f).
 
-        u_t + nu k^2 u = -ugradu - i k p / rho0 + buoyancy
-        T_t + kappa k^2 T = -ugradT + stratification term
+        RHS(u) = - u.grad(u) - S u_y e_x - grad(p) / rho_0 - 2 Omega * u + g alpha_t T
+        RHS(T) = - u.grad(T) - beta * u_z
+        RHS(c) = - u.grad(c)
 
         """
 
@@ -602,26 +612,34 @@ class BoussinesqHydro(IncompressibleHydro):
         IncompressibleHydro.RHS(self, data, deriv)
 
         # Place references
+        mathscalar = self.aux_fields['mathscalar']
+        mathvector = self.aux_fields['mathvector']
+        S = self.parameters['shear_rate']
+        Omega = self.parameters['Omega']
         g = self.parameters['g']
         alpha_t = self.parameters['alpha_t']
         beta = self.parameters['beta']
 
-        u = data['u']
-        T = data['T']
-        mathtmp = self.aux_fields['mathtmp']
-        Tcopy = self.aux_fields['Tcopy']
-        ugradT = self.aux_fields['ugradT']
-        # Compute terms
-
-        # add buoyancy term
+        # Velocity RHS
+        # Bouyancy term
         deriv['u']['z']['kspace'] += g * alpha_t * T['kspace']
 
-        # temperature equation
-        self.XlistgradY([u], T, mathtmp, [Tcopy], [ugradT])
-        deriv['T']['kspace'] = -ugradT['kspace'] - beta * u['z']['kspace']
+        # Pressure term
+        if self.__class__ == IncompressibleHydro:
+            self.pressure_projection(data, deriv)
 
+        # Temperature RHS
+        # Inertial term
+        self.XgradY(data['u'], data['T'], mathscalar, mathvector, deriv['T'])
+        deriv['T']['kspace'] *= -1.
+
+        # Stratification term
+        deriv['T']['kspace'] -= beta * u['z']['kspace']
+
+        # Thermal driving term
         if self.ThermalDrive:
             deriv['T']['kspace'] += self.ThermalDrive(data)
+
         deriv['T']['kspace'][0,0,0] = 0. # must ensure (0,0,0) T mode does not grow.
 
         # Pressure term projects off irrotational part of velocity derivative
