@@ -29,6 +29,7 @@ import numpy as na
 from dedalus.data_objects.representations import FourierRepresentation, \
         FourierShearRepresentation
 from dedalus.utils.logger import mylog
+from dedalus.config import decfg
 from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
 from dedalus.utils.api import a_friedmann
 from dedalus.funcs import insert_ipython
@@ -89,6 +90,11 @@ class Physics(object):
         self.aux_eqns = {}
 
         self._is_finalized = False
+
+        if decfg.getboolean('physics','use_tracer'):
+            self._do_tracer = True
+        else:
+            self._do_tracer = False
 
     def __getitem__(self, item):
          value = self.parameters.get(item, None)
@@ -448,6 +454,12 @@ class IncompressibleHydro(Physics):
                            'shear_rate': 0.,
                            'Omega': None}
 
+        if self._do_tracer:
+            self.fields.append(('c', 'ScalarField'))
+            self._aux_fields.append(('ccopy', 'VectorField'))
+            self._aux_fields.append(('ugradc', 'ScalarField'))
+            self.parameters['c_diff'] = 0.
+
     def _finalize(self):
 
         # Reconcile representation and shear_rate
@@ -482,6 +494,14 @@ class IncompressibleHydro(Physics):
             else:
                 comp.integrating_factor = nu * comp.k2() ** vo
 
+        if self._do_tracer:
+            comp = deriv['c'][0]
+            diff = self.parameters['c_diff']
+            if diff == 0.:
+                comp.integrating_factor = None
+            else:
+                comp.integrating_factor = diff * comp.k2() ** vo
+
     def RHS(self, data, deriv):
         """
         Compute right-hand side of fluid equations, cast in the form
@@ -493,6 +513,9 @@ class IncompressibleHydro(Physics):
 
         # Inherited RHS
         Physics.RHS(self, data, deriv)
+
+        if self._do_tracer:
+            self.tracer(data, deriv)
 
         # Place references
         mathscalar = self.aux_fields['mathscalar']
@@ -526,6 +549,17 @@ class IncompressibleHydro(Physics):
         # Recalculate integrating factors
         if self._shear:
             self._setup_integrating_factors(deriv)
+
+    def tracer(self, data, deriv):
+        u = data['u']
+        c = data['c']
+        mathtmp = self.aux_fields['mathtmp']
+        ccopy = self.aux_fields['ccopy']
+        ugradc = self.aux_fields['ugradc']
+
+        self.XlistgradY([u], c, mathtmp, [ccopy], [ugradc])
+        deriv['c']['kspace'] = -ugradc['kspace']
+
 
 class BoussinesqHydro(IncompressibleHydro):
     def __init__(self, *args, **kwargs):
