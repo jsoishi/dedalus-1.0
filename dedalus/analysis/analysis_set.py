@@ -47,6 +47,7 @@ class AnalysisSet(object):
 
     def add(self, task):
         self.tasks.append(task)
+        task._an = self
         task._n = len(self.tasks)
         task.setup(self.data, self.ti.iter)
 
@@ -203,6 +204,11 @@ class Snapshot(AnalysisTask):
 
         for row, (fname, field) in enumerate(data):
             for cindex, comp in field:
+
+                # Copy data before transforming
+                if self.space == 'xspace':
+                    self._an.ti.RHS.aux_fields['mathscalar']['kspace'] = comp['kspace']
+                    comp = self._an.ti.RHS.aux_fields['mathscalar']
 
                 # Retrieve correct slice
                 if ((row == 0) and (cindex == 0) and
