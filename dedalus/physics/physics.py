@@ -86,10 +86,8 @@ class Physics(object):
 
         self._is_finalized = False
 
-        if decfg.getboolean('physics','use_tracer'):
-            self._do_tracer = True
-        else:
-            self._do_tracer = False
+        self._tracer = decfg.getboolean('physics','use_tracer')
+
 
     def __getitem__(self, item):
          value = self.parameters.get(item, None)
@@ -451,6 +449,9 @@ class IncompressibleHydro(Physics):
             self.fields.append(('c', 'ScalarField'))
             self.parameters['c_diff'] = 0.
 
+        self._finalize()
+        self._is_finalized = False
+
     def _finalize(self):
 
         # Inherited finalization
@@ -486,7 +487,7 @@ class IncompressibleHydro(Physics):
                 comp.integrating_factor = nu * comp.k2() ** vo
 
         # Diffusion for tracer
-        if self.tracer:
+        if self._tracer:
             comp = deriv['c'][0]
             diff = self.parameters['c_diff']
             if diff == 0.:
@@ -500,6 +501,7 @@ class IncompressibleHydro(Physics):
             f_t + S y f_x - c div.grad(f) = RHS(f).
 
         RHS(u) = - u.grad(u) - S u_y e_x - grad(p) / rho_0 - 2 Omega * u
+        RHS(c) = - u.grad(c)
 
         """
 
@@ -512,6 +514,7 @@ class IncompressibleHydro(Physics):
         S = self.parameters['shear_rate']
         Omega = self.parameters['Omega']
 
+        # Velocity RHS
         # Inertial term
         self.XgradY(data['u'], data['u'], mathscalar, mathvector, deriv['u'])
         for i in self.dims:
@@ -528,22 +531,23 @@ class IncompressibleHydro(Physics):
                 deriv['u'][i]['kspace'] -= 2 * mathvector[i]['kspace']
 
         # Pressure term
-        self.divX(deriv['u'], mathscalar)
-        if self._shear:
-            mathscalar['kspace'] -= S * data['u']['y'].deriv('x')
-        self.laplace_solve(mathscalar, mathscalar)
-        for i in self.dims:
-            deriv['u'][i]['kspace'] -= mathscalar.deriv(self._trans[i])
+        if self.__class__ == IncompressibleHydro:
+            self.divX(deriv['u'], mathscalar)
+            if self._shear:
+                mathscalar['kspace'] -= S * data['u']['y'].deriv('x')
+            self.laplace_solve(mathscalar, mathscalar)
+            for i in self.dims:
+                deriv['u'][i]['kspace'] -= mathscalar.deriv(self._trans[i])
 
-        # Tracer derivative
-        if self._do_tracer:
+        # Tracer RHS
+        # Inertial term
+        if self._tracer:
             self.XgradY(data['u'], data['c'], mathscalar, mathvector, deriv['c'])
             deriv['c'][0]['kspace'] *= -1
 
         # Recalculate integrating factors
         if self._shear:
             self._setup_integrating_factors(deriv)
-
 
 class BoussinesqHydro(IncompressibleHydro):
     def __init__(self, *args, **kwargs):
