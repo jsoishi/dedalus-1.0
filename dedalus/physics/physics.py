@@ -106,7 +106,6 @@ class Physics(object):
         return (_reconstruct_object, (self.__class__, savedict))
 
     def _finalize(self):
-        self._setup_aux_fields(0., self._aux_field_list)
         self._is_finalized = True
 
     def create_fields(self, time, field_list=None):
@@ -451,8 +450,8 @@ class IncompressibleHydro(Physics):
             self._field_list.append(('c', 'ScalarField'))
             self.parameters['c_diff'] = 0.
 
-        self._finalize()
-        self._is_finalized = False
+        if self.__class__ == IncompressibleHydro:
+            self._setup_aux_fields(0., self._aux_field_list)
 
     def _finalize(self):
 
@@ -579,6 +578,9 @@ class BoussinesqHydro(IncompressibleHydro):
 
         # Add thermal drive function
         self.ThermalDrive = None
+
+        if self.__class__ == BoussinesqHydro:
+            self._setup_aux_fields(0., self._aux_field_list)
 
     def _setup_integrating_factors(self, deriv):
 
