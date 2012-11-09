@@ -77,16 +77,18 @@ class TimeStepBase(object):
     def ok(self):
         if self.iter >= self._stop_iter:
             if com_sys.myproc == 0:
-                print "Maximum number of iterations reached. Done."
+                mylog.info("Maximum number of iterations reached. Done.")
             self._is_ok = False
-        if self.time >= self._stop_time:
+        elif self.time >= self._stop_time:
+            if com_sys.moyproc == 0:
+                mylog.info("Time > stop time. Done")
+            self._is_ok = False
+        elif (time.time() - self._start_time) >= self._stop_wall:
             if com_sys.myproc == 0:
-                print "Time > stop time. Done"
+                mylog.info("Wall clock time exceeded. Done.")
             self._is_ok = False
-        if (time.time() - self._start_time) >= self._stop_wall:
-            if com_sys.myproc == 0:
-                print "Wall clock time exceeded. Done."
-            self._is_ok = False
+        else:
+            self._is_ok = True
 
         return self._is_ok
     @timer
