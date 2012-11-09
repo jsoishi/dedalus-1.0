@@ -86,3 +86,19 @@ try:
     signal.signal(signal.SIGHUP, signal_print_traceback)
 except ValueError:  # Not in main thread
     pass
+
+# load plugins
+# WARNING WARNING WARNING: this is *really* dangerous.
+# be careful out there, good buddies.
+
+if decfg.getboolean("utils","loadplugins"):
+    my_plugin_name = decfg.get("utils","pluginfilename")
+    # We assume that it is with respect to the $HOME/.dedalus directory
+    if os.path.isfile(my_plugin_name):
+        _fn = my_plugin_name
+    else:
+        _fn = os.path.expanduser("~/.dedalus/%s" % my_plugin_name)
+    if os.path.isfile(_fn):
+        mylog.info("Loading plugins from %s", _fn)
+        execfile(_fn)
+
