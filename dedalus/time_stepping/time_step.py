@@ -81,7 +81,7 @@ class TimeStepBase(object):
                 mylog.info("Maximum number of iterations reached. Done.")
             self._is_ok = False
         elif self.time >= self._stop_time:
-            if com_sys.moyproc == 0:
+            if com_sys.myproc == 0:
                 mylog.info("Time > stop time. Done")
             self._is_ok = False
         elif (time.time() - self._start_time) >= self._stop_wall:
