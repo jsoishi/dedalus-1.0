@@ -24,7 +24,6 @@ License:
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-
 import numpy as na
 from dedalus.data_objects.representations import FourierRepresentation, \
         FourierShearRepresentation
@@ -65,6 +64,14 @@ class Physics(object):
             defaults to 2 pi in all directions.
 
         """
+        # parameters
+        self.forcing_functions = {}
+        self._forcing_function_names = {}
+
+        if decfg.getboolean('physics','use_tracer'):
+            self._do_tracer = True
+        else:
+            self._do_tracer = False
 
         # Store inputs
         self.shape = shape
@@ -96,7 +103,8 @@ class Physics(object):
 
     def __reduce__(self):
         savedict = {}
-        exclude = ['aux_fields', '_field_classes']
+        exclude = ['aux_fields', '_field_classes', 'forcing_functions']
+        self._is_finalized = False
         for k,v in self.__dict__.iteritems():
             if k not in exclude:
                 savedict[k] = v
@@ -356,10 +364,6 @@ class IncompressibleHydro(Physics):
         Physics.__init__(self, *args, **kwargs)
     
         
-        if decfg.getboolean('physics','use_tracer'):
-            self._do_tracer = True
-        else:
-            self._do_tracer = False
         # Setup data fields
         self.fields = [('u', 'VectorField')]
         self._aux_fields = [('pressure', 'VectorField'),
@@ -517,8 +521,6 @@ class BoussinesqHydro(IncompressibleHydro):
                            'alpha_t': 1.,
                            'beta': 1.}
 
-        self.ThermalDrive = None
-
     def _setup_integrating_factors(self, deriv):
 
         # Kinematic viscosity for u
@@ -533,8 +535,8 @@ class BoussinesqHydro(IncompressibleHydro):
         else:
             comp.integrating_factor = kappa * comp.k2() ** vo
 
-    def set_thermal_drive(self, func):
-        self.ThermalDrive = func
+    def set_thermal_forcing(self, func):
+        self.forcing_functions['ThermalForcing'] = func
 
     def RHS(self, data, deriv):
         """
@@ -576,8 +578,8 @@ class BoussinesqHydro(IncompressibleHydro):
         self.XlistgradY([u], T, mathtmp, [Tcopy], [ugradT])
         deriv['T']['kspace'] = -ugradT['kspace'] - beta * u['z']['kspace']
 
-        if self.ThermalDrive:
-            deriv['T']['kspace'] += self.ThermalDrive(data)
+        if self.forcing_functions.has_key('ThermalForcing'):
+            deriv['T']['kspace'] += self.forcing_functions['ThermalForcing'](data)
         deriv['T']['kspace'][0,0,0] = 0. # must ensure (0,0,0) T mode does not grow.
 
 class IncompressibleMHD(IncompressibleHydro):

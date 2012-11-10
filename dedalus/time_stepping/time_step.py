@@ -20,6 +20,7 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+import inspect
 import os
 import cPickle
 import time
@@ -110,7 +111,19 @@ class TimeStepBase(object):
         if com_sys.comm:
             com_sys.comm.Barrier()
 
-        # first, pickle physics data
+        # first, save forcing functions, if any
+        string = ""
+        for k,forcer in self.RHS.forcing_functions.iteritems():
+            if forcer:
+                string += inspect.getsource(forcer) + "\n"
+                self.RHS._forcing_function_names[k] = forcer.__name__
+
+        sidecar = open(os.path.join(pathname,'forcing_functions.py'),'w')
+        sidecar.writelines(string)
+        sidecar.close()
+
+
+        # next, pickle physics data
         obj_file = open(os.path.join(pathname,'dedalus_obj_%04i.cpkl' % myproc),'w')
         cPickle.dump(self.RHS, obj_file)
         cPickle.dump(data, obj_file)
