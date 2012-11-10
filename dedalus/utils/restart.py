@@ -20,6 +20,8 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+import imp
+import inspect
 import os
 import cPickle
 import h5py
@@ -41,12 +43,29 @@ def restart(snap_dir):
     ti = cPickle.load(obj_file)
 
     RHS._setup_aux_fields(data.time, RHS._aux_fields)
+
+    # setup forcing functions
+    _fn = os.path.join(snap_dir,'forcing_functions.py')
+    if os.path.exists(_fn):
+        f, p, d = imp.find_module('forcing_functions', [os.path.join('.',snap_dir)])
+        forcing_functions = imp.load_module('forcing_functions', f, p, d)
+                          
+    for k,func_name in RHS._forcing_function_names.iteritems():
+        for ffn, ffunc in inspect.getmembers(forcing_functions):
+            if ffn == func_name:
+                RHS.forcing_functions[k] = ffunc
+
+        if not RHS.forcing_functions.has_key(k):
+            raise ValueError("Failed to load driver function for %s. Snapshot may be corrupted." % k)
+
     # now load data from hdf5 file...
     DATA_FILENAME = 'data.cpu%04i' % myproc
     filename = os.path.join(snap_dir, DATA_FILENAME)
     load_all_data(data, filename)
+    
     ti.RHS = RHS
     ti._start_time = time.time()
+
     return RHS, data, ti
 
 def load_all_data(data, filename):
