@@ -47,6 +47,7 @@ class AnalysisSet(object):
 
     def add(self, task):
         self.tasks.append(task)
+        task._an = self
         task._n = len(self.tasks)
         task.setup(self.data, self.ti.iter)
 
@@ -77,7 +78,7 @@ class AnalysisTask(object):
 
 class Snapshot(AnalysisTask):
     def __init__(self, cadence, space=None, axis=None, index=None, units=None,
-                 dpi=None, cmap=None):
+                 dpi=None, cmap=None, even_scale=True):
         """
         Save image of specified plane in data.
 
@@ -106,6 +107,8 @@ class Snapshot(AnalysisTask):
             Default: config setting
         cmap : str, optional
             Name of colormap for plots. Default: config setting
+        even_scale : boolean, optional
+            Whether to make xspace colorbar range even. Default: True.
 
         """
 
@@ -117,6 +120,7 @@ class Snapshot(AnalysisTask):
         self.units = units
         self.dpi = dpi
         self.cmapname = cmap
+        self.even_scale = even_scale
 
         # Get defaults from config
         if self.space is None:
@@ -203,6 +207,13 @@ class Snapshot(AnalysisTask):
 
         for row, (fname, field) in enumerate(data):
             for cindex, comp in field:
+
+                # Copy data before transforming
+                if self.space == 'xspace':
+                    if not self._an.ti.RHS._is_finalized:
+                        self._an_ti.RHS._finalize()
+                    self._an.ti.RHS.aux_fields['mathscalar']['kspace'] = comp['kspace']
+                    comp = self._an.ti.RHS.aux_fields['mathscalar']
 
                 # Retrieve correct slice
                 if ((row == 0) and (cindex == 0) and
@@ -369,8 +380,11 @@ class Snapshot(AnalysisTask):
         if self.space == 'kspace':
             im.set_clim(plane_data.min(), plane_data.max())
         else:
-            lim = na.max(na.abs([plane_data.min(), plane_data.max()]))
-            im.set_clim(-lim, lim)
+            if self.even_scale:
+                lim = na.max(na.abs([plane_data.min(), plane_data.max()]))
+                im.set_clim(-lim, lim)
+            else:
+                im.set_clim(plane_data.min(), plane_data.max())
 
     def add_lines(self, axtup, x, y, plane_data, comp):
 

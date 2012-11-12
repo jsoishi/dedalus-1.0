@@ -436,6 +436,32 @@ def vorticity_wave(data, mode, w_amp):
         data['u']['x']['kspace'] = aux['psi'].deriv('y')
         data['u']['y']['kspace'] = -aux['psi'].deriv('x')
 
+def add_gaussian_white_noise(comp, std):
+    """
+    Add Gaussian white noise to specified component.  Noise is constructed by
+    adding a phasor of specified amplitude (determined by desired x-space
+    standard deviation) and random phase to each mode.  When dealiasing is used,
+    true white noise is not possible: the signal can only be uncorrelated down
+    to the dealiasing scale, instead of all the way to the Nyquist scale.
+
+    Parameters
+    ----------
+    comp : Representation object
+        Component to be augmented by noise.
+    std : float
+        x-space standard deviation.
+
+    """
+
+    phase = 2 * na.pi * na.random.random(comp.kdata.shape)
+    amp = std / na.sqrt(comp.nmodes - 1)
+    noise = amp * na.exp(1j * phase)
+    zero_index = comp.find_mode([0.,] * comp.ndim)
+    if zero_index:
+        noise[zero_index] = 0.
+    comp['kspace'] += noise
+    comp.enforce_hermitian()
+
 # def zeldovich(data, ampl, A, a_ini, a_cross):
 #     """velocity wave IC, for testing nonlinear collisionless cosmology
 #     against the Zeldovich approximation
