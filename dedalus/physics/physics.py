@@ -37,11 +37,13 @@ from dedalus.utils.parallelism import com_sys
 
 shearing_representations = [FourierShearRepresentation]
 
+
 def _reconstruct_object(*args, **kwargs):
     new_args = [args[1]['shape'], args[1]['_representation'], args[1]['length']]
     obj = args[0](*new_args)
     obj.__dict__.update(args[1])
     return obj
+
 
 class Physics(object):
     """
@@ -296,7 +298,7 @@ class Physics(object):
             output['y']['kspace'] = Xz * Yx - Xx * Yz
             output['z']['kspace'] = Xx * Yy - Xy * Yx
 
-    def XcrossY(self, X, Y, output, space):
+    def XcrossY(self, X, Y, output):
         """
         Calculate X cross Y, computed in xspace.
 
@@ -389,7 +391,7 @@ class Physics(object):
         elif N == 2:
             output['kspace'] = X[1].deriv(self._trans[0]) - X[0].deriv(self._trans[1])
 
-        # Scalar input (z) yeilds vector output (xy)
+        # Scalar input (z) yields vector output (xy)
         elif N == 1:
             output[0]['kspace'] = X[0].deriv(self._trans[1])
             output[1]['kspace'] = -X[0].deriv(self._trans[0])
@@ -400,6 +402,7 @@ class Physics(object):
         """
         k2 = output.k2(no_zero=True)
         output['kspace'] = -X['kspace'] / k2
+
 
 class IncompressibleHydro(Physics):
     """
@@ -515,9 +518,11 @@ class IncompressibleHydro(Physics):
         # Inherited RHS
         Physics.RHS(self, data, deriv)
 
-        # Place references
+        # Auxiliary field references
         mathscalar = self.aux_fields['mathscalar']
         mathvector = self.aux_fields['mathvector']
+
+        # Parameter references
         S = self.parameters['shear_rate']
         Omega = self.parameters['Omega']
 
@@ -565,6 +570,7 @@ class IncompressibleHydro(Physics):
         for i in self.dims:
             deriv['u'][i]['kspace'] -= mathscalar.deriv(self._trans[i])
 
+
 class BoussinesqHydro(IncompressibleHydro):
 
     def __init__(self, *args, **kwargs):
@@ -604,18 +610,19 @@ class BoussinesqHydro(IncompressibleHydro):
         Compute right-hand side of fluid equations, cast in the form
             f_t + S y f_x - c div.grad(f) = RHS(f).
 
-        RHS(u) = - u.grad(u) - S u_y e_x - grad(p) / rho_0 - 2 Omega * u + g alpha_t T
+        RHS(u) += g alpha_t T
         RHS(T) = - u.grad(T) - beta * u_z
-        RHS(c) = - u.grad(c)
 
         """
 
         # Inherited RHS
         IncompressibleHydro.RHS(self, data, deriv)
 
-        # Place references
+        # Auxiliary field references
         mathscalar = self.aux_fields['mathscalar']
         mathvector = self.aux_fields['mathvector']
+
+        # Parameter references
         S = self.parameters['shear_rate']
         Omega = self.parameters['Omega']
         g = self.parameters['g']
@@ -644,32 +651,20 @@ class BoussinesqHydro(IncompressibleHydro):
 
         deriv['T']['kspace'][0,0,0] = 0. # must ensure (0,0,0) T mode does not grow.
 
-        # Pressure term projects off irrotational part of velocity derivative
-        deriv['u'].div_free()
 
 class IncompressibleMHD(IncompressibleHydro):
-    """Incompressible magnetohydrodynamics."""
 
     def __init__(self, *args, **kwargs):
-        Physics.__init__(self, *args, **kwargs)
 
-        # Setup data fields
-        self.fields = [('u', 'VectorField'),
-                       ('B', 'VectorField')]
-        self._aux_fields = [('Ptotal', 'VectorField'),
-                            ('mathtmp', 'ScalarField'),
-                            ('ucopy','VectorField'),
-                            ('Bcopy','VectorField'),
-                            ('ugradu', 'VectorField'),
-                            ('BgradB', 'VectorField'),
-                            ('ugradB', 'VectorField'),
-                            ('Bgradu', 'VectorField')]
+        # Inherited initialization
+        IncompressibleHydro.__init__(self, *args, **kwargs)
 
-        self._trans = {0: 'x', 1: 'y', 2: 'z'}
-        self.parameters = {'rho0': 1.,
-                           'viscosity_order': 1,
-                           'nu': 0.,
-                           'eta': 0.}
+        # Add magnetic field
+        self._field_list.append(('B', 'ScalarField'))
+
+        # Add default parameters
+        self.parameters['rho0'] = 1.
+        self.parameters['eta'] = 0.
 
     def _setup_integrating_factors(self, deriv):
 
@@ -687,150 +682,45 @@ class IncompressibleMHD(IncompressibleHydro):
 
     def RHS(self, data, deriv):
         """
-        Compute right hand side of fluid equations, populating deriv with
-        the time derivatives of the fields.
+        Compute right-hand side of fluid equations, cast in the form
+            d_t f + S y d_x f - c div.grad(f) = RHS(f).
 
-        u_t + nu k^2 u = -ugradu + BgradB / (4 pi rho0) - i k Ptot / rho0
-
-        B_t + eta k^2 B = Bgradu - ugradB
-
-        """
-
-        if not self._finalized:
-            self._finalize_init()
-            self._setup_integrating_factors(deriv)
-
-        deriv.set_time(data.time)
-        self.aux_fields.set_time(data.time)
-
-        # Place references
-        u = data['u']
-        B = data['B']
-        mathtmp = self.aux_fields['mathtmp']
-        ugradu = self.aux_fields['ugradu']
-        BgradB = self.aux_fields['BgradB']
-        ugradB = self.aux_fields['ugradB']
-        Bgradu = self.aux_fields['Bgradu']
-        Ptotal = self.aux_fields['Ptotal']
-        ucopy = self.aux_fields['ucopy']
-        Bcopy = self.aux_fields['Bcopy']
-        pr4 = 4 * na.pi * self.parameters['rho0']
-        k2 = data['u']['x'].k2()
-
-        # Compute terms
-        self.XlistgradY([u, B], u, mathtmp, [ucopy, Bcopy], [ugradu, Bgradu])
-        self.XlistgradY([u, B], B, mathtmp, [ucopy, Bcopy], [ugradB, BgradB])
-        self.total_pressure(data)
-
-        # Construct time derivatives
-        for i in self.dims:
-            deriv['u'][i]['kspace'] = (-ugradu[i]['kspace'] +
-                                        BgradB[i]['kspace'] / pr4 -
-                                        Ptotal[i]['kspace'])
-
-            deriv['B'][i]['kspace'] = Bgradu[i]['kspace'] - ugradB[i]['kspace']
-
-    def total_pressure(self, data):
-        """
-        Compute total pressure term (including magnetic): i k Ptot / rho0
-
-        Ptot / rho0 = i (k * ugradu - k * BgradB / (4 pi rho0)) / k^2
-        ==> pressure term = - k (k * ugradu - k * BgradB / (4 pi rho0)) / k^2
+        RHS(u) += curl(B) * B / (4 pi rho_0)
+        RHS(B) = S B_y e_x + curl(u * B)
 
         """
 
-        # Place references
-        ugradu = self.aux_fields['ugradu']
-        BgradB = self.aux_fields['BgradB']
-        Ptotal = self.aux_fields['Ptotal']
-        pr4 = 4 * na.pi * self.parameters['rho0']
+        # Inherited RHS
+        IncompressibleHydro.RHS(self, data, deriv)
 
-        # Setup temporary data container
-        sampledata = data['u']['x']
-        tmp = data.create_tmp_data('kspace')
-        k2 = sampledata.k2(no_zero=True)
+        # Auxiliary field references
+        mathscalar = self.aux_fields['mathscalar']
+        mathvector = self.aux_fields['mathvector']
 
-        # Construct k * ugradu - k * BgradB / (4 pi rho0)
-        for i in self.dims:
-            tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace']
-            tmp -= data['u'][i].k[self._trans[i]] * BgradB[i]['kspace'] / pr4
+        # Parameter references
+        S = self.parameters['shear_rate']
+        rho0 = self.parameters['rho0']
+        fpr = 4 * na.pi * rho0
 
-        # Construct full term
-        for i in self.dims:
-            Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            #Ptotal[i].zero_nyquist()
+        # Velocity RHS
+        # Lorentz force
+        self.curlX(data['B'], mathvector)
+        self.XcrossY(mathvector, data['B'], mathvector)
+        for cindex, comp in deriv['u']:
+            deriv['u'][cindex]['kspace'] += mathvector['kspace'] / fpr
 
-class ShearIncompressibleMHD(IncompressibleMHD):
-    """Incompressible magnetohydrodynamics in a shearing box."""
+        # Pressure term
+        if self.__class__ == IncompressibleMHD:
+            self.pressure_projection(data, deriv)
 
-    def RHS(self, data, deriv):
-        """
-        Compute right hand side of fluid equations, populating deriv with
-        the time derivatives of the fields.
+        # Magnetic field RHS
+        # Induction term
+        self.XcrossY(data['u'], data['B'], mathvector)
+        self.curlX(mathvector, deriv['B'])
 
-        u_t + nu k^2 u = -ugradu + BgradB / (4 pi rho0) - i k Ptot / rho0 + rotation + shear
-
-        rotation = -2 Omega u_x e_y
-        shear =  (2 + S) Omega u_y e_x
-
-        B_t + eta k^2 B = Bgradu - ugradB + shear
-
-        shear = -S Omega B_y e_x
-
-        """
-
-        # Place references
-        S = self.parameters['S']
-        Omega = self.parameters['Omega']
-
-        # Compute terms
-        MHD.RHS(self, data, deriv)
-        deriv['u']['y']['kspace'] += -2. * Omega * data['u']['x']['kspace']
-        deriv['u']['x']['kspace'] += (2 + S) * Omega * data['u']['y']['kspace']
-        deriv['B']['x']['kspace'] += -S * Omega * data['B']['y']['kspace']
-
-        # Recalculate integrating factors
-        self._setup_integrating_factors(deriv)
-
-    def total_pressure(self, data):
-        """
-        Compute total pressure term (including magnetic): i k Ptot / rho0
-
-        Ptot / rho0 = i (k * ugradu - k * BgradB / (4 pi rho0) + rotation + shear) / k^2
-        ==> pressure term = - k (k * ugradu - k * BgradB / (4 pi rho0) + rotation + shear) / k^2
-
-        rotation = 2 Omega u_x K_y
-        shear = -(1 + S) 2 Omega u_y K_x
-
-        """
-
-        # Place references
-        ugradu = self.aux_fields['ugradu']
-        BgradB = self.aux_fields['BgradB']
-        Ptotal = self.aux_fields['Ptotal']
-        pr4 = 4 * na.pi * self.parameters['rho0']
-        S = self.parameters['S']
-        Omega = self.parameters['Omega']
-
-
-        # Setup temporary data container
-        sampledata = data['u']['x']
-        tmp = data.create_tmp_data('kspace')
-        k2 = sampledata.k2(no_zero=True)
-
-        # Construct k * ugradu - k * BgradB / (4 pi rho0)
-        for i in self.dims:
-            tmp += data['u'][i].k[self._trans[i]] * ugradu[i]['kspace']
-            tmp -= data['u'][i].k[self._trans[i]] * BgradB[i]['kspace'] / pr4
-
-        # Add rotation + shear
-        tmp += (-2. * (1 + S) * Omega * data['u']['y'].k['x'] * data['u']['y']['kspace'] +
-                2. * Omega * data['u']['x'].k['y'] * data['u']['x']['kspace'])
-
-        # Construct full term
-        for i in self.dims:
-            Ptotal[i]['kspace'] = -data['u'][i].k[self._trans[i]] * tmp / k2
-            #Ptotal[i].zero_nyquist()
+        # Shear term
+        if self._shear:
+            deriv['B']['x']['kspace'] += S * data['B']['y']['kspace']
 
 
 class LinearCollisionlessCosmology(Physics):
