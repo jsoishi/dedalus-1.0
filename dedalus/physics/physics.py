@@ -505,7 +505,7 @@ class IncompressibleHydro(Physics):
         Compute right-hand side of fluid equations, cast in the form
             f_t + S y f_x - c div.grad(f) = RHS(f).
 
-        RHS(u) = - u.grad(u) - S u_y e_x - grad(p) / rho_0 - 2 Omega * u
+        RHS(u) = - u.grad(u) - S u_y e_x - grad(p) / rho0 - 2 Omega * u
         RHS(c) = - u.grad(c)
 
         """
@@ -582,7 +582,6 @@ class BoussinesqHydro(IncompressibleHydro):
         self._field_list.append(('T', 'ScalarField'))
 
         # Add default parameters
-        self.parameters['rho0'] = 1.
         self.parameters['kappa'] = 0.
         self.parameters['g'] = 1.
         self.parameters['alpha_t'] = 1.
@@ -685,7 +684,7 @@ class IncompressibleMHD(IncompressibleHydro):
         Compute right-hand side of fluid equations, cast in the form
             d_t f + S y d_x f - c div.grad(f) = RHS(f).
 
-        RHS(u) += curl(B) * B / (4 pi rho_0)
+        RHS(u) += curl(B) * B / (4 pi rho0)
         RHS(B) = S B_y e_x + curl(u * B)
 
         """
