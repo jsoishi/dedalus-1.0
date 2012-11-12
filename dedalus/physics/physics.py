@@ -66,6 +66,9 @@ class Physics(object):
             defaults to 2 pi in all directions.
 
         """
+        # parameters
+        self.forcing_functions = {}
+        self._forcing_function_names = {}
 
         # Store inputs
         self.shape = shape
@@ -95,7 +98,8 @@ class Physics(object):
 
     def __reduce__(self):
         savedict = {}
-        exclude = ['aux_fields', '_field_classes']
+        exclude = ['aux_fields', '_field_classes', 'forcing_functions']
+        self._is_finalized = False
         for k,v in self.__dict__.iteritems():
             if k not in exclude:
                 savedict[k] = v
@@ -578,9 +582,6 @@ class BoussinesqHydro(IncompressibleHydro):
         self.parameters['alpha_t'] = 1.
         self.parameters['beta'] = 1.
 
-        # Add thermal drive function
-        self.ThermalDrive = None
-
     def _setup_integrating_factors(self, deriv):
 
         # Kinematic viscosity for u, diffusion for tracer
@@ -595,8 +596,8 @@ class BoussinesqHydro(IncompressibleHydro):
         else:
             comp.integrating_factor = kappa * comp.k2() ** vo
 
-    def set_thermal_drive(self, func):
-        self.ThermalDrive = func
+    def set_thermal_forcing(self, func):
+        self.forcing_functions['ThermalForcing'] = func
 
     def RHS(self, data, deriv):
         """
@@ -638,8 +639,8 @@ class BoussinesqHydro(IncompressibleHydro):
         deriv['T']['kspace'] -= beta * u['z']['kspace']
 
         # Thermal driving term
-        if self.ThermalDrive:
-            deriv['T']['kspace'] += self.ThermalDrive(data)
+        if self.forcing_functions.has_key('ThermalForcing'):
+            deriv['T']['kspace'] += self.forcing_functions['ThermalForcing'](data)
 
         deriv['T']['kspace'][0,0,0] = 0. # must ensure (0,0,0) T mode does not grow.
 
