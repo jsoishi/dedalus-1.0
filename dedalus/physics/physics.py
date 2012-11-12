@@ -627,7 +627,7 @@ class BoussinesqHydro(IncompressibleHydro):
         deriv['u']['z']['kspace'] += g * alpha_t * T['kspace']
 
         # Pressure term
-        if self.__class__ == IncompressibleHydro:
+        if self.__class__ == BoussinesqHydro:
             self.pressure_projection(data, deriv)
 
         # Temperature RHS
