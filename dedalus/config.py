@@ -36,8 +36,12 @@ decfg.set('FFT', 'dealiasing', '2/3 cython')
 decfg.add_section('physics')
 decfg.set('physics', 'use_tracer', 'False')
 
+decfg.add_section('forcing')
+
 decfg.add_section('utils')
 decfg.set('utils', 'loglevel', 'debug')
+decfg.set('utils','loadplugins', 'False')
+decfg.set('utils','pluginfilename','dedalus_plugins.py')
 
 decfg.add_section('analysis')
 decfg.set('analysis', 'snapshot_space', 'xspace')
