@@ -204,6 +204,8 @@ class FourierRepresentation(Representation):
         self._static_k = True
 
         # Get Nyquist wavenumbers
+        self.dk = 2 * na.pi / self.length
+        self.dk = swap_indices(self.dk)
         self.kny = na.pi * self.global_shape['xspace'] / self.length
         self.kny = swap_indices(self.kny)
 
@@ -358,6 +360,7 @@ class FourierRepresentation(Representation):
 
         if dealiasing == '2/3':
             self.dealias = self.dealias_23
+            self.nmodes = na.prod(2 * na.ceil(self.global_shape['xspace'] / 3. - 1) + 1)
         elif dealiasing == '2/3 cython':
             if self.ndim == 2:
                 from dealias_cy_2d import dealias_23
@@ -365,10 +368,13 @@ class FourierRepresentation(Representation):
                 from dealias_cy_3d import dealias_23
             self._cython_dealias_function = dealias_23
             self.dealias = self.dealias_23_cython
+            self.nmodes = na.prod(2 * na.ceil(self.global_shape['xspace'] / 3. - 1) + 1)
         elif dealiasing == '2/3 spherical':
             self.dealias = self.dealias_23_spherical
-        elif dealiasing == 'None':
+            self.nmodes = None
+        elif dealiasing in ['None', None, 0]:
             self.dealias = self.zero_nyquist
+            self.nmodes = na.prod(2 * na.ceil(self.global_shape['xspace'] / 2. - 1) + 1)
         else:
             raise NotImplementedError("Specified dealiasing method not implemented.")
 
@@ -459,7 +465,7 @@ class FourierRepresentation(Representation):
 
         if self.ndim == 2:
             # Enforce along kx=0 pencil, which is local to one process
-            zindex = self.find_mode((0, 0), exact=True)
+            zindex = self.find_mode((0., 0.), exact=True)
             if zindex:
                 self.data[0, 0] = self.data[0, 0].real
                 nyindex = self.local_shape['kspace'][1] / 2
@@ -490,8 +496,8 @@ class FourierRepresentation(Representation):
 
             plane_data = com_sys.comm.bcast(plane_data, root=0)
             lstart = self.offset['kspace']
-            lstop = self.local_shape['kspace'][0]
-            self.kdata[:, :, 0] = plane_data[lstart:lstop, :]
+            lsize = self.local_shape['kspace'][0]
+            self.kdata[:, :, 0] = plane_data[lstart:lstart + lsize, :]
 
     def zero_under_eps(self):
         """Zero out any modes with coefficients smaller than machine epsilon."""
@@ -591,10 +597,10 @@ class FourierShearRepresentation(FourierRepresentation):
             xkx[-1] *= -1.
         xkx.resize((self.ndim - 1) * (1,) + (ksize,))
         y = self.xspace_grid(open=True)[self.xtrans['y']]
-        self._phase_rate = -self.sd.parameters['S'] * self.sd.parameters['Omega'] * xkx * y
+        self._phase_rate = self.sd.parameters['shear_rate'] * xkx * y
 
         # Calculate wave rate for use in wavenumber update
-        self._wave_rate = -self.sd.parameters['S'] * self.sd.parameters['Omega'] * self.k['x']
+        self._wave_rate = self.sd.parameters['shear_rate'] * self.k['x']
 
         # Update wavenumbers in case component is initialized at non-zero time
         self._update_k()
@@ -616,9 +622,9 @@ class FourierShearRepresentation(FourierRepresentation):
 
         # Wrap wavenumbers past Nyquist value
         kny_y = self.kny[3 - self.ndim]
-        while self.k['y'].min() <= -kny_y:
+        if self.k['y'].min() <= -kny_y:
             self.k['y'][self.k['y'] <= -kny_y] += 2 * kny_y
-        while self.k['y'].max() > kny_y:
+        if self.k['y'].max() > kny_y:
             self.k['y'][self.k['y'] > kny_y] -= 2 * kny_y
 
         # Dealias

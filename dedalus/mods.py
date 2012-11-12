@@ -56,7 +56,6 @@ from dedalus.init_cond.api import \
 from dedalus.physics.api import \
     IncompressibleHydro, \
     BoussinesqHydro, \
-    ShearIncompressibleHydro, \
     IncompressibleMHD, \
     ShearIncompressibleMHD, \
     LinearCollisionlessCosmology, \
