@@ -83,13 +83,9 @@ class Physics(object):
         self._field_classes = create_field_classes(
                 self._representation, self.shape, self.length)
         self.aux_eqns = {}
-
         self.parameters = {}
-
         self._is_finalized = False
-
         self._tracer = decfg.getboolean('physics','use_tracer')
-
 
     def __getitem__(self, item):
          value = self.parameters.get(item, None)
@@ -106,6 +102,7 @@ class Physics(object):
         return (_reconstruct_object, (self.__class__, savedict))
 
     def _finalize(self):
+        self._setup_aux_fields(0., self._aux_field_list)
         self._is_finalized = True
 
     def create_fields(self, time, field_list=None):
@@ -132,14 +129,16 @@ class Physics(object):
 
     def RHS(self, data, deriv):
 
-        # Finalize and setup initial integrating factors
+        # Finalize
         if not self._is_finalized:
             self._finalize()
-            self._setup_integrating_factors(deriv)
 
         # Zero derivative fields
         for fname, field in deriv:
-                field.zero_all()
+            field.zero_all()
+
+        for fname, field in self.aux_fields:
+            field.zero_all(space='kspace')
 
         # Synchronize times
         deriv.set_time(data.time)
@@ -438,6 +437,7 @@ class IncompressibleHydro(Physics):
                                 ('mathvector', 'VectorField')]
 
         self._trans = {0: 'x', 1: 'y', 2: 'z'}
+        self._first_rhs = True
 
         # Default parameters
         self.parameters['viscosity_order'] = 1
@@ -449,9 +449,6 @@ class IncompressibleHydro(Physics):
         if self._tracer:
             self._field_list.append(('c', 'ScalarField'))
             self.parameters['c_diff'] = 0.
-
-        if self.__class__ == IncompressibleHydro:
-            self._setup_aux_fields(0., self._aux_field_list)
 
     def _finalize(self):
 
@@ -505,6 +502,11 @@ class IncompressibleHydro(Physics):
         RHS(c) = - u.grad(c)
 
         """
+
+        # Initial integrating factors
+        if self._first_rhs:
+            self._setup_integrating_factors(deriv)
+            self._first_rhs = False
 
         # Inherited RHS
         Physics.RHS(self, data, deriv)
@@ -578,9 +580,6 @@ class BoussinesqHydro(IncompressibleHydro):
 
         # Add thermal drive function
         self.ThermalDrive = None
-
-        if self.__class__ == BoussinesqHydro:
-            self._setup_aux_fields(0., self._aux_field_list)
 
     def _setup_integrating_factors(self, deriv):
 

@@ -210,6 +210,8 @@ class Snapshot(AnalysisTask):
 
                 # Copy data before transforming
                 if self.space == 'xspace':
+                    if not self._an.ti.RHS._is_finalized:
+                        self._an_ti.RHS._finalize()
                     self._an.ti.RHS.aux_fields['mathscalar']['kspace'] = comp['kspace']
                     comp = self._an.ti.RHS.aux_fields['mathscalar']
 
