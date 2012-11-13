@@ -703,8 +703,12 @@ class IncompressibleMHD(IncompressibleHydro):
 
         # Velocity RHS
         # Lorentz force
-        self.curlX(data['B'], mathvector)
-        self.XcrossY(mathvector, data['B'], mathvector)
+        if self.ndim == 2:
+            self.curlX(data['B'], mathscalar)
+            self.XcrossY(mathscalar, data['B'], mathvector)
+        else:
+            self.curlX(data['B'], mathvector)
+            self.XcrossY(mathvector, data['B'], mathvector)
         for cindex, comp in deriv['u']:
             deriv['u'][cindex]['kspace'] += mathvector[cindex]['kspace'] / fpr
 
@@ -714,8 +718,12 @@ class IncompressibleMHD(IncompressibleHydro):
 
         # Magnetic field RHS
         # Induction term
-        self.XcrossY(data['u'], data['B'], mathvector)
-        self.curlX(mathvector, deriv['B'])
+        if self.ndim == 2:
+            self.XcrossY(data['u'], data['B'], mathscalar)
+            self.curlX(mathscalar, deriv['B'])
+        else:
+            self.XcrossY(data['u'], data['B'], mathvector)
+            self.curlX(mathvector, deriv['B'])
 
         # Shear term
         if self._shear:
