@@ -457,6 +457,11 @@ class IncompressibleHydro(Physics):
             self._field_list.append(('c', 'ScalarField'))
             self.parameters['c_diff'] = 0.
 
+    def __reduce__(self):
+
+        self._first_rhs = True
+        return Physics.__reduce__(self)
+
     def _finalize(self):
 
         # Inherited finalization
