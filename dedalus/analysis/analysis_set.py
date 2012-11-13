@@ -252,7 +252,6 @@ class Snapshot(AnalysisTask):
                         else:
                             self.update_image(axtup, plane_data)
 
-
         if com_sys.myproc == 0:
 
             # Update time title
