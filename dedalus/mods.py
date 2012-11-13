@@ -57,7 +57,6 @@ from dedalus.physics.api import \
     IncompressibleHydro, \
     BoussinesqHydro, \
     IncompressibleMHD, \
-    ShearIncompressibleMHD, \
     LinearCollisionlessCosmology, \
     CollisionlessCosmology, \
     LinearBaryonCDMCosmology, \

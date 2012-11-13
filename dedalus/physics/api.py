@@ -25,7 +25,6 @@ from .physics import \
     IncompressibleHydro,\
     BoussinesqHydro,\
     IncompressibleMHD, \
-    ShearIncompressibleMHD, \
     LinearCollisionlessCosmology, \
     CollisionlessCosmology, \
     LinearBaryonCDMCosmology, \
