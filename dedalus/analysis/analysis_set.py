@@ -633,11 +633,11 @@ class PowerSpectrum(AnalysisTask):
 
     def setup(self, data, it):
 
-        self.firstrun = True
-
         # Default to all fields in data
         if self.fieldlist is None:
             self.fieldlist = data.fields.keys()
+
+        self.firstrun = [True] * len(self.fieldlist)
 
         if com_sys.myproc == 0:
             if self.plot:
@@ -703,7 +703,7 @@ class PowerSpectrum(AnalysisTask):
                         continue
 
                     ax = self.axes[col]
-                    if self.firstrun:
+                    if self.firstrun[col]:
 
                         # Plot and store lines
                         if self.loglog:
@@ -749,7 +749,7 @@ class PowerSpectrum(AnalysisTask):
 
                 if self.write:
                     file = open('%s_power_spectra.dat' %fname, 'a')
-                    if self.firstrun:
+                    if self.firstrun[col]:
                         columnnames = 'time\t'
                         columnnames += '\t'.join([repr(ki) for ki in k])
                         file.write(columnnames)
@@ -759,6 +759,9 @@ class PowerSpectrum(AnalysisTask):
                     file.write(tstring + specstring)
                     file.write('\n')
                     file.close()
+
+            if self.firstrun[col]:
+                self.firstrun[col] = False
 
         if com_sys.myproc == 0:
             if self.plot:
@@ -770,9 +773,6 @@ class PowerSpectrum(AnalysisTask):
                 # Save in frames folder
                 outfile = 'frames/power_spectra_n%07i.png' %it
                 self.fig.savefig(outfile, dpi=self.dpi)
-
-        if self.firstrun:
-            self.firstrun = False
 
     def _compute_spectrum(self, field, norm):
 

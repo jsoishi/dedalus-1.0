@@ -589,7 +589,7 @@ class BoussinesqHydro(IncompressibleHydro):
 
     def _setup_integrating_factors(self, deriv):
 
-        # Kinematic viscosity for u, diffusion for tracer
+        # Inherited integrating factors
         IncompressibleHydro._setup_integrating_factors(self, deriv)
 
         # Thermal diffusivity for T
@@ -630,7 +630,7 @@ class BoussinesqHydro(IncompressibleHydro):
 
         # Velocity RHS
         # Bouyancy term
-        deriv['u']['z']['kspace'] += g * alpha_t * T['kspace']
+        deriv['u']['z']['kspace'] += g * alpha_t * data['T']['kspace']
 
         # Pressure term
         if self.__class__ == BoussinesqHydro:
@@ -642,7 +642,7 @@ class BoussinesqHydro(IncompressibleHydro):
         deriv['T']['kspace'] *= -1.
 
         # Stratification term
-        deriv['T']['kspace'] -= beta * u['z']['kspace']
+        deriv['T']['kspace'] -= beta * data['u']['z']['kspace']
 
         # Thermal driving term
         if self.forcing_functions.has_key('ThermalForcing'):
@@ -659,7 +659,7 @@ class IncompressibleMHD(IncompressibleHydro):
         IncompressibleHydro.__init__(self, *args, **kwargs)
 
         # Add magnetic field
-        self._field_list.append(('B', 'ScalarField'))
+        self._field_list.append(('B', 'VectorField'))
 
         # Add default parameters
         self.parameters['rho0'] = 1.
@@ -667,8 +667,8 @@ class IncompressibleMHD(IncompressibleHydro):
 
     def _setup_integrating_factors(self, deriv):
 
-        # Kinematic viscosity for u
-        IncompressibleHydro._setup_integrating_factors(self)
+        # Inherited integrating factors
+        IncompressibleHydro._setup_integrating_factors(self, deriv)
 
         # Magnetic diffusivity for B
         for cindex, comp in deriv['B']:
@@ -706,7 +706,7 @@ class IncompressibleMHD(IncompressibleHydro):
         self.curlX(data['B'], mathvector)
         self.XcrossY(mathvector, data['B'], mathvector)
         for cindex, comp in deriv['u']:
-            deriv['u'][cindex]['kspace'] += mathvector['kspace'] / fpr
+            deriv['u'][cindex]['kspace'] += mathvector[cindex]['kspace'] / fpr
 
         # Pressure term
         if self.__class__ == IncompressibleMHD:
