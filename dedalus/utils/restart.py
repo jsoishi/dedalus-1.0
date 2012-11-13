@@ -42,14 +42,14 @@ def restart(snap_dir):
     data = cPickle.load(obj_file)
     ti = cPickle.load(obj_file)
 
-    RHS._setup_aux_fields(data.time, RHS._aux_fields)
+    RHS._setup_aux_fields(data.time, RHS._aux_field_list)
 
     # setup forcing functions
     _fn = os.path.join(snap_dir,'forcing_functions.py')
     if os.path.exists(_fn):
         f, p, d = imp.find_module('forcing_functions', [os.path.join('.',snap_dir)])
         forcing_functions = imp.load_module('forcing_functions', f, p, d)
-                          
+
     for k,func_name in RHS._forcing_function_names.iteritems():
         for ffn, ffunc in inspect.getmembers(forcing_functions):
             if ffn == func_name:
@@ -62,7 +62,7 @@ def restart(snap_dir):
     DATA_FILENAME = 'data.cpu%04i' % myproc
     filename = os.path.join(snap_dir, DATA_FILENAME)
     load_all_data(data, filename)
-    
+
     ti.RHS = RHS
     ti._start_time = time.time()
 
