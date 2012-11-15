@@ -77,7 +77,8 @@ from dedalus.utils.api import \
     interp_linear, \
     find_zero, \
     load_all, \
-    com_sys
+    com_sys, \
+    swap_indices
 
 from funcs import signal_print_traceback
 try:

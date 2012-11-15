@@ -15,4 +15,5 @@ from .misc_numeric import \
 
 from .parallelism import \
     com_sys,\
-    load_all
+    load_all,\
+    swap_indices
