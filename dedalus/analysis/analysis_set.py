@@ -152,6 +152,10 @@ class Snapshot(AnalysisTask):
             if com_sys.myproc == 0:
                 self.images = {}
 
+        # Create local copy space for xspace snapshots
+        if self.space == 'xspace':
+            self._local_scalar = data._field_classes['ScalarField'](data)
+
         # Figure setup for proc 0
         if com_sys.myproc == 0:
 
@@ -210,10 +214,8 @@ class Snapshot(AnalysisTask):
 
                 # Copy data before transforming
                 if self.space == 'xspace':
-                    if not self._an.ti.RHS._is_finalized:
-                        self._an.ti.RHS._finalize()
-                    self._an.ti.RHS.aux_fields['mathscalar']['kspace'] = comp['kspace']
-                    comp = self._an.ti.RHS.aux_fields['mathscalar']
+                    self._local_scalar['kspace'] = comp['kspace']
+                    comp = self._local_scalar[0]
 
                 # Retrieve correct slice
                 if ((row == 0) and (cindex == 0) and
