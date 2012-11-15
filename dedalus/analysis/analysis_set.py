@@ -212,8 +212,8 @@ class Snapshot(AnalysisTask):
                 if self.space == 'xspace':
                     if not self._an.ti.RHS._is_finalized:
                         self._an.ti.RHS._finalize()
-                    #self._an.ti.RHS.aux_fields['mathscalar']['kspace'] = comp['kspace']
-                    #comp = self._an.ti.RHS.aux_fields['mathscalar']
+                    self._an.ti.RHS.aux_fields['mathscalar']['kspace'] = comp['kspace']
+                    comp = self._an.ti.RHS.aux_fields['mathscalar']
 
                 # Retrieve correct slice
                 if ((row == 0) and (cindex == 0) and
