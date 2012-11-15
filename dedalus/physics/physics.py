@@ -666,6 +666,9 @@ class IncompressibleMHD(IncompressibleHydro):
         # Add magnetic field
         self._field_list.append(('B', 'VectorField'))
 
+        # Add extra auxiliary math field
+        self._aux_field_list.append(('mathvector2', 'VectorField'))
+
         # Add default parameters
         self.parameters['rho0'] = 1.
         self.parameters['eta'] = 0.
@@ -700,6 +703,7 @@ class IncompressibleMHD(IncompressibleHydro):
         # Auxiliary field references
         mathscalar = self.aux_fields['mathscalar']
         mathvector = self.aux_fields['mathvector']
+        mathvector2 = self.aux_fields['mathvector2']
 
         # Parameter references
         S = self.parameters['shear_rate']
@@ -713,9 +717,9 @@ class IncompressibleMHD(IncompressibleHydro):
             self.XcrossY(mathscalar, data['B'], mathvector)
         else:
             self.curlX(data['B'], mathvector)
-            self.XcrossY(mathvector, data['B'], mathvector)
+            self.XcrossY(mathvector, data['B'], mathvector2)
         for cindex, comp in deriv['u']:
-            deriv['u'][cindex]['kspace'] += mathvector[cindex]['kspace'] / fpr
+            comp['kspace'] += mathvector2[cindex]['kspace'] / fpr
 
         # Pressure term
         if self.__class__ == IncompressibleMHD:
