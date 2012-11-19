@@ -62,9 +62,6 @@ class Physics(object):
             defaults to 2 pi in all directions.
 
         """
-        # parameters
-        self.forcing_functions = {}
-        self._forcing_function_names = {}
 
         # Store inputs
         self.shape = shape
@@ -78,11 +75,17 @@ class Physics(object):
         self.ndim = len(self.shape)
         self.dims = xrange(self.ndim)
 
+        # Setup containers
+        self._field_list = []
+        self._aux_field_list = []
+        self.parameters = {}
+        self.aux_eqns = {}
+        self.forcing_functions = {}
+        self._forcing_function_names = {}
+
         # Additional setup
         self._field_classes = create_field_classes(
                 self._representation, self.shape, self.length)
-        self.aux_eqns = {}
-        self.parameters = {}
         self._is_finalized = False
         self._tracer = decfg.getboolean('physics','use_tracer')
 
@@ -399,57 +402,61 @@ class Physics(object):
 
 
 class IncompressibleHydro(Physics):
-    """
-    Homogeneous incompressible hydrodynamics.
-
-    Parameters
-    ----------
-    *** Set in self.parameters dictionary after instantiation. ***
-
-    'viscosity_order' : int
-        Hyperviscosity order. Defaults to 1.
-    'nu' : float
-        Kinematic viscosity. Defaults to 0.
-    'shear_rate' : float
-        Linear shearing rate S, such that v_x = S * y. Defaults to 0.
-    'Omega' : float, array of floats, or None
-        Angular velocity vector np.array[(Omega_z, Omega_y, Omega_x)].  Float
-        for z-direction in 2D.  Defaults to None.
-
-    Notes
-    -----
-    For a Keplerian angular velocity profile, ...
-
-    Example
-    -------
-    >>> physics = IncompressibleHydro((128, 128), FourierRepresentation)
-    >>> physics.parameters['viscosity_order'] = 2
-
-    """
+    """Homogeneous incompressible hydrodynamics."""
 
     def __init__(self, *args, **kwargs):
+        """
+        Create a physics object for incompressible hydrodynamics.
+
+        Parameters
+        ----------
+        *** Set in self.parameters dictionary after instantiation. ***
+
+        'viscosity_order' : int
+            Hyperviscosity order. Defaults to 1.
+        'nu' : float
+            Kinematic viscosity. Defaults to 0.
+        'shear_rate' : float
+            Linear shearing rate S, such that v_x = S y. Defaults to 0.
+        'Omega' : float, array of floats, or None
+            Angular velocity vector np.array[(Omega_z, Omega_y, Omega_x)].
+            Float for z-direction in 2D.  Defaults to None.
+
+        Notes
+        -----
+        For a Keplerian angular velocity profile, S = 1.5 * Omega_z.
+
+        Example
+        -------
+        >>> physics = IncompressibleHydro((128, 128), FourierRepresentation)
+        >>> physics.parameters['viscosity_order'] = 2
+
+        """
 
         # Inherited initialization
         Physics.__init__(self, *args, **kwargs)
 
-        # Setup data fields
-        self._field_list = [('u', 'VectorField')]
-        self._aux_field_list = [('mathscalar', 'ScalarField'),
-                                ('mathvector', 'VectorField')]
+        # Add velocity field
+        self._field_list.append(('u', 'VectorField'))
 
-        self._trans = {0: 'x', 1: 'y', 2: 'z'}
-        self._first_rhs = True
+        # Add auxiliary math fields
+        self._aux_field_list.append(('mathscalar', 'ScalarField'))
+        self._aux_field_list.append(('mathvector', 'VectorField'))
 
-        # Default parameters
+        # Add default parameters
         self.parameters['viscosity_order'] = 1
         self.parameters['nu'] = 0.
         self.parameters['shear_rate'] = 0.
         self.parameters['Omega'] = None
 
-        # Tracer field and parameters
+        # Add tracer field and parameters
         if self._tracer:
             self._field_list.append(('c', 'ScalarField'))
             self.parameters['c_diff'] = 0.
+
+
+        self._trans = {0: 'x', 1: 'y', 2: 'z'}
+        self._first_rhs = True
 
     def __reduce__(self):
 
@@ -502,7 +509,7 @@ class IncompressibleHydro(Physics):
     def RHS(self, data, deriv):
         """
         Compute right-hand side of fluid equations, cast in the form
-            f_t + S y f_x - c div.grad(f) = RHS(f).
+            d_t f + S y d_x f - c div.grad(f) = RHS(f).
 
         RHS(u) = - u.grad(u) - S u_y e_x - grad(p) / rho0 - 2 Omega * u
         RHS(c) = - u.grad(c)
@@ -606,7 +613,7 @@ class BoussinesqHydro(IncompressibleHydro):
     def RHS(self, data, deriv):
         """
         Compute right-hand side of fluid equations, cast in the form
-            f_t + S y f_x - c div.grad(f) = RHS(f).
+            d_t f + S y d_x f - c div.grad(f) = RHS(f).
 
         RHS(u) += g alpha_t T
         RHS(T) = - u.grad(T) - beta * u_z
@@ -651,8 +658,23 @@ class BoussinesqHydro(IncompressibleHydro):
 
 
 class IncompressibleMHD(IncompressibleHydro):
+    """Homogeneous incompressible magnetohydrodynamics."""
 
     def __init__(self, *args, **kwargs):
+        """
+        Create a physics object for incompressible hydrodynamics.
+
+        Parameters
+        ----------
+        *** Set in self.parameters dictionary after instantiation. ***
+        *** See IncompressibleHydro for definitions of inherited parameters. ***
+
+        'rho0' : float
+            Background density. Defaults to 1.
+        'eta' : float
+            Magnetic resistivity. Defaults to 0.
+
+        """
 
         # Inherited initialization
         IncompressibleHydro.__init__(self, *args, **kwargs)
@@ -673,9 +695,9 @@ class IncompressibleMHD(IncompressibleHydro):
         IncompressibleHydro._setup_integrating_factors(self, deriv)
 
         # Magnetic diffusivity for B
+        eta = self.parameters['eta']
+        vo = self.parameters['viscosity_order']
         for cindex, comp in deriv['B']:
-            eta = self.parameters['eta']
-            vo = self.parameters['viscosity_order']
             if eta == 0.:
                 comp.integrating_factor = None
             else:
@@ -712,8 +734,8 @@ class IncompressibleMHD(IncompressibleHydro):
         else:
             self.curlX(data['B'], mathvector)
             self.XcrossY(mathvector, data['B'], mathvector2)
-        for cindex, comp in deriv['u']:
-            comp['kspace'] += mathvector2[cindex]['kspace'] / fpr
+        for i in self.dims:
+            deriv['u'][i]['kspace'] += mathvector2[i]['kspace'] / fpr
 
         # Pressure term
         if self.__class__ == IncompressibleMHD:
