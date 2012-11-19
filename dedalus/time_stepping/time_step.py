@@ -211,6 +211,35 @@ class TimeStepBase(object):
         # Update time
         output.set_time(start.time + dt)
 
+    def cfl_time(self, data):
+
+        if data.fields.has_key('u'):
+
+            umax = []
+            umax.append(2 * na.max(na.abs(data['u']['x']['kspace'])))
+            umax.append(2 * na.max(na.abs(data['u']['y']['kspace'])))
+            if data.ndim == 3:
+                umax.append(2 * na.max(na.abs(data['u']['z']['kspace'])))
+            umax.reverse()
+
+            dt = na.asfarray(data.length) / na.asfarray(data.shape) / umax
+            print dt
+
+        if data.fields.has_key('B'):
+
+            Bmax = []
+            Bmax.append(2 * na.max(na.abs(data['B']['x']['kspace'])))
+            Bmax.append(2 * na.max(na.abs(data['B']['y']['kspace'])))
+            if data.ndim == 3:
+                Bmax.append(2 * na.max(na.abs(data['B']['z']['kspace'])))
+            Bmax.reverse()
+
+            vAmax = Bmax / na.sqrt(4 * na.pi * data.parameters['rho0'])
+
+            dt = na.asfarray(data.length) / na.asfarray(data.shape) / vAmax
+            print dt
+
+
 class RK2mid(TimeStepBase):
     """
     Second-order explicit midpoint Runge-Kutta method.
@@ -311,6 +340,8 @@ class RK4(TimeStepBase):
     """
 
     def __init__(self, *arg, **kwargs):
+
+        # Inherited initialization
         TimeStepBase.__init__(self, *arg, **kwargs)
 
         # Create StateData for constructing increments
@@ -325,49 +356,49 @@ class RK4(TimeStepBase):
         for a in self.RHS.aux_eqns.values():
             a_old = a.value
             a_final_dt = a.RHS(a.value) / 6.
-        deriv = self.RHS.RHS(data)
+        self.RHS.RHS(data, self.temp_data)
         for fname, field in self.total_deriv:
             for cindex, comp in field:
-                comp['kspace'] = deriv[fname][cindex]['kspace'] / 6.
+                comp['kspace'] = self.temp_data[fname][cindex]['kspace'] / 6.
 
                 # Retrieve initial integrating factors for the complete step
-                if comp._static_k or (deriv[fname][cindex].integrating_factor is None):
-                    comp.integrating_factor = deriv[fname][cindex].integrating_factor
+                if comp._static_k or (self.temp_data[fname][cindex].integrating_factor is None):
+                    comp.integrating_factor = self.temp_data[fname][cindex].integrating_factor
                 else:
-                    comp.integrating_factor = deriv[fname][cindex].integrating_factor.copy()
+                    comp.integrating_factor = self.temp_data[fname][cindex].integrating_factor.copy()
 
         # Construct k2
-        self.forward_step(data, deriv, self.temp_data, dt / 2.)
+        self.forward_step(data, self.temp_data, self.temp_data, dt / 2.)
         for a in self.RHS.aux_eqns.values():
             a.value = a_old + dt / 2. * a.RHS(a.value)
             a_final_dt += a.RHS(a.value) / 3.
 
-        deriv = self.RHS.RHS(self.temp_data)
+        self.RHS.RHS(self.temp_data, self.temp_data)
         for fname, field in self.total_deriv:
             for cindex, comp in field:
-                comp['kspace'] += deriv[fname][cindex]['kspace'] / 3.
+                comp['kspace'] += self.temp_data[fname][cindex]['kspace'] / 3.
 
         # Construct k3
-        self.forward_step(data, deriv, self.temp_data, dt / 2.)
+        self.forward_step(data, self.temp_data, self.temp_data, dt / 2.)
         for a in self.RHS.aux_eqns.values():
             a.value = a_old + dt / 2. * a.RHS(a.value)
             a_final_dt += a.RHS(a.value) / 3.
 
-        deriv = self.RHS.RHS(self.temp_data)
+        self.RHS.RHS(self.temp_data, self.temp_data)
         for fname, field in self.total_deriv:
             for cindex, comp in field:
-                comp['kspace'] += deriv[fname][cindex]['kspace'] / 3.
+                comp['kspace'] += self.temp_data[fname][cindex]['kspace'] / 3.
 
         # Construct k4
-        self.forward_step(data, deriv, self.temp_data, dt)
+        self.forward_step(data, self.temp_data, self.temp_data, dt)
         for a in self.RHS.aux_eqns.values():
             a.value = a_old + dt * a.RHS(a.value)
             a_final_dt += a.RHS(a.value) / 6.
 
-        deriv = self.RHS.RHS(self.temp_data)
+        self.RHS.RHS(self.temp_data, self.temp_data)
         for fname, field in self.total_deriv:
             for cindex, comp in field:
-                comp['kspace'] += deriv[fname][cindex]['kspace'] / 6.
+                comp['kspace'] += self.temp_data[fname][cindex]['kspace'] / 6.
 
         # Complete step
         self.forward_step(data, self.total_deriv, data, dt)
