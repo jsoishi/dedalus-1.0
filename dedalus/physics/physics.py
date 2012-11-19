@@ -1,12 +1,12 @@
 """
-Physics classes. These defines fields, and provides a right hand side
+Physics classes for defining fields and providing a right hand side
 to time integrators.
 
 Authors: J. S. Oishi <jsoishi@gmail.com>
-         K. J. Burns <kburns@berkeley.edu>
+         K. J. Burns <keaton.burns@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
 License:
-  Copyright (C) 2011 J. S. Oishi, K. J. Burns.  All Rights Reserved.
+  Copyright (C) 2011, 2012 J. S. Oishi, K. J. Burns.  All Rights Reserved.
 
   This file is part of dedalus.
 
@@ -26,17 +26,12 @@ License:
 """
 
 import numpy as na
-from dedalus.data_objects.representations import FourierRepresentation, \
-        FourierShearRepresentation
 from dedalus.utils.logger import mylog
 from dedalus.config import decfg
 from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
 from dedalus.utils.api import a_friedmann
 from dedalus.funcs import insert_ipython
 from dedalus.utils.parallelism import com_sys
-
-shearing_representations = [FourierShearRepresentation]
-
 
 def _reconstruct_object(*args, **kwargs):
     new_args = [args[1]['shape'], args[1]['_representation'], args[1]['length']]
@@ -470,11 +465,11 @@ class IncompressibleHydro(Physics):
         # Set shear flag and check representation
         if self.parameters['shear_rate'] == 0.:
             self._shear = False
-            if self._representation in shearing_representations:
+            if not self._representation._static_k:
                 mylog.warning("Performance suffers when using a shearing representation without a linear shear.")
         else:
             self._shear = True
-            if self._representation not in shearing_representations:
+            if self._representation._static_k:
                 raise ValueError("A shearing representation must be used if shear_rate is nonzero.")
 
         # Set rotation flag
