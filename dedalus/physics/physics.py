@@ -578,8 +578,27 @@ class IncompressibleHydro(Physics):
 
 
 class BoussinesqHydro(IncompressibleHydro):
+    """Boussinesq hydrodynamics."""
 
     def __init__(self, *args, **kwargs):
+        """
+        Create a physics object for Boussinesq hydrodynamics.
+
+        Parameters
+        ----------
+        *** Set in self.parameters dictionary after instantiation. ***
+        *** See IncompressibleHydro for definitions of inherited parameters. ***
+
+        'kappa' : float
+            Defaults to 0.
+        'g' : float
+            Defaults to 1.
+        'alpha_t' : float
+            Defaults to 1.
+        'beta' : float
+            Defaults to 1.
+
+        """
 
         # Inherited initialization
         IncompressibleHydro.__init__(self, *args, **kwargs)
@@ -599,13 +618,12 @@ class BoussinesqHydro(IncompressibleHydro):
         IncompressibleHydro._setup_integrating_factors(self, deriv)
 
         # Thermal diffusivity for T
-        comp = deriv['T'][0]
         kappa = self.parameters['kappa']
         vo = self.parameters['viscosity_order']
         if kappa == 0.:
-            comp.integrating_factor = None
+            deriv['T'][0].integrating_factor = None
         else:
-            comp.integrating_factor = kappa * comp.k2() ** vo
+            deriv['T'][0].integrating_factor = kappa * comp.k2() ** vo
 
     def set_thermal_forcing(self, func):
         self.forcing_functions['ThermalForcing'] = func
@@ -653,8 +671,7 @@ class BoussinesqHydro(IncompressibleHydro):
         # Thermal driving term
         if self.forcing_functions.has_key('ThermalForcing'):
             deriv['T']['kspace'] += self.forcing_functions['ThermalForcing'](data)
-
-        deriv['T']['kspace'][0,0,0] = 0. # must ensure (0,0,0) T mode does not grow.
+        deriv['T']['kspace'][0,0,0] = 0. # Must ensure (0,0,0) T mode does not grow.
 
 
 class IncompressibleMHD(IncompressibleHydro):
@@ -662,7 +679,7 @@ class IncompressibleMHD(IncompressibleHydro):
 
     def __init__(self, *args, **kwargs):
         """
-        Create a physics object for incompressible hydrodynamics.
+        Create a physics object for incompressible magnetohydrodynamics.
 
         Parameters
         ----------
