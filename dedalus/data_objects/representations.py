@@ -1,10 +1,11 @@
 """
-Representation object for transformable fields.
+Representation classes for transformable fields.
 
 Author: J. S. Oishi <jsoishi@gmail.com>
+        K. J. Burns <keaton.burns@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
 License:
-  Copyright (C) 2011 J. S. Oishi.  All Rights Reserved.
+  Copyright (C) 2011, 2012 J. S. Oishi, K. J. Burns.  All Rights Reserved.
 
   This file is part of dedalus.
 
@@ -56,6 +57,7 @@ class FourierRepresentation(Representation):
     """
 
     timer = timer
+    _static_k = True
 
     def __init__(self, sd, shape, length):
         """
@@ -200,8 +202,6 @@ class FourierRepresentation(Representation):
 
     def _setup_k(self):
         """Create local wavenumber arrays."""
-
-        self._static_k = True
 
         # Get Nyquist wavenumbers
         self.dk = 2 * na.pi / self.length
@@ -551,6 +551,7 @@ class FourierShearRepresentation(FourierRepresentation):
     """
 
     timer = timer
+    _static_k = False
 
     def __init__(self, sd, shape, length):
         """
@@ -585,7 +586,6 @@ class FourierShearRepresentation(FourierRepresentation):
         FourierRepresentation.__init__(self, sd, shape, length)
 
         # Store initial copy of ky, allocate a fleshed-out ky
-        self._static_k = False
         self._ky = self.k['y'].copy()
         self.k['y'] = self.k['y'] * na.ones_like(self.k['x'])
 
