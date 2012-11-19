@@ -25,13 +25,12 @@ License:
 
 """
 
-import numpy as na
+
+import numpy as np
 from dedalus.utils.logger import mylog
 from dedalus.config import decfg
 from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
-from dedalus.utils.api import a_friedmann
-from dedalus.funcs import insert_ipython
-from dedalus.utils.parallelism import com_sys
+
 
 def _reconstruct_object(*args, **kwargs):
     new_args = [args[1]['shape'], args[1]['_representation'], args[1]['length']]
@@ -73,7 +72,7 @@ class Physics(object):
         if length:
             self.length = length
         else:
-            self.length = (2 * na.pi,) * len(self.shape)
+            self.length = (2 * np.pi,) * len(self.shape)
 
         # Dimensionality
         self.ndim = len(self.shape)
@@ -210,7 +209,7 @@ class Physics(object):
             for i in self.dims:
                 stmp['kspace'] = comp.deriv(self._trans[i])
                 output[cindex]['xspace'] += stmp['xspace'] * vtmp[i]['xspace']
-                #na.add(output[cindex]['xspace'],
+                #np.add(output[cindex]['xspace'],
                 #       stmp['xspace'] * vtmp[i]['xspace'],
                 #       output[cindex]['xspace'])
 
@@ -247,7 +246,7 @@ class Physics(object):
                 # Add term to each output
                 for k,X in enumerate(vtmp):
                     #outlist[k][i]['xspace'] += (X[j]['xspace'] * stmp['xspace']).real
-                    na.add(outlist[k][i]['xspace'], (X[j]['xspace'] * stmp['xspace']), outlist[k][i]['xspace'])
+                    np.add(outlist[k][i]['xspace'], (X[j]['xspace'] * stmp['xspace']), outlist[k][i]['xspace'])
 
 
     def XconstcrossY(self, X, Y, output):
@@ -268,7 +267,7 @@ class Physics(object):
 
         # X references
         if self.ndim == 2:
-            if na.isscalar(X):
+            if np.isscalar(X):
                 Xz = X
             else:
                 Xy, Xx = X
@@ -283,7 +282,7 @@ class Physics(object):
 
         # Calculate cross product
         if self.ndim == 2:
-            if na.isscalar(X):
+            if np.isscalar(X):
                 output['x']['kspace'] = - Xz * Yy
                 output['y']['kspace'] = Xz * Yx
             else:
@@ -703,7 +702,7 @@ class IncompressibleMHD(IncompressibleHydro):
         # Parameter references
         S = self.parameters['shear_rate']
         rho0 = self.parameters['rho0']
-        fpr = 4 * na.pi * rho0
+        fpr = 4 * np.pi * rho0
 
         # Velocity RHS
         # Lorentz force
