@@ -1218,23 +1218,4 @@ class BaryonCDMCosmology(Physics):
                                              adot * u[i]['kspace'] +
                                              ugradu[i]['kspace']) / a
 
-if __name__ == "__main__":
-    import pylab as P
-    from representations import FourierData
-    from init_cond import taylor_green
-    a = Hydro((100,100),FourierData)
-    data = a.create_fields(0.)
-    taylor_green(data['ux'],data['uy'])
-    vgv = a.ugradu(data)
-    #test = a.pressure(data,vgv)
-    test = a.RHS(data)
 
-    for i,f in enumerate(a.fields):
-        print test[f]._curr_space
-        P.subplot(1,2,i+1)
-        P.imshow(test[f]['xspace'].real)
-        tmp =test[f]['xspace'].imag
-        print "%s (min, max) = (%10.5e, %10.5e)" % (f, tmp.min(), tmp.max())
-        P.colorbar()
-
-    P.show()
