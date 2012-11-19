@@ -57,13 +57,7 @@ from dedalus.init_cond.api import \
 from dedalus.physics.api import \
     IncompressibleHydro, \
     BoussinesqHydro, \
-    IncompressibleMHD, \
-    LinearCollisionlessCosmology, \
-    CollisionlessCosmology, \
-    LinearBaryonCDMCosmology, \
-    BaryonCDMCosmology, \
-    LinearCollisionlessCosmology,\
-    CollisionlessCosmology
+    IncompressibleMHD
 
 from dedalus.time_stepping.api import \
     RK2mid,\
