@@ -76,7 +76,7 @@ def kelvin_helmholz(data, L=0.025):
 kelvin_helmholz(data)
 
 ti = RK2mid(RHS, CFL=0.4)
-ti.stop_time(1.5) # set stoptime
+ti.stop_time(2.) # set stoptime
 ti.stop_walltime(36000.) # stop after 10 hours
 #ti.stop_iter(1)
 ti.set_nsnap(50)
@@ -91,7 +91,7 @@ vs.add("vort_cenk","%10.5e")
 
 an = AnalysisSet(data, ti)
 an.add(Snapshot(10, space='kspace'))
-an.add(Snapshot(10, space='xspace'))
+an.add(Snapshot(10, space='xspace', even_scale=False))
 an.add(PowerSpectrum(10))
 an.add(VolumeAverage(10, vs))
 
