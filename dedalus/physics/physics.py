@@ -671,7 +671,7 @@ class BoussinesqHydro(IncompressibleHydro):
         # Thermal driving term
         if self.forcing_functions.has_key('ThermalForcing'):
             deriv['T']['kspace'] += self.forcing_functions['ThermalForcing'](data)
-        deriv['T']['kspace'][0,0,0] = 0. # Must ensure (0,0,0) T mode does not grow.
+        deriv['T']['kspace'][0,0,0] = 0. # Must ensure (0,0,0) T mode does not grow. #REVIEW
 
 
 class IncompressibleMHD(IncompressibleHydro):
