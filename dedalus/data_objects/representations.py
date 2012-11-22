@@ -383,12 +383,12 @@ class FourierRepresentation(Representation):
 
         # Zeroing mask
         if self.ndim ==2:
-            dmask = ((np.abs(self.k['x']) >= 2 / 3. * self.kny[0]) |
-                     (np.abs(self.k['y']) >= 2 / 3. * self.kny[1]))
+            dmask = ((np.abs(self.k['x']) >= 2. / 3. * self.kny[0]) |
+                     (np.abs(self.k['y']) >= 2. / 3. * self.kny[1]))
         else:
-            dmask = ((np.abs(self.k['x']) >= 2 / 3. * self.kny[2]) |
-                     (np.abs(self.k['y']) >= 2 / 3. * self.kny[0]) |
-                     (np.abs(self.k['z']) >= 2 / 3. * self.kny[1]))
+            dmask = ((np.abs(self.k['x']) >= 2. / 3. * self.kny[2]) |
+                     (np.abs(self.k['y']) >= 2. / 3. * self.kny[0]) |
+                     (np.abs(self.k['z']) >= 2. / 3. * self.kny[1]))
 
         self.require_space('kspace')
         self.data[dmask] = 0.
