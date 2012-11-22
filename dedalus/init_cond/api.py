@@ -30,7 +30,8 @@ from .init_cond import \
     MIT_vortices, \
     vorticity_wave, \
     alfven, \
-    kida_vortex
+    kida_vortex, \
+    add_gaussian_white_noise
 
 from .turb_spectra import \
     mcwilliams_spec

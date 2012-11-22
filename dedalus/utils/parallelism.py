@@ -175,7 +175,11 @@ def pickle(data,name):
 def strided_copy(input):
     """Helper function to 'deep copy' a view using stridetricks."""
 
-    return st.as_strided(input, shape=input.shape, strides=input.strides)
+    out = na.empty(input.shape, dtype=input.dtype)
+    sli = [slice(i) for i in input.shape]
+    out[:] = input[sli]
+    return out
+    #return st.as_strided(input, shape=input.shape, strides=input.strides)
 
 def get_plane(comp, space='xspace', axis='z', index='middle',
               return_position_arrays=True):
