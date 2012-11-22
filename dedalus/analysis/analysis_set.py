@@ -78,7 +78,7 @@ class AnalysisTask(object):
 
 class Snapshot(AnalysisTask):
     def __init__(self, cadence, space=None, axis=None, index=None, units=None,
-                 dpi=None, cmap=None):
+                 dpi=None, cmap=None, even_scale=True):
         """
         Save image of specified plane in data.
 
@@ -107,6 +107,8 @@ class Snapshot(AnalysisTask):
             Default: config setting
         cmap : str, optional
             Name of colormap for plots. Default: config setting
+        even_scale : boolean, optional
+            Whether to make xspace colorbar range even. Default: True.
 
         """
 
@@ -118,6 +120,7 @@ class Snapshot(AnalysisTask):
         self.units = units
         self.dpi = dpi
         self.cmapname = cmap
+        self.even_scale = even_scale
 
         # Get defaults from config
         if self.space is None:
@@ -148,6 +151,10 @@ class Snapshot(AnalysisTask):
             self._moves = False
             if com_sys.myproc == 0:
                 self.images = {}
+
+        # Create local copy space for xspace snapshots
+        if self.space == 'xspace':
+            self._local_scalar = data._field_classes['ScalarField'](data)
 
         # Figure setup for proc 0
         if com_sys.myproc == 0:
@@ -207,8 +214,8 @@ class Snapshot(AnalysisTask):
 
                 # Copy data before transforming
                 if self.space == 'xspace':
-                    self._an.ti.RHS.aux_fields['mathscalar']['kspace'] = comp['kspace']
-                    comp = self._an.ti.RHS.aux_fields['mathscalar']
+                    self._local_scalar['kspace'] = comp['kspace']
+                    comp = self._local_scalar[0]
 
                 # Retrieve correct slice
                 if ((row == 0) and (cindex == 0) and
@@ -246,7 +253,6 @@ class Snapshot(AnalysisTask):
                             self.update_patches(axtup, x, y, plane_data)
                         else:
                             self.update_image(axtup, plane_data)
-
 
         if com_sys.myproc == 0:
 
@@ -375,8 +381,11 @@ class Snapshot(AnalysisTask):
         if self.space == 'kspace':
             im.set_clim(plane_data.min(), plane_data.max())
         else:
-            lim = na.max(na.abs([plane_data.min(), plane_data.max()]))
-            im.set_clim(-lim, lim)
+            if self.even_scale:
+                lim = na.max(na.abs([plane_data.min(), plane_data.max()]))
+                im.set_clim(-lim, lim)
+            else:
+                im.set_clim(plane_data.min(), plane_data.max())
 
     def add_lines(self, axtup, x, y, plane_data, comp):
 
@@ -625,11 +634,11 @@ class PowerSpectrum(AnalysisTask):
 
     def setup(self, data, it):
 
-        self.firstrun = True
-
         # Default to all fields in data
         if self.fieldlist is None:
             self.fieldlist = data.fields.keys()
+
+        self.firstrun = [True] * len(self.fieldlist)
 
         if com_sys.myproc == 0:
             if self.plot:
@@ -695,7 +704,7 @@ class PowerSpectrum(AnalysisTask):
                         continue
 
                     ax = self.axes[col]
-                    if self.firstrun:
+                    if self.firstrun[col]:
 
                         # Plot and store lines
                         if self.loglog:
@@ -741,7 +750,7 @@ class PowerSpectrum(AnalysisTask):
 
                 if self.write:
                     file = open('%s_power_spectra.dat' %fname, 'a')
-                    if self.firstrun:
+                    if self.firstrun[col]:
                         columnnames = 'time\t'
                         columnnames += '\t'.join([repr(ki) for ki in k])
                         file.write(columnnames)
@@ -751,6 +760,9 @@ class PowerSpectrum(AnalysisTask):
                     file.write(tstring + specstring)
                     file.write('\n')
                     file.close()
+
+            if self.firstrun[col]:
+                self.firstrun[col] = False
 
         if com_sys.myproc == 0:
             if self.plot:
@@ -762,9 +774,6 @@ class PowerSpectrum(AnalysisTask):
                 # Save in frames folder
                 outfile = 'frames/power_spectra_n%07i.png' %it
                 self.fig.savefig(outfile, dpi=self.dpi)
-
-        if self.firstrun:
-            self.firstrun = False
 
     def _compute_spectrum(self, field, norm):
 

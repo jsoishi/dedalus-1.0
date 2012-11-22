@@ -32,9 +32,9 @@ from dedalus.mods import *
 
 shape = (30, 10)
 length = (2 * np.pi, 100 * 2 * np.pi)
-RHS = ShearIncompressibleHydro(shape, FourierShearRepresentation, length=length)
+RHS = IncompressibleHydro(shape, FourierShearRepresentation, length=length)
 RHS.parameters['Omega'] = 1.
-RHS.parameters['S'] = -1.5
+RHS.parameters['shear_rate'] = 1.5
 data = RHS.create_fields(0.)
 
 # Setup vorticity wave

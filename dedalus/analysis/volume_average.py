@@ -104,6 +104,7 @@ def volume_average(data, kdict=None, space='kspace', reduce_all=False):
 
 @VolumeAverageSet.register_task
 def ekin(data, scratch, space='kspace'):
+    scratch['scalar'].zero_all()
     for i in xrange(data['u'].ncomp):
         if space == 'kspace':
             scratch['scalar']['kspace'] += 0.5 * na.abs(data['u'][i]['kspace']) ** 2

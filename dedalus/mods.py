@@ -52,19 +52,13 @@ from dedalus.init_cond.api import \
     MIT_vortices, \
     vorticity_wave, \
     alfven, \
-    kida_vortex
+    kida_vortex, \
+    add_gaussian_white_noise
 
 from dedalus.physics.api import \
     IncompressibleHydro, \
     BoussinesqHydro, \
-    IncompressibleMHD, \
-    ShearIncompressibleMHD, \
-    LinearCollisionlessCosmology, \
-    CollisionlessCosmology, \
-    LinearBaryonCDMCosmology, \
-    BaryonCDMCosmology, \
-    LinearCollisionlessCosmology,\
-    CollisionlessCosmology
+    IncompressibleMHD
 
 from dedalus.time_stepping.api import \
     RK2mid,\
@@ -79,10 +73,27 @@ from dedalus.utils.api import \
     interp_linear, \
     find_zero, \
     load_all, \
-    com_sys
+    com_sys, \
+    swap_indices
 
 from funcs import signal_print_traceback
 try:
     signal.signal(signal.SIGHUP, signal_print_traceback)
 except ValueError:  # Not in main thread
     pass
+
+# load plugins
+# WARNING WARNING WARNING: this is *really* dangerous.
+# be careful out there, good buddies.
+
+if decfg.getboolean("utils","loadplugins"):
+    my_plugin_name = decfg.get("utils","pluginfilename")
+    # We assume that it is with respect to the $HOME/.dedalus directory
+    if os.path.isfile(my_plugin_name):
+        _fn = my_plugin_name
+    else:
+        _fn = os.path.expanduser("~/.dedalus/%s" % my_plugin_name)
+    if os.path.isfile(_fn):
+        mylog.info("Loading plugins from %s", _fn)
+        execfile(_fn)
+
