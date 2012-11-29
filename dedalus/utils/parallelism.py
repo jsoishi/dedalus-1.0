@@ -95,7 +95,9 @@ def load_all(field, snap_dir):
     concat_ax = 0
 
     print "loaded %s at time = %f" % (field, time)
-    return np.concatenate(data,axis=concat_ax), space
+    data = np.concatenate(data,axis=concat_ax)
+    data = np.transpose(data,axes=[1,0,2])
+    return data, space
 
 ######
 # these reduction operators are light wrappers around mpi functions
