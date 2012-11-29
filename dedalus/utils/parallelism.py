@@ -87,7 +87,7 @@ def load_all(field, snap_dir):
     if not field.startswith('/fields/'):
         field = os.path.join('/fields',field)
 
-    for i in range(1,nproc):
+    for i in range(nproc):
         fi = h5py.File(data_file % i)
         fi[field].read_direct(data[i])
         fi.close()
