@@ -623,7 +623,7 @@ class BoussinesqHydro(IncompressibleHydro):
         if kappa == 0.:
             deriv['T'][0].integrating_factor = None
         else:
-            deriv['T'][0].integrating_factor = kappa * comp.k2() ** vo
+            deriv['T'][0].integrating_factor = kappa * deriv['T'][0].k2() ** vo
 
     def set_thermal_forcing(self, func):
         self.forcing_functions['ThermalForcing'] = func
