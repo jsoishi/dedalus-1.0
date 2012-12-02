@@ -538,12 +538,20 @@ class FourierRepresentation(Representation):
         grid[0] += self.offset['xspace']
 
         # Multiply integer array by grid spacing
-        dx = self.length / self.global_shape['xspace']
+        dx = self.dx()
         for i in xrange(self.ndim):
             grid[i] *= dx[i]
 
         return grid
 
+    def dx(self):
+        """return the grid spacing for each dimension,
+
+        [z, y, x] in 3D
+        [y, x] in 2D
+        """
+        dx = self.length / self.global_shape['xspace']
+        return dx
 class FourierShearRepresentation(FourierRepresentation):
     """
     Fourier representation in a shearing-box domain.
