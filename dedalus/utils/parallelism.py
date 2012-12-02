@@ -126,23 +126,31 @@ def reduce_sum(data, reduce_all=False):
         if com_sys.myproc == 0:
             return total
 
-def reduce_min(data):
+def reduce_min(data, reduce_all=False):
     local_min = data.min()
     if com_sys.comm == None:
         return local_min
 
-    global_min = com_sys.comm.reduce(local_min,op=com_sys.MPI.MIN)
-    if com_sys.myproc == 0:
+    if reduce_all:
+        global_min = com_sys.comm.allreduce(local_min,op=com_sys.MPI.SUM)
         return global_min
+    else:
+        global_min = com_sys.comm.reduce(local_min,op=com_sys.MPI.MIN)
+        if com_sys.myproc == 0:
+            return global_min
 
-def reduce_max(data):
+def reduce_max(data, reduce_all=False):
     local_max = data.max()
     if com_sys.comm == None:
         return local_max
 
-    global_max = com_sys.comm.reduce(local_max,op=com_sys.MPI.MAX)
-    if com_sys.myproc == 0:
+    if reduce_all:
+        global_max = com_sys.comm.allreduce(local_max,op=com_sys.MPI.SUM)
         return global_max
+    else:
+        global_max = com_sys.comm.reduce(local_max,op=com_sys.MPI.MAX)
+        if com_sys.myproc == 0:
+            return global_max
 
 def swap_indices(arr):
     """
