@@ -62,6 +62,7 @@ from dedalus.physics.api import \
 
 from dedalus.time_stepping.api import \
     RK2mid,\
+    RK2trap,\
     RK4, \
     CrankNicholsonVisc
 
