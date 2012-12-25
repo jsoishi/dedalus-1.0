@@ -27,7 +27,6 @@ License:
 import numpy as np
 import numpy.lib.stride_tricks as st
 import numpy.fft as npfft
-import scipy.fftpack as spfft
 from dedalus.config import decfg
 from dedalus.utils.parallelism import com_sys, swap_indices, get_plane
 from dedalus.utils.logger import mylog
