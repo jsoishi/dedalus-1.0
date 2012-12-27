@@ -534,7 +534,7 @@ class TrackMode(AnalysisTask):
                 field = data[fname]
                 for cindex, comp in field:
                     name = fname + field.ctrans[cindex]
-                    file = open('%s_mode_amplitudes.dat' %name, 'w')
+                    file = open('%s_mode_amplitudes.dat' %name, 'a')
                     file.write("# Dedalus Mode Amplitudes\n")
                     file.write(columnnames)
                     file.write('\n')
