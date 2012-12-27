@@ -513,7 +513,7 @@ class TrackMode(AnalysisTask):
 
         # Construct string defining columns
         if com_sys.myproc == 0:
-            columnnames = 'time'
+            columnnames = '# time'
             for mode in self.modelist:
                 columnnames += '\t' + str(list(mode))
 
