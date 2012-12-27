@@ -174,6 +174,38 @@ class TimeStepBase(object):
         self.snapshot(data)
         self.final_stats()
 
+    def cfl_time(self, data):
+
+        if data.fields.has_key('u'):
+
+            umax = []
+            umax.append(2 * na.max(na.abs(data['u']['x']['kspace'])))
+            umax.append(2 * na.max(na.abs(data['u']['y']['kspace'])))
+            if data.ndim == 3:
+                umax.append(2 * na.max(na.abs(data['u']['z']['kspace'])))
+            umax.reverse()
+
+            dt = na.asfarray(data.length) / na.asfarray(data.shape) / umax
+            print dt
+
+        if data.fields.has_key('B'):
+
+            Bmax = []
+            Bmax.append(2 * na.max(na.abs(data['B']['x']['kspace'])))
+            Bmax.append(2 * na.max(na.abs(data['B']['y']['kspace'])))
+            if data.ndim == 3:
+                Bmax.append(2 * na.max(na.abs(data['B']['z']['kspace'])))
+            Bmax.reverse()
+
+            vAmax = Bmax / na.sqrt(4 * na.pi * data.parameters['rho0'])
+
+            dt = na.asfarray(data.length) / na.asfarray(data.shape) / vAmax
+            print dt
+
+class RKBase(TimeStepBase):
+    """Base class for all Runge-Kutta integrators.
+
+    """
     @timer
     def forward_step(self, start, deriv, output, dt):
         """
@@ -211,36 +243,9 @@ class TimeStepBase(object):
         # Update time
         output.set_time(start.time + dt)
 
-    def cfl_time(self, data):
-
-        if data.fields.has_key('u'):
-
-            umax = []
-            umax.append(2 * na.max(na.abs(data['u']['x']['kspace'])))
-            umax.append(2 * na.max(na.abs(data['u']['y']['kspace'])))
-            if data.ndim == 3:
-                umax.append(2 * na.max(na.abs(data['u']['z']['kspace'])))
-            umax.reverse()
-
-            dt = na.asfarray(data.length) / na.asfarray(data.shape) / umax
-            print dt
-
-        if data.fields.has_key('B'):
-
-            Bmax = []
-            Bmax.append(2 * na.max(na.abs(data['B']['x']['kspace'])))
-            Bmax.append(2 * na.max(na.abs(data['B']['y']['kspace'])))
-            if data.ndim == 3:
-                Bmax.append(2 * na.max(na.abs(data['B']['z']['kspace'])))
-            Bmax.reverse()
-
-            vAmax = Bmax / na.sqrt(4 * na.pi * data.parameters['rho0'])
-
-            dt = na.asfarray(data.length) / na.asfarray(data.shape) / vAmax
-            print dt
 
 
-class RK2mid(TimeStepBase):
+class RK2mid(RKBase):
     """
     Second-order explicit midpoint Runge-Kutta method.
 
@@ -298,7 +303,7 @@ class RK2mid(TimeStepBase):
         self.iter += 1
 
 
-class RK2trap(TimeStepBase):
+class RK2trap(RKBase):
     """
     Second-order explicit trapezoidal Runge-Kutta method, using exponential
     time differencing to handle integrating factors.
@@ -319,7 +324,7 @@ class RK2trap(TimeStepBase):
         pass
 
 
-class RK4(TimeStepBase):
+class RK4(RKBase):
     """
     Fourth-order explicit classical Runge-Kutta method.
 
