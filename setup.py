@@ -21,6 +21,13 @@ def find_path(name):
         path = os.environ[pn]
         return path
     except KeyError:
+        # for MPI under Ubuntu
+        path = "/usr/lib/openmpi/lib"
+        glob_string = "*%s*" % name
+        l = glob.glob(os.path.join(path, glob_string))
+        if len(l) != 0:
+            return os.path.split(path)[0]
+
         path = "/usr/lib"
         glob_string = "*%s*" % name
         l = glob.glob(os.path.join(path, glob_string))
@@ -32,7 +39,7 @@ def find_path(name):
         l = glob.glob(os.path.join(path, glob_string))
         if len(l) != 0:
             return os.path.split(path)[0]
-        
+
         path = os.path.expanduser("~/build/lib")
         l = glob.glob(os.path.join(path,glob_string))
         if len(l) != 0:
