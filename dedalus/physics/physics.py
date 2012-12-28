@@ -506,6 +506,9 @@ class IncompressibleHydro(Physics):
             else:
                 comp.integrating_factor = diff * comp.k2() ** vo
 
+    def set_velocity_forcing(self, func):
+        self.forcing_functions['VelocityForcing'] = func
+
     def RHS(self, data, deriv):
         """
         Compute right-hand side of fluid equations, cast in the form
@@ -547,6 +550,11 @@ class IncompressibleHydro(Physics):
             self.XconstcrossY(Omega, data['u'], mathvector)
             for i in self.dims:
                 deriv['u'][i]['kspace'] -= 2 * mathvector[i]['kspace']
+
+        # Velocity forcing term
+        if self.forcing_functions.has_key('VelocityForcing'):
+            for i in self.dims:
+                deriv['u'][i]['kspace'] += self.forcing_functions['VelocityForcing'](data, i)
 
         # Pressure term
         if self.__class__ == IncompressibleHydro:
