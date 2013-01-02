@@ -2,7 +2,9 @@ from .metrics import \
     a_friedmann
 
 from .restart import \
-    restart
+    restart, \
+    identify_version
+
 
 from .timer import \
      Timer

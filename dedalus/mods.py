@@ -73,7 +73,8 @@ from dedalus.utils.api import \
     find_zero, \
     load_all, \
     com_sys, \
-    swap_indices
+    swap_indices, \
+    identify_version
 
 from funcs import signal_print_traceback
 try:

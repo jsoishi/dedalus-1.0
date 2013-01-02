@@ -97,3 +97,14 @@ def load_all_data(data, filename):
             data.fields[field][comp]._curr_space = data_file[field_comp].attrs['space']
 
     data_file.close()
+
+def identify_version(snap_dir, cpu_file='data.cpu0000'):
+    """id the version a dataset was created by
+
+    """
+    filename = os.path.join(snap_dir, cpu_file)
+    fi = h5py.File(filename)
+    version = fi.attrs['hg_version']
+    fi.close()
+
+    return version
