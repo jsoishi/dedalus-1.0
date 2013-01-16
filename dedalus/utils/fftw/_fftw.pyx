@@ -97,6 +97,7 @@ def create_data(np.ndarray[DTYPEi_t, ndim=1] shape not None, com_sys):
     cdef np.dtype kdtype = np.dtype('complex128')
     cdef np.dtype xdtype = np.dtype('float64')
     Py_INCREF(kdtype)
+    Py_INCREF(kdtype)
     Py_INCREF(xdtype)
 
     cdef complex *data
