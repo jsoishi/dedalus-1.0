@@ -94,7 +94,7 @@ class TimeStepBase(object):
         return self._is_ok
     @timer
     def advance(self, data, dt):
-        if ((self.iter % self._dnsnap) == 0) or (data.time - self._tlastsnap >= self._dtsnap):
+        if ((self.iter % self._dnsnap) == 0) or (self.time - self._tlastsnap >= self._dtsnap):
             self.snapshot(data)
         self.do_advance(data,dt)
         mylog.info("step %i" % self.iter)
