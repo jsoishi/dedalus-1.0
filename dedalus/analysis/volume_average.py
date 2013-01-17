@@ -97,7 +97,10 @@ def volume_average(data, kdict=None, space='kspace', reduce_all=False):
 
         return reduce_sum(local_sum,reduce_all=reduce_all)
     elif space == 'xspace':
-        data_values = data['xspace']
+        if type(data) == na.ndarray:
+            data_values = data
+        else:
+            data_values = data['xspace']
         return reduce_mean(data_values)
     else:
         raise ValueError("volume_average: must be either xspace or kspace")
@@ -113,6 +116,10 @@ def ekin(data, scratch, space='kspace'):
 
 
     return volume_average(scratch['scalar'], space=space)
+
+@VolumeAverageSet.register_task
+def comp_mean(data, scratch, fname, cindex):
+    return volume_average(data[fname][cindex]['xspace'], space='xspace')
 
 @VolumeAverageSet.register_task
 def ux2(data, scratch, space='kspace'):

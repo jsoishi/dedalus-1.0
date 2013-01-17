@@ -23,5 +23,6 @@ License:
 
 from time_step import \
     RK2mid,\
+    RK2trap,\
     RK4, \
     CrankNicholsonVisc
