@@ -25,7 +25,7 @@ import os
 import cPickle
 import time
 import h5py
-import numpy as na
+import numpy as np
 
 from dedalus.utils.parallelism import com_sys
 from dedalus.utils.logger import mylog
@@ -64,6 +64,7 @@ class TimeStepBase(object):
         self._dnsnap  = 100
         self._dtsnap = 1.
 
+        self.dt_old = np.finfo('d').max
         self._start_time = time.time()
 
         # Import Cython step functions
@@ -93,9 +94,11 @@ class TimeStepBase(object):
 
         return self._is_ok
     @timer
-    def advance(self, data, dt):
-        if ((self.iter % self._dnsnap) == 0) or (data.time - self._tlastsnap >= self._dtsnap):
+    def advance(self, data, dt=None):
+        if ((self.iter % self._dnsnap) == 0) or (self.time - self._tlastsnap >= self._dtsnap):
             self.snapshot(data)
+        if dt == None:
+            dt = self.cfl_dt(data)
         self.do_advance(data,dt)
         mylog.info("step %i" % self.iter)
     def do_advance(self, data, dt):
@@ -174,32 +177,44 @@ class TimeStepBase(object):
         self.snapshot(data)
         self.final_stats()
 
+    def cfl_dt(self, data, cfl = 0.4):
+        dt = cfl * self.RHS.compute_dt(data)
+
+        # only let it increase by 5%                                                
+        if dt > 1.05*self.dt_old:
+            dt = 1.05 * self.dt_old
+
+        self.dt_old = dt
+        mylog.info("dt = %10.5e" % dt)
+        return dt
+
+
     def cfl_time(self, data):
 
         if data.fields.has_key('u'):
 
             umax = []
-            umax.append(2 * na.max(na.abs(data['u']['x']['kspace'])))
-            umax.append(2 * na.max(na.abs(data['u']['y']['kspace'])))
+            umax.append(2 * np.max(np.abs(data['u']['x']['kspace'])))
+            umax.append(2 * np.max(np.abs(data['u']['y']['kspace'])))
             if data.ndim == 3:
-                umax.append(2 * na.max(na.abs(data['u']['z']['kspace'])))
+                umax.append(2 * np.max(np.abs(data['u']['z']['kspace'])))
             umax.reverse()
 
-            dt = na.asfarray(data.length) / na.asfarray(data.shape) / umax
+            dt = np.asfarray(data.length) / np.asfarray(data.shape) / umax
             print dt
 
         if data.fields.has_key('B'):
 
             Bmax = []
-            Bmax.append(2 * na.max(na.abs(data['B']['x']['kspace'])))
-            Bmax.append(2 * na.max(na.abs(data['B']['y']['kspace'])))
+            Bmax.append(2 * np.max(np.abs(data['B']['x']['kspace'])))
+            Bmax.append(2 * np.max(np.abs(data['B']['y']['kspace'])))
             if data.ndim == 3:
-                Bmax.append(2 * na.max(na.abs(data['B']['z']['kspace'])))
+                Bmax.append(2 * np.max(np.abs(data['B']['z']['kspace'])))
             Bmax.reverse()
 
-            vAmax = Bmax / na.sqrt(4 * na.pi * data.parameters['rho0'])
+            vAmax = Bmax / np.sqrt(4 * np.pi * data.parameters['rho0'])
 
-            dt = na.asfarray(data.length) / na.asfarray(data.shape) / vAmax
+            dt = np.asfarray(data.length) / np.asfarray(data.shape) / vAmax
             print dt
 
 class RKBase(TimeStepBase):
