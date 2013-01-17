@@ -64,16 +64,7 @@ class TimeStepBase(object):
         self._dnsnap  = 100
         self._dtsnap = 1.
 
-        self.dt_old = np.finfo('d').max
         self._start_time = time.time()
-
-        # Import Cython step functions
-        if self.RHS.ndim == 2:
-            from forward_step_cy_2d import linear_step, intfac_step
-        else:
-            from forward_step_cy_3d import linear_step, intfac_step
-        self.linear_step = linear_step
-        self.intfac_step = intfac_step
 
     @property
     def ok(self):
@@ -180,7 +171,7 @@ class TimeStepBase(object):
     def cfl_dt(self, data, cfl = 0.4):
         dt = cfl * self.RHS.compute_dt(data)
 
-        # only let it increase by 5%                                                
+        # only let it increase by 5%
         if dt > 1.05*self.dt_old:
             dt = 1.05 * self.dt_old
 
@@ -233,56 +224,86 @@ class RKBase(TimeStepBase):
 
 class RK2mid(RKBase):
     """
-    Second-order explicit midpoint Runge-Kutta method.
+    Second-order explicit midpoint Runge-Kutta method, using exponential
+    time differencing to handle integrating factors.
 
-    k1 = h * f(t_n, y_n)
-    k2 = h * f(t_n + h / 2, y_n + k1 / 2)
+    Notes
+    -----
+    dy/dt = c * y + f(y)
 
-    y_(n+1) = y_n + k2 + O(h ** 3)
+    if c == 0:
+        a_n = y_n + dt / 2 * f(y_n)
+        y_(n+1) = y_n + dt * f(a_n)
+                = a_n + dt * (f(a_n) - f(y_n) / 2)
+
+    else:
+        eif = exp(c * dt / 2)
+        a_n = y_n * eif + (eif - 1) * f(y_n) / c
+        eif = exp(c * dt)
+        y_(n+1) = y_n * eif + {[(c * dt - 2) * eif + c * dt + 2] * f(y_n) + [2 * (eif - c * dt - 1)] * f(a_n)} / (c * c * dt)
 
       0  |  0    0
      1/2 | 1/2   0
     ----------------
          |  0    1
 
+    References
+    ----------
+    Ashi, H. Numerical Methods for Stiff Systems. University of Nottingham PhD
+        (2008). http://etheses.nottingham.ac.uk/663/
+
     """
 
     def __init__(self, *arg, **kwargs):
+
+        # Inherited initialization
         TimeStepBase.__init__(self, *arg, **kwargs)
 
-        # Create StateData for constructing increments
-        self.deriv = self.RHS.create_fields(0.)
-        self.temp_data = self.RHS.create_fields(0.)
+        # Create necessary storage
+        self.data2 = self.RHS.create_fields(0.)
+        self.deriv1 = self.RHS.create_fields(0.)
+        self.deriv2 = self.RHS.create_fields(0.)
+
+        # Import Cython functions
+        if self.RHS.ndim == 2:
+            from forward_step_cy_2d import euler, etd1, etd2rk2
+        else:
+            from forward_step_cy_3d import euler, etd1, etd2rk2
+        self.euler = euler
+        self.etd1 = etd1
+        self.etd2rk2 = etd2rk2
 
     def do_advance(self, data, dt):
 
-        # Construct k1
-        self.RHS.RHS(data, self.deriv)
+        # Integrate in kspace
+        s = 'kspace'
 
-        # Store initial integrating factors for the complete step
-        for fname, field in self.temp_data:
-            for cindex, comp in field:
-                if comp._static_k or (self.deriv[fname][cindex].integrating_factor is None):
-                    comp.integrating_factor = self.deriv[fname][cindex].integrating_factor
+        # Place references
+        data2 = self.data2
+        deriv1 = self.deriv1
+        deriv2 = self.deriv2
+
+        # Construct a_n
+        self.RHS.RHS(data, deriv1)
+        for f in data.fields.keys():
+            for c in xrange(data[f].ncomp):
+                IF = deriv1[f][c].integrating_factor
+                if IF is None:
+                    self.euler(data[f][c][s], data2[f][c][s], deriv1[f][c][s], dt / 2.)
                 else:
-                    comp.integrating_factor = self.deriv[fname][cindex].integrating_factor.copy()
-
-        # Construct k2
-        self.forward_step(data, self.deriv, self.temp_data, dt / 2.)
-        for a in self.RHS.aux_eqns.values():
-            a_old = a.value
-            a.value = a_old + dt / 2. * a.RHS(a.value)
-        self.RHS.RHS(self.temp_data, self.deriv)
-
-        # Retrieve initial integrating factors for the complete step
-        for fname, field in self.temp_data:
-            for cindex, comp in field:
-                self.deriv[fname][cindex].integrating_factor = comp.integrating_factor
+                    self.etd1(data[f][c][s], data2[f][c][s], deriv1[f][c][s], -IF, dt / 2.)
+        data2.set_time(data.time + dt / 2.)
 
         # Complete step
-        self.forward_step(data, self.deriv, data, dt)
-        for a in self.RHS.aux_eqns.values():
-            a.value = a_old + dt * a.RHS(a.value)
+        self.RHS.RHS(data2, deriv2)
+        for f in data.fields.keys():
+            for c in xrange(data[f].ncomp):
+                IF = deriv1[f][c].integrating_factor
+                if IF is None:
+                    self.euler(data[f][c][s], data[f][c][s], deriv2[f][c][s], dt)
+                else:
+                    self.etd2rk2(data[f][c][s], data[f][c][s], deriv1[f][c][s], deriv2[f][c][s], -IF, dt)
+        data.set_time(data.time + dt)
 
         # Update integrator stats
         self.time += dt
@@ -294,20 +315,82 @@ class RK2trap(RKBase):
     Second-order explicit trapezoidal Runge-Kutta method, using exponential
     time differencing to handle integrating factors.
 
-    k1 = h * f(t_n, y_n)
-    k2 = h * f(t_n + h, y_n + k1)
+    Notes
+    -----
+    dy/dt = c * y + f(y)
 
-    y_(n+1) = y_n + (k1 + k2) / 2 + O(h ** 3)
+    if c == 0:
+        a_n = y_n + dt * f(y_n)
+        y_(n+1) = y_n + dt / 2 * (f(a_n) + f(y_n))
+                = a_n + dt / 2 * (f(a_n) - f(y_n))
+    else:
+        eif = exp(c * dt)
+        a_n = y_n * eif + (eif - 1) * f(y_n) / c
+        y_(n+1) = a_n + (eif - c * dt - 1) * (f(a_n) - f(y_n)) / (c * c * dt)
 
       0  |  0    0
       1  |  1    0
     ----------------
          | 1/2  1/2
 
+    References
+    ----------
+    Ashi, H. Numerical Methods for Stiff Systems. University of Nottingham PhD
+        (2008). http://etheses.nottingham.ac.uk/663/
+
     """
 
     def __init__(self, *arg, **kwargs):
-        pass
+
+        # Inherited initialization
+        TimeStepBase.__init__(self, *arg, **kwargs)
+
+        # Create necessary storage
+        self.deriv1 = self.RHS.create_fields(0.)
+        self.deriv2 = self.RHS.create_fields(0.)
+
+        # Import Cython functions
+        if self.RHS.ndim == 2:
+            from forward_step_cy_2d import euler, etd1, etd2rk1
+        else:
+            from forward_step_cy_3d import euler, etd1, etd2rk1
+        self.euler = euler
+        self.etd1 = etd1
+        self.etd2rk1 = etd2rk1
+
+    def do_advance(self, data, dt):
+
+        # Integrate in kspace
+        s = 'kspace'
+
+        # Place references
+        deriv1 = self.deriv1
+        deriv2 = self.deriv2
+
+        # Construct a_n
+        self.RHS.RHS(data, deriv1)
+        for f in data.fields.keys():
+            for c in xrange(data[f].ncomp):
+                IF = deriv1[f][c].integrating_factor
+                if IF is None:
+                    self.euler(data[f][c][s], data[f][c][s], deriv1[f][c][s], dt)
+                else:
+                    self.etd1(data[f][c][s], data[f][c][s], deriv1[f][c][s], -IF, dt)
+        data.set_time(data.time + dt)
+
+        # Complete step
+        self.RHS.RHS(data, deriv2)
+        for f in data.fields.keys():
+            for c in xrange(data[f].ncomp):
+                IF = deriv1[f][c].integrating_factor
+                if IF is None:
+                    self.euler(data[f][c][s], data[f][c][s], deriv2[f][c][s] - deriv1[f][c][s], dt / 2.)
+                else:
+                    self.etd2rk1(data[f][c][s], data[f][c][s], deriv1[f][c][s], deriv2[f][c][s], -IF, dt)
+
+        # Update integrator stats
+        self.time += dt
+        self.iter += 1
 
 
 class RK4(RKBase):

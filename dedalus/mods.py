@@ -39,7 +39,8 @@ from dedalus.analysis.api import \
 
 from dedalus.data_objects.api import \
     FourierRepresentation, \
-    FourierShearRepresentation
+    FourierShearRepresentation, \
+    ChebyshevRepresentation
 
 from dedalus.init_cond.api import \
     taylor_green, \
@@ -61,6 +62,7 @@ from dedalus.physics.api import \
 
 from dedalus.time_stepping.api import \
     RK2mid,\
+    RK2trap,\
     RK4, \
     CrankNicholsonVisc
 

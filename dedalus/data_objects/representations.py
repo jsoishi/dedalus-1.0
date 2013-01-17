@@ -24,14 +24,18 @@ License:
 
 """
 
-import numpy as na
+import numpy as np
 import numpy.lib.stride_tricks as st
-import numpy.fft as fpack
+import numpy.fft as npfft
 from dedalus.config import decfg
 from dedalus.utils.parallelism import com_sys, swap_indices, get_plane
 from dedalus.utils.logger import mylog
 from dedalus.utils.fftw import fftw
 from dedalus.utils.timer import timer
+try:
+    import scipy.fftpack as spfft
+except ImportError:
+    mylog.warning("Scipy cannot be imported.  Chebyshev representation unavailable.")
 try:
     import pycuda.autoinit
     import pycuda.gpuarray as gpuarray
@@ -91,8 +95,8 @@ class FourierRepresentation(Representation):
 
         # Store inputs
         self.sd = sd
-        self.global_shape = {'xspace': na.array(shape)}
-        self.length = na.asfarray(length)
+        self.global_shape = {'xspace': np.array(shape)}
+        self.length = np.asfarray(length)
         self.ndim = len(shape)
 
         # Make sure all dimensions make sense
@@ -104,8 +108,8 @@ class FourierRepresentation(Representation):
         # Flexible datatypes not currently supported
         self.dtype = {'kspace': 'complex128',
                       'xspace': 'float64'}
-        self._eps = {'kspace': na.finfo(self.dtype['kspace']).eps,
-                      'xspace': na.finfo(self.dtype['xspace']).eps}
+        self._eps = {'kspace': np.finfo(self.dtype['kspace']).eps,
+                      'xspace': np.finfo(self.dtype['xspace']).eps}
 
         # Retrieve FFT method and dealiasing method from config
         method = decfg.get('FFT', 'method')
@@ -153,11 +157,6 @@ class FourierRepresentation(Representation):
         # Scalar assignment
         if type(data) == float or type(data) == complex:
             self.data[:] = data
-        # Mis-matched size assignment
-        elif data.size < self.data.size:
-            mylog.warning("Size of assignment and data don't agree. This may be disallowed in future versions.")
-            sli = [slice(i/4+1,i/4+i+1) for i in data.shape]
-            self.data[sli] = data
         # Regular assignment by slicing
         else:
             sli = [slice(i) for i in self.data.shape]
@@ -184,15 +183,15 @@ class FourierRepresentation(Representation):
             self.offset = {'xspace': local_n0_start,
                            'kspace': local_n1_start}
         elif method == 'numpy':
-            self.kdata = na.zeros(self.global_shape['kspace'], dtype=self.dtype['kspace'])
-            self.xdata = na.zeros(self.global_shape['xspace'], dtype=self.dtype['xspace'])
+            self.kdata = np.zeros(self.global_shape['kspace'], dtype=self.dtype['kspace'])
+            self.xdata = np.zeros(self.global_shape['xspace'], dtype=self.dtype['xspace'])
             self.local_shape = {'kspace': self.global_shape['kspace'].copy(),
                                 'xspace': self.global_shape['xspace'].copy()}
             self.offset = {'xspace': 0,
                            'kspace': 0}
 
         # Allocate an array to hold derivatives
-        self.deriv_data = na.zeros_like(self.kdata)
+        self.deriv_data = np.zeros_like(self.kdata)
 
         # Incorporate ability to add extra views, etc.
         self._additional_allocation(method)
@@ -204,9 +203,9 @@ class FourierRepresentation(Representation):
         """Create local wavenumber arrays."""
 
         # Get Nyquist wavenumbers
-        self.dk = 2 * na.pi / self.length
+        self.dk = 2 * np.pi / self.length
         self.dk = swap_indices(self.dk)
-        self.kny = na.pi * self.global_shape['xspace'] / self.length
+        self.kny = np.pi * self.global_shape['xspace'] / self.length
         self.kny = swap_indices(self.kny)
 
         # Setup global wavenumber arrays
@@ -216,11 +215,11 @@ class FourierRepresentation(Representation):
         for i,ksize in enumerate(self.global_shape['kspace']):
             xsize = swap_indices(self.global_shape['xspace'])[i]
             if i == rcomp:
-                ki = fpack.fftfreq(xsize)[:ksize] * 2. * self.kny[i]
+                ki = npfft.fftfreq(xsize)[:ksize] * 2. * self.kny[i]
                 if xsize % 2 == 0:
                     ki[-1] *= -1.
             else:
-                ki = fpack.fftfreq(ksize) * 2. * self.kny[i]
+                ki = npfft.fftfreq(ksize) * 2. * self.kny[i]
                 if xsize % 2 == 0:
                     ki[ksize / 2] *= -1.
             kshape = i * (1,) + (ksize,) + (self.ndim - i - 1) * (1,)
@@ -264,10 +263,10 @@ class FourierRepresentation(Representation):
         """
 
         # Get k-mode spacing
-        dk = 2 * na.pi / swap_indices(self.length)
+        dk = 2 * np.pi / swap_indices(self.length)
 
         # Intersect applicable mode sets by dimension
-        test = na.ones(self.local_shape['kspace'], dtype=bool)
+        test = np.ones(self.local_shape['kspace'], dtype=bool)
         for name, kn in self.k.iteritems():
             i = self.ktrans[name]
             if exact:
@@ -323,11 +322,11 @@ class FourierRepresentation(Representation):
 
     def fwd_np(self):
         tr = [1, 0, 2][:self.ndim]
-        self.kdata[:] = na.transpose(fpack.rfftn(self.xdata / self.global_shape['xspace'].prod()), tr)
+        self.kdata[:] = np.transpose(npfft.rfftn(self.xdata / self.global_shape['xspace'].prod()), tr)
 
     def rev_np(self):
         tr = [1, 0, 2][:self.ndim]
-        self.xdata[:] = fpack.irfftn(na.transpose(self.kdata, tr)) * self.global_shape['xspace'].prod()
+        self.xdata[:] = npfft.irfftn(np.transpose(self.kdata, tr)) * self.global_shape['xspace'].prod()
 
     def forward(self):
         """FFT method to go from xspace to kspace."""
@@ -360,7 +359,7 @@ class FourierRepresentation(Representation):
 
         if dealiasing == '2/3':
             self.dealias = self.dealias_23
-            self.nmodes = na.prod(2 * na.ceil(self.global_shape['xspace'] / 3. - 1) + 1)
+            self.nmodes = np.prod(2 * np.ceil(self.global_shape['xspace'] / 3. - 1) + 1)
         elif dealiasing == '2/3 cython':
             if self.ndim == 2:
                 from dealias_cy_2d import dealias_23
@@ -368,13 +367,13 @@ class FourierRepresentation(Representation):
                 from dealias_cy_3d import dealias_23
             self._cython_dealias_function = dealias_23
             self.dealias = self.dealias_23_cython
-            self.nmodes = na.prod(2 * na.ceil(self.global_shape['xspace'] / 3. - 1) + 1)
+            self.nmodes = np.prod(2 * np.ceil(self.global_shape['xspace'] / 3. - 1) + 1)
         elif dealiasing == '2/3 spherical':
             self.dealias = self.dealias_23_spherical
             self.nmodes = None
         elif dealiasing in ['None', None, 0]:
             self.dealias = self.zero_nyquist
-            self.nmodes = na.prod(2 * na.ceil(self.global_shape['xspace'] / 2. - 1) + 1)
+            self.nmodes = np.prod(2 * np.ceil(self.global_shape['xspace'] / 2. - 1) + 1)
         else:
             raise NotImplementedError("Specified dealiasing method not implemented.")
 
@@ -383,12 +382,12 @@ class FourierRepresentation(Representation):
 
         # Zeroing mask
         if self.ndim ==2:
-            dmask = ((na.abs(self.k['x']) >= 2 / 3. * self.kny[0]) |
-                     (na.abs(self.k['y']) >= 2 / 3. * self.kny[1]))
+            dmask = ((np.abs(self.k['x']) >= 2. / 3. * self.kny[0]) |
+                     (np.abs(self.k['y']) >= 2. / 3. * self.kny[1]))
         else:
-            dmask = ((na.abs(self.k['x']) >= 2 / 3. * self.kny[2]) |
-                     (na.abs(self.k['y']) >= 2 / 3. * self.kny[0]) |
-                     (na.abs(self.k['z']) >= 2 / 3. * self.kny[1]))
+            dmask = ((np.abs(self.k['x']) >= 2. / 3. * self.kny[2]) |
+                     (np.abs(self.k['y']) >= 2. / 3. * self.kny[0]) |
+                     (np.abs(self.k['z']) >= 2. / 3. * self.kny[1]))
 
         self.require_space('kspace')
         self.data[dmask] = 0.
@@ -408,7 +407,7 @@ class FourierRepresentation(Representation):
         """Spherical 2/3 dealiasing rule."""
 
         # Zeroing mask
-        dmask = (na.sqrt(self.k2()) >= 2 / 3. * na.min(self.kny))
+        dmask = (np.sqrt(self.k2()) >= 2 / 3. * np.min(self.kny))
 
         self.require_space('kspace')
         self.data[dmask] = 0.
@@ -417,7 +416,7 @@ class FourierRepresentation(Representation):
         """Calculate derivative along specified dimension."""
 
         self.require_space('kspace')
-        na.multiply(self.data, 1j * self.k[dim], self.deriv_data)
+        np.multiply(self.data, 1j * self.k[dim], self.deriv_data)
 
         return self.deriv_data
 
@@ -428,7 +427,7 @@ class FourierRepresentation(Representation):
 
         """
 
-        k2 = na.zeros(self.local_shape['kspace'])
+        k2 = np.zeros(self.local_shape['kspace'])
         for k in self.k.values():
             k2 += k ** 2
         if no_zero:
@@ -441,12 +440,12 @@ class FourierRepresentation(Representation):
 
         # Zeroing mask
         if self.ndim == 2:
-            dmask = ((na.abs(self.k['x']) == self.kny[0]) |
-                     (na.abs(self.k['y']) == self.kny[1]))
+            dmask = ((np.abs(self.k['x']) == self.kny[0]) |
+                     (np.abs(self.k['y']) == self.kny[1]))
         else:
-            dmask = ((na.abs(self.k['x']) == self.kny[2]) |
-                     (na.abs(self.k['y']) == self.kny[0]) |
-                     (na.abs(self.k['z']) == self.kny[1]))
+            dmask = ((np.abs(self.k['x']) == self.kny[2]) |
+                     (np.abs(self.k['y']) == self.kny[0]) |
+                     (np.abs(self.k['z']) == self.kny[1]))
 
         self.require_space('kspace')
         self.data[dmask] = 0.
@@ -477,8 +476,8 @@ class FourierRepresentation(Representation):
             gathered_data = com_sys.comm.gather(proc_data, root=0)
 
             if com_sys.myproc == 0:
-                plane_data = na.concatenate(gathered_data)
-                nyy, nyz = na.array(plane_data.shape) / 2
+                plane_data = np.concatenate(gathered_data)
+                nyy, nyz = np.array(plane_data.shape) / 2
 
                 # Enforce along ky=0 pencil
                 grab = plane_data[0, 1:nyz + 1]
@@ -503,7 +502,7 @@ class FourierRepresentation(Representation):
         """Zero out any modes with coefficients smaller than machine epsilon."""
 
         self.require_space('kspace')
-        self.data[na.abs(self.data) < self._eps['kspace']] = 0.
+        self.data[np.abs(self.data) < self._eps['kspace']] = 0.
 
     def save(self, dataset):
         """
@@ -529,12 +528,12 @@ class FourierRepresentation(Representation):
         """
 
         if open:
-            refgrid = na.ogrid
+            refgrid = np.ogrid
         else:
-            refgrid = na.mgrid
+            refgrid = np.mgrid
 
         # Create integer array based on local shape and offset
-        grid = refgrid[[slice(i) for i in na.asfarray(self.local_shape['xspace'])]]
+        grid = refgrid[[slice(i) for i in np.asfarray(self.local_shape['xspace'])]]
         grid[0] += self.offset['xspace']
 
         # Multiply integer array by grid spacing
@@ -595,12 +594,12 @@ class FourierShearRepresentation(FourierRepresentation):
 
         # Store initial copy of ky, allocate a fleshed-out ky
         self._ky = self.k['y'].copy()
-        self.k['y'] = self.k['y'] * na.ones_like(self.k['x'])
+        self.k['y'] = self.k['y'] * np.ones_like(self.k['x'])
 
         # Calculate phase rate for use in x-orientation transpose
         ksize = self.global_shape['kspace'][self.ktrans['x']]
         xsize = self.global_shape['xspace'][self.xtrans['x']]
-        xkx = fpack.fftfreq(xsize)[:ksize] * 2. * self.kny[self.ktrans['x']]
+        xkx = npfft.fftfreq(xsize)[:ksize] * 2. * self.kny[self.ktrans['x']]
         if xsize % 2 == 0:
             xkx[-1] *= -1.
         xkx.resize((self.ndim - 1) * (1,) + (ksize,))
@@ -619,14 +618,14 @@ class FourierShearRepresentation(FourierRepresentation):
         if method == 'numpy':
             mshape = self.local_shape['xspace'].copy()
             mshape[-1] = mshape[-1] / 2 + 1
-            self._mdata = na.zeros(mshape, dtype=self.dtype['kspace'])
+            self._mdata = np.zeros(mshape, dtype=self.dtype['kspace'])
 
     def _update_k(self):
         """Evolve wavenumbers due to shear."""
 
         # Wavenumber shift
         #self.k['y'] = self._ky - self._wave_rate * self.sd.time
-        na.subtract(self._ky, self._wave_rate * self.sd.time , self.k['y'])
+        np.subtract(self._ky, self._wave_rate * self.sd.time , self.k['y'])
 
         # Wrap wavenumbers past Nyquist value
         kny_y = self.kny[3 - self.ndim]
@@ -667,7 +666,7 @@ class FourierShearRepresentation(FourierRepresentation):
         self._fplan_x()
 
         # Phase shift
-        self._mdata *= na.exp(1j * self._phase_rate * self.sd.time)
+        self._mdata *= np.exp(1j * self._phase_rate * self.sd.time)
 
         # Do y and z ffts (with MPI transpose)
         if self.ndim == 2:
@@ -689,7 +688,7 @@ class FourierShearRepresentation(FourierRepresentation):
             self._rplan_yz()
 
         # Phase shift
-        self._mdata *= na.exp(-1j * self._phase_rate * self.sd.time)
+        self._mdata *= np.exp(-1j * self._phase_rate * self.sd.time)
 
         # Do x ifft
         self._rplan_x()
@@ -697,20 +696,20 @@ class FourierShearRepresentation(FourierRepresentation):
     def fwd_np(self):
 
         # Do x fft
-        self._mdata[:] = fpack.rfft(self.xdata, axis=-1)
+        self._mdata[:] = npfft.rfft(self.xdata, axis=-1)
 
         # Phase shift
-        self._mdata *= na.exp(1j * self._phase_rate * self.sd.time)
+        self._mdata *= np.exp(1j * self._phase_rate * self.sd.time)
 
         # Transpose
         tr = [1, 0, 2][:self.ndim]
-        self.kdata[:] = na.transpose(self._mdata, tr)
+        self.kdata[:] = np.transpose(self._mdata, tr)
 
         # Do y and z ffts
         if self.ndim == 2:
-            self.kdata[:] = fpack.fft(self.kdata, axis=1)
+            self.kdata[:] = npfft.fft(self.kdata, axis=1)
         else:
-            self.kdata[:] = fpack.fftn(self.kdata, axes=(0,1))
+            self.kdata[:] = npfft.fftn(self.kdata, axes=(0,1))
 
         # Correct numpy normalization
         self.kdata /= self.global_shape['xspace'].prod()
@@ -719,27 +718,23 @@ class FourierShearRepresentation(FourierRepresentation):
 
         # Do y and z iffts
         if self.ndim == 2:
-            self.kdata[:] = fpack.ifft(self.kdata, axis=1)
+            self.kdata[:] = npfft.ifft(self.kdata, axis=1)
         else:
-            self.kdata[:] = fpack.ifftn(self.kdata, axes=(0,1))
+            self.kdata[:] = npfft.ifftn(self.kdata, axes=(0,1))
 
         # Transpose
         tr = [1, 0, 2][:self.ndim]
-        self._mdata[:] = na.transpose(self.kdata, tr)
+        self._mdata[:] = np.transpose(self.kdata, tr)
 
         # Phase shift
-        self._mdata *= na.exp(-1j * self._phase_rate * self.sd.time)
+        self._mdata *= np.exp(-1j * self._phase_rate * self.sd.time)
 
         # Do x ifft
-        self.xdata[:] = fpack.irfft(self._mdata, axis=-1)
+        self.xdata[:] = npfft.irfft(self._mdata, axis=-1)
 
         # Correct numpy normalization
         self.kdata *= self.global_shape['xspace'].prod()
 
-class SphericalHarmonicRepresentation(FourierRepresentation):
-    """
-    Dedalus should eventually support spherical and cylindrical geometries.
 
-    """
-
+class ChebyshevRepresentation(FourierRepresentation):
     pass

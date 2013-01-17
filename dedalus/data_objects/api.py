@@ -29,7 +29,8 @@ from .state_data import \
 
 from .representations import \
     FourierRepresentation, \
-    FourierShearRepresentation
+    FourierShearRepresentation, \
+    ChebyshevRepresentation
 
 from .aux_equation import \
     AuxEquation
