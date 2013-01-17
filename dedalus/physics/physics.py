@@ -147,6 +147,15 @@ class Physics(object):
         deriv.set_time(data.time)
         self.aux_fields.set_time(data.time)
 
+    def compute_dt(self, data):
+        """returns raw dt, without CFL number
+
+        """
+        self.dtlist = []
+        self.set_dtlist(data)
+        
+        return min(self.dtlist)
+
     def gradX(self, X, output):
         """
         Compute Jacobian: gradX[N * i + j] = dX_i/dx_j
@@ -584,6 +593,16 @@ class IncompressibleHydro(Physics):
         for i in self.dims:
             deriv['u'][i]['kspace'] -= mathscalar.deriv(self._trans[i])
 
+    def max_abs_vel(self, data):
+        u2max = data['u'].max_square()
+        umax = np.sqrt(u2max)
+
+        return umax
+
+    def set_dtlist(self, data):
+        dx = data['u']['x'].dx().min()
+        dt_advect = dx/self.max_abs_vel(data)
+        self.dtlist.append(dt_advect)
 
 class BoussinesqHydro(IncompressibleHydro):
     """Boussinesq hydrodynamics."""
@@ -680,6 +699,15 @@ class BoussinesqHydro(IncompressibleHydro):
         if self.forcing_functions.has_key('ThermalForcing'):
             deriv['T']['kspace'] += self.forcing_functions['ThermalForcing'](data)
         deriv['T']['kspace'][0,0,0] = 0. # Must ensure (0,0,0) T mode does not grow.
+
+    def set_dtlist(self, data):
+        IncompressibleHydro.set_dtlist(self, data)
+        dx = data['u']['x'].dx().min()
+        N = np.sqrt(np.abs(self.parameters['alpha_t']  * self.parameters['g'] * \
+                               self.parameters['beta']))
+        dt_wave = dx/N
+
+        self.dtlist.append(dt_wave)
 
 
 class IncompressibleMHD(IncompressibleHydro):
@@ -779,3 +807,17 @@ class IncompressibleMHD(IncompressibleHydro):
         if self._shear:
             deriv['B']['x']['kspace'] += S * data['B']['y']['kspace']
 
+    def max_alfven_speed(self, data):
+        rho0 = self.parameters['rho0']
+        b2max = data['B'].max_square()
+        va_max = np.sqrt(b2max/rho0)
+
+        return va_max
+
+    def set_dtlist(self, data):
+        Hydro.set_dtlist(data)
+        dx = data['u']['x'].dx().min()
+        va_max = self.max_alfven_speed(data)
+        dt_wave = dx/va_max
+
+        self.dtlist.append(dt_wave)

@@ -153,7 +153,7 @@ class VectorFieldBase(BaseField):
     def max_square(self):
         c2 = [(c['xspace']**2).max() for i,c in self]
         c2max = reduce_max(max(c2), reduce_all=True)
-        print c2max
+
         return c2max
         
     def div_free(self):
