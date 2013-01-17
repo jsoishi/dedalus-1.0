@@ -120,7 +120,7 @@ class StateData(object):
                 for i,c in field:
                     c._update_k()
 
-    def add_field(self, name, type):
+    def add_field(self, name, fieldtype):
         """
         Add a new field.
 
@@ -128,7 +128,7 @@ class StateData(object):
         ----------
         name : str
             Name of the field to add
-        type : str
+        fieldtype : str
             Type of field to add, e.g. "ScalarField"
 
         Notes
@@ -142,7 +142,7 @@ class StateData(object):
         if name in self.fields.keys():
             raise ValueError("Field with this name already exists.")
         else:
-            self.fields[name] = self._field_classes[type](self)
+            self.fields[name] = self._field_classes[fieldtype](self)
 
     def snapshot(self, root_grp):
         """
