@@ -27,6 +27,7 @@ License:
 import weakref
 import numpy as na
 from dedalus.utils.logger import mylog
+from dedalus.utils.parallelism import reduce_max
 from dedalus.data_objects.representations import \
     FourierRepresentation, \
     FourierShearRepresentation
@@ -149,6 +150,12 @@ class VectorFieldBase(BaseField):
         else:
             self.ctrans = {'x':0, 0:'x', 'y':1, 1:'y', 'z':2, 2:'z'}
 
+    def max_square(self):
+        c2 = [(c['xspace']**2).max() for i,c in self]
+        c2max = reduce_max(max(c2), reduce_all=True)
+
+        return c2max
+        
     def div_free(self):
         """
         Project off irrotational part of the vector field.
