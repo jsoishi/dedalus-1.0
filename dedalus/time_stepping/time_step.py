@@ -188,35 +188,6 @@ class TimeStepBase(object):
         mylog.info("dt = %10.5e" % dt)
         return dt
 
-
-    def cfl_time(self, data):
-
-        if data.fields.has_key('u'):
-
-            umax = []
-            umax.append(2 * np.max(np.abs(data['u']['x']['kspace'])))
-            umax.append(2 * np.max(np.abs(data['u']['y']['kspace'])))
-            if data.ndim == 3:
-                umax.append(2 * np.max(np.abs(data['u']['z']['kspace'])))
-            umax.reverse()
-
-            dt = np.asfarray(data.length) / np.asfarray(data.shape) / umax
-            print dt
-
-        if data.fields.has_key('B'):
-
-            Bmax = []
-            Bmax.append(2 * np.max(np.abs(data['B']['x']['kspace'])))
-            Bmax.append(2 * np.max(np.abs(data['B']['y']['kspace'])))
-            if data.ndim == 3:
-                Bmax.append(2 * np.max(np.abs(data['B']['z']['kspace'])))
-            Bmax.reverse()
-
-            vAmax = Bmax / np.sqrt(4 * np.pi * data.parameters['rho0'])
-
-            dt = np.asfarray(data.length) / np.asfarray(data.shape) / vAmax
-            print dt
-
 class RKBase(TimeStepBase):
     """Base class for all Runge-Kutta integrators.
 
