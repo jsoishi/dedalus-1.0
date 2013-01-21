@@ -63,7 +63,7 @@ class TimeStepBase(object):
         self._stop_wall = 3600.*24. # 24 hours
         self._dnsnap  = 100
         self._dtsnap = 1.
-
+        self.dt_old = np.finfo('d').max
         self._start_time = time.time()
 
     @property
