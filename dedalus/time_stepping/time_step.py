@@ -1,4 +1,5 @@
-"""Time Integrators.
+"""
+Time Integrators.
 
 Author: J. S. Oishi <jsoishi@gmail.com>
 Affiliation: KIPAC/SLAC/Stanford
@@ -19,7 +20,10 @@ License:
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 """
+
+
 import inspect
 import os
 import cPickle
@@ -40,58 +44,67 @@ except:
     mylog.warning("could not find hg_version.")
     hg_version = "unknown"
 
+
 class TimeStepBase(object):
+
     timer = timer
+
     def __init__(self, RHS, CFL=0.4, int_factor=None):
-        """Base class for dedalus time stepping methods. Provides
+        """
+        Base class for dedalus time stepping methods. Provides
         stopping controls, statistics, and (eventually) a snapshotting
         trigger.
 
         """
+
+        # Store inputs
         self.RHS = RHS
         self.CFL = CFL
         self.int_factor = int_factor
-        self._is_ok = True
-        self._nsnap = 0
-        self._tlastsnap = 0.
 
-        # parameters
-        self.iter = 0
-        self.time = 0.
-        self._stop_iter = 100000
-        self._stop_time = -1.
-        self._stop_wall = 3600.*24. # 24 hours
+        # Default parameters
+        self.sim_stop_time = 100
+        self.wall_stop_time = 24. * 60. * 60.
+        self.stop_iteration = 100
         self._dnsnap  = 100
         self._dtsnap = 1.
+
+        # Instantiation
+        self.time = 0
+        self.iteration = 0
+        self._nsnap = 0
+        self._tlastsnap = 0.
         self.dt_old = np.finfo('d').max
         self._start_time = time.time()
 
     @property
     def ok(self):
-        if self.iter >= self._stop_iter:
-            if com_sys.myproc == 0:
-                mylog.info("Maximum number of iterations reached. Done.")
-            self._is_ok = False
-        elif self.time >= self._stop_time:
-            if com_sys.myproc == 0:
-                mylog.info("Time > stop time. Done")
-            self._is_ok = False
-        elif (time.time() - self._start_time) >= self._stop_wall:
-            if com_sys.myproc == 0:
-                mylog.info("Wall clock time exceeded. Done.")
-            self._is_ok = False
-        else:
-            self._is_ok = True
 
-        return self._is_ok
+        if self.iteration >= self.stop_iteration:
+            ok_flag = False
+            if com_sys.myproc == 0:
+                mylog.info("Timestepping complete: stop iteration reached.")
+        elif self.time >= self.sim_stop_time:
+            ok_flag = False
+            if com_sys.myproc == 0:
+                mylog.info("Timestepping complete: simulation stop time reached.")
+        elif (time.time() - self._start_time) >= self.wall_stop_time:
+            ok_flag = False
+            if com_sys.myproc == 0:
+                mylog.info("Timestepping complete: wall stop time reached.")
+        else:
+            ok_flag = True
+
+        return ok_flag
+
     @timer
     def advance(self, data, dt=None):
-        if ((self.iter % self._dnsnap) == 0) or (self.time - self._tlastsnap >= self._dtsnap):
+        if ((self.iteration % self._dnsnap) == 0) or (self.time - self._tlastsnap >= self._dtsnap):
             self.snapshot(data)
         if dt == None:
             dt = self.cfl_dt(data)
         self.do_advance(data,dt)
-        mylog.info("step %i" % self.iter)
+        mylog.info("step %i" % self.iteration)
     def do_advance(self, data, dt):
         raise NotImplementedError("do_advance must be provided by subclass.")
 
@@ -136,15 +149,6 @@ class TimeStepBase(object):
         self._nsnap += 1
         self._tlastsnap = self.time
 
-    def stop_time(self,t):
-        self._stop_time = t
-
-    def stop_iter(self, it):
-        self._stop_iter = it
-
-    def stop_walltime(self, wt):
-        self._stop_wall = wt
-
     def set_nsnap(self, n):
         self._dnsnap = n
 
@@ -156,7 +160,7 @@ class TimeStepBase(object):
         if com_sys.myproc == 0:
             total_wtime = self.timer.timers['advance']
             print "total advance wall time: %10.5e sec" % total_wtime
-            print "%10.5e sec/step " %(total_wtime/self.iter)
+            print "%10.5e sec/step " %(total_wtime/self.iteration)
             print
             print "Simulation complete. Status: awesome"
 
@@ -307,7 +311,7 @@ class RK2mid(RKBase):
 
         # Update integrator stats
         self.time += dt
-        self.iter += 1
+        self.iteration += 1
 
 
 class RK2trap(RKBase):
@@ -390,7 +394,7 @@ class RK2trap(RKBase):
 
         # Update integrator stats
         self.time += dt
-        self.iter += 1
+        self.iteration += 1
 
 
 class RK4(RKBase):
@@ -481,7 +485,7 @@ class RK4(RKBase):
 
         # Update integrator stats
         self.time += dt
-        self.iter += 1
+        self.iteration += 1
 
 class CrankNicholsonVisc(TimeStepBase):
     """
@@ -503,5 +507,5 @@ class CrankNicholsonVisc(TimeStepBase):
         # Update data and integrator stats
         data.set_time(data.time + dt)
         self.time += dt
-        self.iter += 1
+        self.iteration += 1
 

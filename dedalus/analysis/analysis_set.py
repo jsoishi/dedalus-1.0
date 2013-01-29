@@ -49,16 +49,16 @@ class AnalysisSet(object):
         self.tasks.append(task)
         task._an = self
         task._n = len(self.tasks)
-        task.setup(self.data, self.ti.iter)
+        task.setup(self.data, self.ti.iteration)
 
     def run(self):
         for task in self.tasks:
-            if self.ti.iter % task.cadence == 0:
-                task.run(self.data, self.ti.iter)
+            if self.ti.iteration % task.cadence == 0:
+                task.run(self.data, self.ti.iteration)
 
     def cleanup(self):
         for task in self.tasks:
-            task.cleanup(self.data, self.ti.iter)
+            task.cleanup(self.data, self.ti.iteration)
 
 
 class AnalysisTask(object):
