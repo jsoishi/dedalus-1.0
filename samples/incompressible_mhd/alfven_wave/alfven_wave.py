@@ -55,10 +55,10 @@ if index:
 
 # Integration
 ti = RK2mid(RHS,CFL=0.4)
-ti.stop_iter(1e6)
-ti.stop_time(2 * np.pi / omega)
-ti.set_nsnap(10000)
-ti.set_dtsnap(100.)
+ti.stop_iteration = 1e6
+ti.sim_stop_time = 2 * np.pi / omega
+ti.save_cadence = 10000
+ti.max_save_period = 100.
 
 # Analysis
 an = AnalysisSet(data, ti)

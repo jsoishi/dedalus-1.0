@@ -43,10 +43,10 @@ w = 0.01
 vorticity_wave(data, k, w)
 
 ti = RK2mid(RHS,CFL=0.4)
-ti.stop_iter(1e6)
-ti.stop_time(534)
-ti.set_nsnap(10000)
-ti.set_dtsnap(100.)
+ti.stop_iteration = 1e6
+ti.sim_stop_time = 534
+ti.save_cadence = 10000
+ti.max_save_period = 100.
 
 an = AnalysisSet(data, ti)
 #vs = VolumeAverageSet(data)

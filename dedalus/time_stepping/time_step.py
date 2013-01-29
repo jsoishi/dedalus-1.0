@@ -63,11 +63,11 @@ class TimeStepBase(object):
         self.int_factor = int_factor
 
         # Default parameters
-        self.sim_stop_time = 100
-        self.wall_stop_time = 24. * 60. * 60.
-        self.stop_iteration = 100
-        self._dnsnap  = 100
-        self._dtsnap = 1.
+        self.sim_stop_time = 1000
+        self.wall_stop_time = 60. * 60.
+        self.stop_iteration = 1000
+        self.save_cadence = 100
+        self.max_save_period = 100.
 
         # Instantiation
         self.time = 0
@@ -99,12 +99,13 @@ class TimeStepBase(object):
 
     @timer
     def advance(self, data, dt=None):
-        if ((self.iteration % self._dnsnap) == 0) or (self.time - self._tlastsnap >= self._dtsnap):
+        if ((self.iteration % self.save_cadence) == 0) or (self.time - self._tlastsnap >= self.max_save_period):
             self.snapshot(data)
         if dt == None:
             dt = self.cfl_dt(data)
         self.do_advance(data,dt)
         mylog.info("step %i" % self.iteration)
+
     def do_advance(self, data, dt):
         raise NotImplementedError("do_advance must be provided by subclass.")
 
@@ -149,12 +150,6 @@ class TimeStepBase(object):
         self._nsnap += 1
         self._tlastsnap = self.time
 
-    def set_nsnap(self, n):
-        self._dnsnap = n
-
-    def set_dtsnap(self, dt):
-        self._dtsnap = dt
-
     def final_stats(self):
         self.timer.print_stats()
         if com_sys.myproc == 0:
@@ -182,6 +177,7 @@ class TimeStepBase(object):
         self.dt_old = dt
         mylog.info("dt = %10.5e" % dt)
         return dt
+
 
 class RKBase(TimeStepBase):
     """Base class for all Runge-Kutta integrators.
@@ -223,7 +219,6 @@ class RKBase(TimeStepBase):
 
         # Update time
         output.set_time(start.time + dt)
-
 
 
 class RK2mid(RKBase):
@@ -486,6 +481,7 @@ class RK4(RKBase):
         # Update integrator stats
         self.time += dt
         self.iteration += 1
+
 
 class CrankNicholsonVisc(TimeStepBase):
     """

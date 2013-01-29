@@ -55,12 +55,11 @@ if mode:
 
 # Integration parameters
 ti = RK2mid(RHS)
-ti.stop_time(tstop) # 2 wave periods
-#ti.stop_iter(1)
-ti.stop_walltime(86400.) # stop after 24 hours
-ti.set_nsnap(1e7)
-#ti.set_nsnap(100)
-ti.set_dtsnap(2.)
+ti.sim_stop_time = tstop # 2 wave periods
+#ti.stop_iteration = 1
+ti.wall_stop_time = 86400. # stop after 24 hours
+ti.save_cadence = 1e7
+ti.max_save_period = 2.
 
 vs = VolumeAverageSet(data)
 vs.add('ekin', '%10.5e')
