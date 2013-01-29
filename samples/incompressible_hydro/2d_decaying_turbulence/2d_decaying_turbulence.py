@@ -31,11 +31,10 @@ data = RHS.create_fields(0.)
 
 turb_new(data, mcwilliams_spec, k0=30., E0=1.)
 ti = RK2mid(RHS, CFL=0.4)
-ti.stop_time(1.) # set stoptime
-ti.stop_walltime(36000.) # stop after 10 hours
-
-ti.set_nsnap(50)
-ti.set_dtsnap(1.)
+ti.sim_stop_time = 1. # set stoptime
+ti.wall_stop_time = 36000. # stop after 10 hours
+ti.save_cadence = 50
+ti.max_save_period = 1.
 
 vs = VolumeAverageSet(data)
 vs.add("ekin","%20.10e", options={'space': 'kspace'})

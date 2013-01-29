@@ -76,11 +76,11 @@ def kelvin_helmholz(data, L=0.025):
 kelvin_helmholz(data)
 
 ti = RK2mid(RHS, CFL=0.4)
-ti.stop_time(2.) # set stoptime
-ti.stop_walltime(36000.) # stop after 10 hours
-#ti.stop_iter(1)
-ti.set_nsnap(50)
-ti.set_dtsnap(1.)
+ti.sim_stop_time = 2. # set stoptime
+ti.wall_stop_time = 36000. # stop after 10 hours
+#ti.stop_iterartion = 1
+ti.save_cadence = 50
+ti.max_save_period = 1.
 
 vs = VolumeAverageSet(data)
 vs.add("ekin","%20.10e", options={'space': 'kspace'})
