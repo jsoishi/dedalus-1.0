@@ -330,14 +330,15 @@ def turb_new(data, spec, tot_en=0.5, **kwargs):
             data['u']['x']['kspace'][0,:] = alpha[0,:] * na.abs(ky[0,:])/kk[0,:]
             data['u']['x']['kspace'][0,kylim] = 0.
     elif data.ndim == 3:
-        kz = data['u']['x'].k['z']
-        k2 = na.sqrt(data['u']['x']**2 + data['u']['y']**2)
+        kz = data['u'][0].k['z']
+        k2 = na.sqrt(kx**2 + ky**2)
+        k2[k2 == 0] = 1.
         alpha *= na.cos(phi)
         beta = aux['ampl']['kspace'] * theta2 * na.sin(phi)
 
         data['u']['x']['kspace'] = (alpha * kk * ky + beta * kx * kz)/(kk * k2)
         data['u']['y']['kspace'] = (beta * ky * kz - alpha * kk*kx)/(kk * k2)
-        data['u']['z']['kspace'] = (beta * k2)/kk
+        data['u']['z']['kspace'] = -(beta * k2)/kk
 
 def turb(ux, uy, spec, tot_en=0.5, **kwargs):
     """generate noise with a random phase and a spectrum given by
