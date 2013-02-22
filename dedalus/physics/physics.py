@@ -638,6 +638,7 @@ class BoussinesqHydro(IncompressibleHydro):
         self.parameters['g'] = 1.
         self.parameters['alpha_t'] = 1.
         self.parameters['beta'] = 1.
+        self.parameters['boussinesq_direction'] = decfg.get('physics','boussinesq_direction')
 
     def _setup_integrating_factors(self, deriv):
 
@@ -678,10 +679,11 @@ class BoussinesqHydro(IncompressibleHydro):
         g = self.parameters['g']
         alpha_t = self.parameters['alpha_t']
         beta = self.parameters['beta']
+        direction = self.parameters['boussinesq_direction']
 
         # Velocity RHS
         # Bouyancy term
-        deriv['u']['z']['kspace'] += g * alpha_t * data['T']['kspace']
+        deriv['u'][direction]['kspace'] += g * alpha_t * data['T']['kspace']
 
         # Pressure term
         if self.__class__ == BoussinesqHydro:
@@ -693,7 +695,7 @@ class BoussinesqHydro(IncompressibleHydro):
         deriv['T']['kspace'] *= -1.
 
         # Stratification term
-        deriv['T']['kspace'] -= beta * data['u']['z']['kspace']
+        deriv['T']['kspace'] -= beta * data['u'][direction]['kspace']
 
         # Thermal driving term
         if self.forcing_functions.has_key('ThermalForcing'):

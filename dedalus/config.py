@@ -35,7 +35,7 @@ decfg.set('FFT', 'dealiasing', '2/3 cython')
 
 decfg.add_section('physics')
 decfg.set('physics', 'use_tracer', 'False')
-
+decfg.set('physics', 'boussinesq_direction', 'z')
 decfg.add_section('forcing')
 
 decfg.add_section('utils')
