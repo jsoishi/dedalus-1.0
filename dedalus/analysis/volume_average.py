@@ -23,7 +23,7 @@ License:
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from dedalus.utils.parallelism import com_sys, reduce_sum, reduce_mean
+from dedalus.utils.parallelism import com_sys, reduce_sum, reduce_mean, reduce_max
 from dedalus.utils.logger import mylog
 import numpy as na
 
@@ -158,7 +158,7 @@ def enstrophy(data, scratch, space='kspace'):
 
     """
     #aux = data.__class__(['vortz'],data.time)
-    scratch['scalar']['kspace'] = abs((data['u']['y'].deriv('x') - data['u']['x'].deriv('y'))**2)
+    scratch['scalar']['kspace'] = 0.5*na.abs((data['u']['y'].deriv('x') - data['u']['x'].deriv('y'))**2)
 
     return volume_average(scratch['scalar'],space='kspace')
 
@@ -217,8 +217,9 @@ def thermal_energy_dissipation(data, scratch):
 @VolumeAverageSet.register_task
 def divergence(data, scratch):
     scratch['scalar']['kspace'] = data['u']['x'].deriv('x') \
-        + data['u']['y'].deriv('y') \
-        + data['u']['z'].deriv('z')
+        + data['u']['y'].deriv('y')
+    if data.ndim == 3:
+        scratch['scalar']['kspace'] += data['u']['z'].deriv('z')
 
     return volume_average(scratch['scalar'])
 
@@ -231,3 +232,12 @@ def divergence_sum(data, scratch):
         scratch['scalar']['kspace'] += comp.deriv(cname)
 
     return abs(scratch['scalar']['kspace']).sum()
+
+@VolumeAverageSet.register_task
+def div_norm(data, scratch):
+    scratch['scalar'].zero()
+    for cindex, comp in data['u']:
+        cname = data['u'].ctrans[cindex]
+        scratch['scalar']['kspace'] += comp.deriv(cname)
+    dx = (data['u'][0].dx()).max()
+    return reduce_max(dx*scratch['scalar']['xspace']/data['u'].l2norm())
