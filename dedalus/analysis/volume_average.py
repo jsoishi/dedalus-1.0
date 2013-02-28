@@ -134,6 +134,18 @@ def uz2(data, scratch, space='kspace'):
     return volume_average(data['u']['z']['kspace']*data['u']['z']['kspace'].conj(), kdict=data['u']['z'].k)
 
 @VolumeAverageSet.register_task
+def uxm(data, scratch, space='kspace'):
+    return volume_average(data['u']['x'], space='xspace')
+
+@VolumeAverageSet.register_task
+def uym(data, scratch, space='kspace'):
+    return volume_average(data['u']['y'], space='xspace')
+
+@VolumeAverageSet.register_task
+def uzm(data, scratch, space='kspace'):
+    return volume_average(data['u']['z'], space='xspace')
+
+@VolumeAverageSet.register_task
 def temp2(data, scratch, space='kspace'):
     """mean square temperature
 
