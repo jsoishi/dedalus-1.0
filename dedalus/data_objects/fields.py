@@ -155,6 +155,16 @@ class VectorFieldBase(BaseField):
         c2max = reduce_max(max(c2), reduce_all=True)
 
         return c2max
+
+    def l2norm(self):
+        """construct the l2 norm. returns it in xspace.
+
+        l2n = sqrt(sum(comp**2))
+        """
+        data = na.zeros(self.components[0].local_shape['xspace'])
+        for i, c in self:
+            data += c['xspace']**2
+        return na.sqrt(data)
         
     def div_free(self):
         """
