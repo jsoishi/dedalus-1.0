@@ -580,7 +580,6 @@ class IncompressibleHydro(Physics):
             self._setup_integrating_factors(deriv)
 
     def pressure_projection(self, data, deriv):
-
         # Place references
         mathscalar = self.aux_fields['mathscalar']
         S = self.parameters['shear_rate']
@@ -588,7 +587,7 @@ class IncompressibleHydro(Physics):
         # Perform solenoidal projection
         self.divX(deriv['u'], mathscalar)
         if self._shear:
-            mathscalar['kspace'] -= S * data['u']['y'].deriv('x')
+            mathscalar['kspace'] -= 2. * S * data['u']['y'].deriv('x') 
         self.laplace_solve(mathscalar, mathscalar)
         for i in self.dims:
             deriv['u'][i]['kspace'] -= mathscalar.deriv(self._trans[i])
@@ -700,7 +699,6 @@ class BoussinesqHydro(IncompressibleHydro):
         # Thermal driving term
         if self.forcing_functions.has_key('ThermalForcing'):
             deriv['T']['kspace'] += self.forcing_functions['ThermalForcing'](data)
-        deriv['T']['kspace'][0,0,0] = 0. # Must ensure (0,0,0) T mode does not grow. #REVIEW
 
     def set_dtlist(self, data):
         IncompressibleHydro.set_dtlist(self, data)
