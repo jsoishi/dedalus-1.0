@@ -587,7 +587,7 @@ class IncompressibleHydro(Physics):
         # Perform solenoidal projection
         self.divX(deriv['u'], mathscalar)
         if self._shear:
-            mathscalar['kspace'] -= 2. * S * data['u']['y'].deriv('x') 
+            mathscalar['kspace'] -= S * data['u']['y'].deriv('x') 
         self.laplace_solve(mathscalar, mathscalar)
         for i in self.dims:
             deriv['u'][i]['kspace'] -= mathscalar.deriv(self._trans[i])
