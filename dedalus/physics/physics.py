@@ -153,7 +153,7 @@ class Physics(object):
         """
         self.dtlist = []
         self.set_dtlist(data)
-        
+
         return min(self.dtlist)
 
     def gradX(self, X, output):
