@@ -49,7 +49,7 @@ class TimeStepBase(object):
 
     timer = timer
 
-    def __init__(self, RHS, CFL=0.4, int_factor=None):
+    def __init__(self, RHS, CFL=0.1, int_factor=None):
         """
         Base class for dedalus time stepping methods. Provides
         stopping controls, statistics, and (eventually) a snapshotting
@@ -74,7 +74,7 @@ class TimeStepBase(object):
         self.iteration = 0
         self._nsnap = 0
         self._tlastsnap = 0.
-        self.dt_old = np.finfo('d').max
+        self.dt_old = np.finfo('d').max / 10.
         self._start_time = time.time()
 
     @property
@@ -167,8 +167,8 @@ class TimeStepBase(object):
         self.snapshot(data)
         self.final_stats()
 
-    def cfl_dt(self, data, cfl = 0.4):
-        dt = cfl * self.RHS.compute_dt(data)
+    def cfl_dt(self, data):
+        dt = self.CFL * self.RHS.compute_dt(data)
 
         # only let it increase by 5%
         if dt > 1.05*self.dt_old:
