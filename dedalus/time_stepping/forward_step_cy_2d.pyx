@@ -51,7 +51,7 @@ def etd1(np.ndarray[nc128_t, ndim=2] start,
             if Z == 0.:
                 output[x, y] = start[x, y] + dt * deriv[x, y]
             else:
-                if ((Z < 1.) and (Z > -1.)):
+                if ((Z < 0.5) and (Z > -0.5)):
                     f0 = f_taylor(0, Z)
                     f1 = f_taylor(1, Z)
                 else:
@@ -79,7 +79,7 @@ def etd2rk1(np.ndarray[nc128_t, ndim=2] start,
             if Z == 0.:
                 output[x, y] = start[x, y] + dt / 2. * (deriv2[x, y] - deriv1[x, y])
             else:
-                if ((Z < 1.) and (Z > -1.)):
+                if ((Z < 0.5) and (Z > -0.5)):
                     f0 = f_taylor(0, Z)
                     f1 = f_taylor(1, Z)
                     f2 = f_taylor(2, Z)
@@ -109,7 +109,7 @@ def etd2rk2(np.ndarray[nc128_t, ndim=2] start,
             if Z == 0.:
                 output[x, y] = start[x, y] + dt * deriv2[x, y]
             else:
-                if ((Z < 1.) and (Z > -1.)):
+                if ((Z < 0.5) and (Z > -0.5)):
                     f0 = f_taylor(0, Z)
                     f1 = f_taylor(1, Z)
                     f2 = f_taylor(2, Z)
@@ -133,12 +133,11 @@ cdef nf64_t f_taylor(int k, nf64_t Z):
     """
 
     cdef int j
-    cdef int m = 20
     cdef nf64_t factj = 1.
     cdef nf64_t sum = 0.
 
     if k > 2:
-        for j in range(1, k):
+        for j in range(1, 15):
             factj *= j
 
     for j in range(k, m):
