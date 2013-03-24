@@ -137,10 +137,10 @@ cdef nf64_t f_taylor(int k, nf64_t Z):
     cdef nf64_t sum = 0.
 
     if k > 2:
-        for j in range(1, 15):
+        for j in range(1, k):
             factj *= j
 
-    for j in range(k, m):
+    for j in range(k, 15):
         if j > 1:
             factj *= j
         sum += Z ** (j - k) / factj
