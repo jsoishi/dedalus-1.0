@@ -783,7 +783,7 @@ class IncompressibleMHD(IncompressibleHydro):
         # Lorentz force
         if self.ndim == 2:
             self.curlX(data['B'], mathscalar)
-            self.XcrossY(mathscalar, data['B'], mathvector)
+            self.XcrossY(mathscalar, data['B'], mathvector2)
         else:
             self.curlX(data['B'], mathvector)
             self.XcrossY(mathvector, data['B'], mathvector2)
