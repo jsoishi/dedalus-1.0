@@ -134,6 +134,17 @@ def uz2(data, scratch, space='kspace'):
     return volume_average(data['u']['z']['kspace']*data['u']['z']['kspace'].conj(), kdict=data['u']['z'].k)
 
 @VolumeAverageSet.register_task
+def bx2(data, scratch, space='kspace'):
+    return volume_average(data['B']['x']['kspace']*data['B']['x']['kspace'].conj(), kdict=data['B']['x'].k)
+
+@VolumeAverageSet.register_task
+def by2(data, scratch, space='kspace'):
+    return volume_average(data['B']['y']['kspace']*data['B']['y']['kspace'].conj(), kdict=data['B']['y'].k)
+
+
+
+
+@VolumeAverageSet.register_task
 def uxm(data, scratch, space='kspace'):
     return volume_average(data['u']['x'], space='xspace')
 
