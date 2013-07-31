@@ -815,7 +815,7 @@ class IncompressibleMHD(IncompressibleHydro):
         return va_max
 
     def set_dtlist(self, data):
-        Hydro.set_dtlist(data)
+        IncompressibleHydro.set_dtlist(self, data)
         dx = data['u']['x'].dx().min()
         va_max = self.max_alfven_speed(data)
         dt_wave = dx/va_max
