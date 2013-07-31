@@ -158,6 +158,18 @@ def uzm(data, scratch, space='kspace'):
     return volume_average(data['u']['z'], space='xspace')
 
 @VolumeAverageSet.register_task
+def bxm(data, scratch, space='kspace'):
+    return volume_average(data['B']['x'], space='xspace')
+
+@VolumeAverageSet.register_task
+def bym(data, scratch, space='kspace'):
+    return volume_average(data['B']['y'], space='xspace')
+
+@VolumeAverageSet.register_task
+def bzm(data, scratch, space='kspace'):
+    return volume_average(data['B']['z'], space='xspace')
+
+@VolumeAverageSet.register_task
 def temp2(data, scratch, space='kspace'):
     """mean square temperature
 
@@ -214,6 +226,30 @@ def ux_imag_max(data, scratch):
 @VolumeAverageSet.register_task
 def uy_imag_max(data, scratch):
     return data['u']['y']['xspace'].imag.max()
+
+@VolumeAverageSet.register_task
+def ux_max(data, scratch):
+    return reduce_max(data['u']['x']['xspace'])
+
+@VolumeAverageSet.register_task
+def uy_max(data, scratch):
+    return reduce_max(data['u']['y']['xspace'])
+
+@VolumeAverageSet.register_task
+def uz_max(data, scratch):
+    return reduce_max(data['u']['z']['xspace'])
+
+@VolumeAverageSet.register_task
+def bx_max(data, scratch):
+    return reduce_max(data['B']['x']['xspace'])
+
+@VolumeAverageSet.register_task
+def by_max(data, scratch):
+    return reduce_max(data['B']['y']['xspace'])
+
+@VolumeAverageSet.register_task
+def bz_max(data, scratch):
+    return reduce_max(data['B']['z']['xspace'])
 
 @VolumeAverageSet.register_task
 def energy_dissipation(data, scratch):
