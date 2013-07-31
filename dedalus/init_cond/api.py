@@ -31,7 +31,8 @@ from .init_cond import \
     vorticity_wave, \
     alfven, \
     kida_vortex, \
-    add_gaussian_white_noise
+    add_gaussian_white_noise, \
+    constant
 
 from .turb_spectra import \
     mcwilliams_spec
