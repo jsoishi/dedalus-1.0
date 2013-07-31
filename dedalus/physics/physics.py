@@ -809,8 +809,10 @@ class IncompressibleMHD(IncompressibleHydro):
 
     def max_alfven_speed(self, data):
         rho0 = self.parameters['rho0']
+        fpr = 4 * np.pi * rho0
+
         b2max = data['B'].max_square()
-        va_max = np.sqrt(b2max/rho0)
+        va_max = np.sqrt(b2max/fpr)
 
         return va_max
 
