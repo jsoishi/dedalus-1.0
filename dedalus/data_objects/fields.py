@@ -151,8 +151,8 @@ class VectorFieldBase(BaseField):
             self.ctrans = {'x':0, 0:'x', 'y':1, 1:'y', 'z':2, 2:'z'}
 
     def max_square(self):
-        c2 = [(c['xspace']**2).max() for i,c in self]
-        c2max = reduce_max(max(c2), reduce_all=True)
+        c2 = na.array([(c['xspace']**2).max() for i,c in self])
+        c2max = reduce_max(c2, reduce_all=True)
 
         return c2max
 
