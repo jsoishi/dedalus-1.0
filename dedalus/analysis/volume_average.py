@@ -141,8 +141,9 @@ def bx2(data, scratch, space='kspace'):
 def by2(data, scratch, space='kspace'):
     return volume_average(data['B']['y']['kspace']*data['B']['y']['kspace'].conj(), kdict=data['B']['y'].k)
 
-
-
+@VolumeAverageSet.register_task
+def bz2(data, scratch, space='kspace'):
+    return volume_average(data['B']['z']['kspace']*data['B']['z']['kspace'].conj(), kdict=data['B']['y'].k)
 
 @VolumeAverageSet.register_task
 def uxm(data, scratch, space='kspace'):
@@ -165,6 +166,7 @@ def temp2(data, scratch, space='kspace'):
 
 @VolumeAverageSet.register_task
 def emag(data, scratch, space='kspace'):
+    scratch['scalar'].zero_all()
     for i in xrange(data['B'].ncomp):
         if space == 'kspace':
             scratch['scalar']['kspace'] += 0.5 * na.abs(data['B'][i]['kspace']) ** 2
@@ -264,3 +266,30 @@ def div_norm(data, scratch):
         scratch['scalar']['kspace'] += comp.deriv(cname)
     dx = (data['u'][0].dx()).max()
     return reduce_max(dx*scratch['scalar']['xspace']/data['u'].l2norm())
+
+@VolumeAverageSet.register_task
+def mag_div(data, scratch):
+    scratch['scalar']['kspace'] = data['B']['x'].deriv('x') \
+        + data['B']['y'].deriv('y')
+    if data.ndim == 3:
+        scratch['scalar']['kspace'] += data['B']['z'].deriv('z')
+
+    return volume_average(scratch['scalar'])
+
+@VolumeAverageSet.register_task
+def mag_div_sum(data, scratch):
+    scratch['scalar'].zero()
+    for cindex, comp in data['B']:
+        cname = data['B'].ctrans[cindex]
+        scratch['scalar']['kspace'] += comp.deriv(cname)
+
+    return abs(scratch['scalar']['kspace']).sum()
+
+@VolumeAverageSet.register_task
+def mag_div_norm(data, scratch):
+    scratch['scalar'].zero()
+    for cindex, comp in data['B']:
+        cname = data['B'].ctrans[cindex]
+        scratch['scalar']['kspace'] += comp.deriv(cname)
+    dx = (data['B'][0].dx()).max()
+    return reduce_max(dx*scratch['scalar']['xspace']/data['B'].l2norm())
