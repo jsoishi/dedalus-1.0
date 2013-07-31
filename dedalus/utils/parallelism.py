@@ -132,7 +132,7 @@ def reduce_min(data, reduce_all=False):
         return local_min
 
     if reduce_all:
-        global_min = com_sys.comm.allreduce(local_min,op=com_sys.MPI.SUM)
+        global_min = com_sys.comm.allreduce(local_min,op=com_sys.MPI.MIN)
         return global_min
     else:
         global_min = com_sys.comm.reduce(local_min,op=com_sys.MPI.MIN)
@@ -145,7 +145,7 @@ def reduce_max(data, reduce_all=False):
         return local_max
 
     if reduce_all:
-        global_max = com_sys.comm.allreduce(local_max,op=com_sys.MPI.SUM)
+        global_max = com_sys.comm.allreduce(local_max,op=com_sys.MPI.MAX)
         return global_max
     else:
         global_max = com_sys.comm.reduce(local_max,op=com_sys.MPI.MAX)
