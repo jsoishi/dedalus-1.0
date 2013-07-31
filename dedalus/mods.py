@@ -53,7 +53,8 @@ from dedalus.init_cond.api import \
     vorticity_wave, \
     alfven, \
     kida_vortex, \
-    add_gaussian_white_noise
+    add_gaussian_white_noise, \
+    constant
 
 from dedalus.physics.api import \
     IncompressibleHydro, \

@@ -463,4 +463,22 @@ def add_gaussian_white_noise(comp, std):
     comp['kspace'] += noise
     comp.enforce_hermitian()
 
+def constant(data, comp, value):
+    """Add a constant value.
 
+    """
+    if len(comp) == 1:
+        comp_data = data[comp]['kspace'] 
+        zero_index = data[comp].find_mode([0.,] * data[comp].ndim)
+    elif len(comp) == 2:
+        field = comp[0]
+        axis = comp[1]
+        zero_index = data[field][axis].find_mode([0.,] * data[field][axis].ndim)
+        comp_data = data[field][axis]['kspace']
+    else:
+        raise ValueError("constant: comp %s invalid. must be 1 or 2 characters." % comp)
+
+    if not zero_index:
+        return
+
+    comp_data[zero_index] += value + 0j
