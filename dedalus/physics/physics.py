@@ -31,7 +31,6 @@ from dedalus.utils.logger import mylog
 from dedalus.config import decfg
 from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
 
-
 def _reconstruct_object(*args, **kwargs):
     new_args = [args[1]['shape'], args[1]['_representation'], args[1]['length']]
     obj = args[0](*new_args)
@@ -88,6 +87,7 @@ class Physics(object):
                 self._representation, self.shape, self.length)
         self._is_finalized = False
         self._tracer = decfg.getboolean('physics','use_tracer')
+        self.k2 = None
 
     def __getitem__(self, item):
          value = self.parameters.get(item, None)
@@ -220,7 +220,8 @@ class Physics(object):
         for cindex, comp in Y:
             for i in self.dims:
                 stmp['kspace'] = comp.deriv(self._trans[i])
-                output[cindex]['xspace'] += stmp['xspace'] * vtmp[i]['xspace']
+                stmp['xspace'] *= vtmp[i]['xspace']
+                output[cindex]['xspace'] += stmp['xspace'] 
                 #np.add(output[cindex]['xspace'],
                 #       stmp['xspace'] * vtmp[i]['xspace'],
                 #       output[cindex]['xspace'])
@@ -406,8 +407,11 @@ class Physics(object):
         """
         Solve laplace(output) = X.
         """
-        k2 = output.k2(no_zero=True)
-        output['kspace'] = -X['kspace'] / k2
+        if self.k2 == None:
+            self.k2 = output.k2(no_zero=True)
+        output['kspace'] = X['kspace']
+        output['kspace'] /= self.k2
+        output['kspace'] *= -1.
 
 
 class IncompressibleHydro(Physics):
@@ -655,6 +659,7 @@ class BoussinesqHydro(IncompressibleHydro):
     def set_thermal_forcing(self, func):
         self.forcing_functions['ThermalForcing'] = func
 
+    @profile
     def RHS(self, data, deriv):
         """
         Compute right-hand side of fluid equations, cast in the form
@@ -666,7 +671,8 @@ class BoussinesqHydro(IncompressibleHydro):
         """
 
         # Inherited RHS
-        IncompressibleHydro.RHS(self, data, deriv)
+        with profile.timestamp("incompressible"):
+            IncompressibleHydro.RHS(self, data, deriv)
 
         # Auxiliary field references
         mathscalar = self.aux_fields['mathscalar']
@@ -682,19 +688,28 @@ class BoussinesqHydro(IncompressibleHydro):
 
         # Velocity RHS
         # Bouyancy term
-        deriv['u'][direction]['kspace'] += g * alpha_t * data['T']['kspace']
+        with profile.timestamp("buoyancy"):
+            mathscalar['kspace'] = data['T']['kspace']
+            mathscalar['kspace'] *= g
+            mathscalar['kspace'] *= alpha_t
+            deriv['u'][direction]['kspace'] += mathscalar['kspace']
 
         # Pressure term
-        if self.__class__ == BoussinesqHydro:
-            self.pressure_projection(data, deriv)
+        with profile.timestamp("pressure"):
+            if self.__class__ == BoussinesqHydro:
+                self.pressure_projection(data, deriv)
 
         # Temperature RHS
         # Inertial term
-        self.XgradY(data['u'], data['T'], mathscalar, mathvector, deriv['T'])
-        deriv['T']['kspace'] *= -1.
+        with profile.timestamp("temperature"):
+            self.XgradY(data['u'], data['T'], mathscalar, mathvector, deriv['T'])
+            deriv['T']['kspace'] *= -1.
 
         # Stratification term
-        deriv['T']['kspace'] -= beta * data['u'][direction]['kspace']
+        with profile.timestamp("stratification"):
+            mathscalar['kspace'] = data['u'][direction]['kspace']
+            mathscalar['kspace'] *= beta
+            deriv['T']['kspace'] -= mathscalar['kspace']
 
         # Thermal driving term
         if self.forcing_functions.has_key('ThermalForcing'):
