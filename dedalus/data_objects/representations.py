@@ -32,6 +32,7 @@ from dedalus.utils.parallelism import com_sys, swap_indices, get_plane
 from dedalus.utils.logger import mylog
 from dedalus.utils.fftw import fftw
 from dedalus.utils.timer import timer
+from dedalus.utils.function_count import counts
 try:
     import scipy.fftpack as spfft
 except ImportError:
@@ -165,6 +166,7 @@ class FourierRepresentation(Representation):
         self._curr_space = space
 
     @timer
+    @counts
     def _allocate_memory(self, method):
         """Allocate memory for data and derivative."""
 
