@@ -659,7 +659,6 @@ class BoussinesqHydro(IncompressibleHydro):
     def set_thermal_forcing(self, func):
         self.forcing_functions['ThermalForcing'] = func
 
-    @profile
     def RHS(self, data, deriv):
         """
         Compute right-hand side of fluid equations, cast in the form
@@ -671,8 +670,7 @@ class BoussinesqHydro(IncompressibleHydro):
         """
 
         # Inherited RHS
-        with profile.timestamp("incompressible"):
-            IncompressibleHydro.RHS(self, data, deriv)
+        IncompressibleHydro.RHS(self, data, deriv)
 
         # Auxiliary field references
         mathscalar = self.aux_fields['mathscalar']
@@ -688,28 +686,24 @@ class BoussinesqHydro(IncompressibleHydro):
 
         # Velocity RHS
         # Bouyancy term
-        with profile.timestamp("buoyancy"):
-            mathscalar['kspace'] = data['T']['kspace']
-            mathscalar['kspace'] *= g
-            mathscalar['kspace'] *= alpha_t
-            deriv['u'][direction]['kspace'] += mathscalar['kspace']
+        mathscalar['kspace'] = data['T']['kspace']
+        mathscalar['kspace'] *= g
+        mathscalar['kspace'] *= alpha_t
+        deriv['u'][direction]['kspace'] += mathscalar['kspace']
 
         # Pressure term
-        with profile.timestamp("pressure"):
-            if self.__class__ == BoussinesqHydro:
-                self.pressure_projection(data, deriv)
+        if self.__class__ == BoussinesqHydro:
+            self.pressure_projection(data, deriv)
 
         # Temperature RHS
         # Inertial term
-        with profile.timestamp("temperature"):
-            self.XgradY(data['u'], data['T'], mathscalar, mathvector, deriv['T'])
-            deriv['T']['kspace'] *= -1.
+        self.XgradY(data['u'], data['T'], mathscalar, mathvector, deriv['T'])
+        deriv['T']['kspace'] *= -1.
 
         # Stratification term
-        with profile.timestamp("stratification"):
-            mathscalar['kspace'] = data['u'][direction]['kspace']
-            mathscalar['kspace'] *= beta
-            deriv['T']['kspace'] -= mathscalar['kspace']
+        mathscalar['kspace'] = data['u'][direction]['kspace']
+        mathscalar['kspace'] *= beta
+        deriv['T']['kspace'] -= mathscalar['kspace']
 
         # Thermal driving term
         if self.forcing_functions.has_key('ThermalForcing'):
