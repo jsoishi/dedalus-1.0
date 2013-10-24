@@ -24,57 +24,70 @@ License:
 
 from dedalus.mods import *
 from dedalus.funcs import insert_ipython
-import numpy as na
+import numpy as np
 
+vangle = np.pi / 3.
 shape = (128, 128)
-length = (2., 2.)
-RHS = MHD(shape, FourierRepresentation, length=length)
+length = (1/np.cos(vangle/2.), 2.)
+RHS = IncompressibleMHD(shape, FourierRepresentation, length=length)
 data = RHS.create_fields(0.)
 
 # Create grid parameters
-x,y = na.meshgrid(na.linspace(0, length[-1], shape[-1], endpoint=False),
-                  na.linspace(0, length[-2], shape[-2], endpoint=False))
+y,x = data['B']['x'].xspace_grid()
 x -= length[-1] / 2.
 y -= length[-2] / 2.
-r = na.sqrt(x ** 2 + y ** 2)
-theta = na.arctan2(y, x)
+r = np.sqrt(x ** 2 + y ** 2)
+theta = np.arctan2(y, x)
 
 # Setup B field
 aux = data.clone()
 aux.add_field('Az', 'ScalarField')
 
-env = 1e-3 * na.cos(r * 4 * na.pi / length[-1]) ** 2
+env = 1e-3 * np.cos(r * 4 * np.pi / length[-1]) ** 2
 rc = length[-1] * 0.25 / 2
-width = 4*length[0]/shape[0] # 4 dx...
-aux['Az']['xspace'] = env * (1. + na.tanh((rc - r)/width))
+width = length[0]/shape[0] # dx...
+aux['Az']['xspace'] = env * (1. + np.tanh((rc - r)/width))/2
 data['B']['x']['kspace'] = aux['Az'].deriv('y')
 data['B']['y']['kspace'] = -aux['Az'].deriv('x')
 data['B'].div_free()
 
 # Setup flow
 V = 1.0
-vangle = na.pi / 3.
-data['u']['x']['xspace'] += V * na.sin(vangle)
-data['u']['y']['xspace'] += V * na.cos(vangle)
+data['u']['x']['xspace'] += V * np.sin(vangle)
+data['u']['y']['xspace'] += V * np.cos(vangle)
 
 # Integration parameters
-ti = RK2simple(RHS, CFL=0.4)
-ti.stop_time(5.) # set stoptime
-ti.stop_walltime(5*3600.) # stop after 1 hour
+ti = RK2mid(RHS, CFL=0.4)
+ti.stop_iteration = 1e6
+ti.sim_stop_time = 4.
+ti.save_cadence = 10000
+ti.max_save_period = 100.
+
+vs = VolumeAverageSet(data)
+vs.add('ekin', '%17.10e')
+vs.add('emag', '%17.10e')
+vs.add('ux2', '%17.10e')
+vs.add('uy2', '%17.10e')
+vs.add('bx2', '%17.10e')
+vs.add('by2', '%17.10e')
+vs.add('divergence', '%17.10e')
+vs.add('divergence_sum', '%17.10e')
+
 
 an = AnalysisSet(data, ti)
-an.add("field_snap", 10)
+an.add(Snapshot(50, space='xspace', axis='z', index='middle'))
+an.add(Snapshot(50, space='kspace', axis='z', index=2))
+an.add(VolumeAverage(10,vs))
 #an.add("en_spec", 1)
 
 # Main loop
-CFLtime = na.min(na.array(length) / na.array(shape)) / V
+CFLtime = np.min(np.array(length) / np.array(shape)) / V
 dt = CFLtime / 10
 print 'CFL time: ', CFLtime
 print 'Chosen dt: ', dt
 
 an.run()
 while ti.ok:
-    print "step: %i" %ti.iter
     ti.advance(data, dt)
     an.run()
 
