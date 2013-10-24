@@ -30,6 +30,7 @@ import numpy as np
 from dedalus.utils.logger import mylog
 from dedalus.config import decfg
 from dedalus.data_objects.api import create_field_classes, AuxEquation, StateData
+from dedalus.utils.timer import timer
 
 def _reconstruct_object(*args, **kwargs):
     new_args = [args[1]['shape'], args[1]['_representation'], args[1]['length']]
@@ -403,6 +404,7 @@ class Physics(object):
             output[0]['kspace'] = X[0].deriv(self._trans[1])
             output[1]['kspace'] = -X[0].deriv(self._trans[0])
 
+    @timer
     def laplace_solve(self, X, output):
         """
         Solve laplace(output) = X.

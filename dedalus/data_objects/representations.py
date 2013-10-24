@@ -315,10 +315,12 @@ class FourierRepresentation(Representation):
         self.rplan = fftw.rPlan(self.xdata, self.kdata, com_sys, self.global_shape['xspace'],
                 forward=False, flags=['FFTW_MEASURE'])
 
+    @timer
     def fwd_fftw(self):
         self.fplan()
         self.kdata /= self.global_shape['xspace'].prod()
 
+    @timer
     def rev_fftw(self):
         self.rplan()
 
